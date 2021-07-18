@@ -72,7 +72,7 @@ ui <- fluidPage(
       title = "View current dataset",
       value = "view",
       fluidRow(
-        column(10, p(em("This is a preview of the currently loaded dataset. If it looks good, click 'OK' to match your column names to the expected data values for germination modeling."))),
+        column(10, p(em("This is a preview of the currently loaded dataset. If it looks good, click 'OK' to match your column names to the expected data values for germination modeling. Column names matching the template dataset will be matched automatically."))),
         column(2, actionButton("viewColumnMatching", "OK"), align = "right")
       ),
       hr(),
@@ -87,6 +87,8 @@ ui <- fluidPage(
     bsCollapsePanel(
       title = "Define data columns",
       value = "cols",
+      p(em("If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range.")),
+      hr(),
       p(strong("Match required data to column names:")),
       div(
         lapply(1:nrow(columnDefaults), function(i) {
@@ -97,6 +99,7 @@ ui <- fluidPage(
           )
         })
       ),
+      hr(),
       p(strong("Available models:")),
       uiOutput("modelStatus")
     )
