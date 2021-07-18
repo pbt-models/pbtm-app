@@ -47,16 +47,45 @@ server <- function(input, output, session) {
   
   output$columnTypes <- renderTable({columnTypes})
   
-  
-  output$currentDataTable <- renderTable({values$data})
+  output$currentDataTable <- renderDataTable({values$data})
   
   output$currentDataDisplay <- renderUI({
     if (nrow(values$data) == 0) {
       return("No data loaded.")
     } else {
-      tableOutput("currentDataTable")
+      dataTableOutput("currentDataTable")
     }
   })
+  
+  columnNames <- reactive({
+    req(values$data)
+    names(values$data)
+  })
+  
+  output$columnMatching <- renderUI({
+    req(columnNames())
+    
+    choices <- setNames(as.list(c(NA, columnNames())), c("Not specified", columnNames()))
+    
+    if (length(columnNames()) == 0) {
+      p("No column names detected, load a valid dataset.")
+    } else {
+      lapply(1:nrow(columnDefaults), function(i) {
+        wellPanel(
+          style = "display: inline-block; min-width: 20em;",
+          selectInput(
+            inputId = paste0("col.", columnDefaults$defaultColumn[i]),
+            label = columnDefaults$description[i],
+            choices = choices,
+            selected = columnDefaults$defaultColumn[i]
+          ),
+          span("OK", style = "color: red;")
+        )
+      })
+    }
+  })
+  
+  output$columnValidation <- renderText("Hello world.")
   
   
   

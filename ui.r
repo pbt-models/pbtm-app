@@ -44,10 +44,11 @@ ui <- fluidPage(
   ),
   
   bsCollapse(
-    open = "data",
+    id = "data",
+    open = "dataEntry",
     bsCollapsePanel(
       title = "Data entry",
-      value = "data",
+      value = "dataEntry",
       p(strong("Load sample datasets")),
       p(
         actionButton("loadSampleGermData", "Load germination sample data"),
@@ -57,13 +58,21 @@ ui <- fluidPage(
       fileInput("userData", "Upload your own data", accept = c(".csv")),
       br(),
       actionButton("clearData", "Clear loaded data")
+    ),
+    bsCollapsePanel(
+      title = "View current dataset",
+      value = "dataView",
+      p(strong("Currently loaded dataset:")),
+      uiOutput("currentDataDisplay")
+    ),
+    bsCollapsePanel(
+      title = "Define data columns",
+      value = "dataColumns",
+      p(strong("Match required data to column names:")),
+      uiOutput("columnMatching")
     )
   ),
   br(),
-  
-  h4("Current data:"),
-  fluidRow(
-    column(12, uiOutput("currentDataDisplay"))
-  )
+
   
 )
