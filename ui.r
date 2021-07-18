@@ -84,21 +84,6 @@ ui <- fluidPage(
       )
     ),
     
-    # bsCollapsePanel(
-    #   title = "Define data columns",
-    #   value = "cols",
-    #   p(strong("Match required data to column names:")),
-    #   div(style = "vertical-align: baseline;",
-    #     lapply(1:nrow(columnDefaults), function(i) {
-    #       wellPanel(
-    #         style = "display: inline-block; min-width: 20em; vertical-align: baseline;",
-    #         uiOutput(paste0("colSelect", i)),
-    #         uiOutput(paste0("colValidate", i))
-    #       )
-    #     })
-    #   )
-    # )
-    
     bsCollapsePanel(
       title = "Define data columns",
       value = "cols",
@@ -106,12 +91,14 @@ ui <- fluidPage(
       div(
         lapply(1:nrow(columnDefaults), function(i) {
           wellPanel(
-            style = "display: inline-block; vertical-align: top; min-width: 20em; margin: 5px;",
+            style = "display: inline-block; vertical-align: top; width: 20em; margin: 5px;",
             uiOutput(paste0("colSelect", i)),
             uiOutput(paste0("colValidate", i))
           )
         })
-      )
+      ),
+      p(strong("Available models:")),
+      uiOutput("modelStatus")
     )
   ),
   br(),

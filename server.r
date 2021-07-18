@@ -12,7 +12,7 @@ server <- function(input, output, session) {
   # Data definitions ----
   
   values <- reactiveValues(data = tibble())
-  
+  status <- reactiveValues()
   
   
   # Reactions ----
@@ -100,42 +100,85 @@ server <- function(input, output, session) {
   
   # validation message handler
   lapply(1:nrow(columnDefaults), function(i) {
+    
     outCol <- paste0("colValidate", i)
     inCol <- paste0("colSelect", i)
-    # colName <- input[[inCol]]
-    # matchedCol <- values$data[[colName]]
-    
-    # output[[outCol]] <- renderUI({
-    #   p(
-    #     paste0("value =", input[[inCol]]), br(),
-    #     if (!is.na(input[[inCol]])) {
-    #       return(paste0("column type =", class(values$data[[input[[inCol]]]])))
-    #     }
-    #   )
-    # })
+    expectedType <- columnValidation$Type[i]
+    minValue <- columnValidation$Min[i]
+    maxValue <- columnValidation$Max[i]
+    ui <- NULL
+    msg <- NULL
     
     output[[outCol]] <- renderUI({
       
       req(input[[inCol]])
       
+      # check if no column selected
       if (input[[inCol]] == "NA") {
-        ui <- "No column specified."
-      } else {
-        col <- values$data[[input[[inCol]]]]
-        colType <- class(col)
-        ui <- list(
-          paste("Type =", colType)
-        )
-        if (colType == "numeric") {
-          add <- list(
-            br(),
-            paste0("Min = ", round(min(col), 2), ", Max = ", round(max(col), 2))
-          )
-          ui <- append(ui, add)
-        }
+        msg <- list(span("No column specified.", style = "color:orange"))
+        status[[paste0("col", i)]] <- F
+        return(msg)
       }
-      p(ui)
+      
+      col <- values$data[[input[[inCol]]]]
+      
+      if (anyNA(col)) {
+        msg <- list(br(), span("Warning: Missing value in data", style = "color:red"))
+      }
+      
+      colType <- class(col)
+      ui <- list(paste("Type =", colType))
+      
+      if (colType == "numeric") {
+        add <- list(
+          br(),
+          paste0("Min = ", round(min(col), 2), ", Max = ", round(max(col), 2))
+        )
+        ui <- append(ui, add)
+        
+        # column type mismatch
+        if (!is.na(expectedType) & colType != expectedType) {
+          newmsg <- list(br(), span("Error: Incorrect column data type, expected", expectedType, style = "color:red"))
+          msg <- append(msg, newmsg)
+        }
+        
+        # min check
+        if (!is.na(minValue) & min(col) < minValue) {
+          newmsg <- list(br(), span("Error: Min value less than required min of", minValue, style = "color:red"))
+          msg <- append(msg, newmsg)
+        }
+        
+        # max check
+        if (!is.na(maxValue) & max(col) > maxValue) {
+          newmsg <- list(br(), span("Error: Max value greater than required max of", maxValue, style = "color:red"))
+          msg <- append(msg, newmsg)
+        }
+        
+      } else if (!is.na(expectedType) & colType != expectedType) {
+        newmsg <- list(br(), span("Error: Incorrect column data type, expected", expectedType, style = "color:red"))
+        msg <- append(msg, newmsg)
+      }
+      
+      if (is.null(msg)) {
+        msg <- list(span("OK", style = "color:blue"))
+        status[[paste0("col", i)]] <- T
+      } else {
+        status[[paste0("col", i)]] <- F
+      }
+      
+      list(p(ui), p(msg))
+      
     })
+  })
+  
+  output$modelStatus <- renderUI({
+    
+    req(length(status) > 0)
+    
+    lapply(1:nrow(columnDefaults), function(i) {
+      p("Column", i, " - Status:", status[[paste0("col", i)]])
+    })
+    
   })
   
   
