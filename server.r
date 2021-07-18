@@ -119,21 +119,27 @@ server <- function(input, output, session) {
       req(input[[inCol]])
       
       if (input[[inCol]] == "NA") {
-        ui <- list(
-          p("No column specified.")
-        )
+        ui <- "No column specified."
       } else {
+        col <- values$data[[input[[inCol]]]]
+        colType <- class(col)
         ui <- list(
-          p(
-            paste0("value = ", input[[inCol]]), br(),
-            paste0("column type = ", class(values$data[[input[[inCol]]]]))
-          )
+          paste("Type =", colType)
         )
+        if (colType == "numeric") {
+          add <- list(
+            br(),
+            paste0("Min = ", round(min(col), 2), ", Max = ", round(max(col), 2))
+          )
+          ui <- append(ui, add)
+        }
       }
-      ui
+      p(ui)
     })
   })
   
   
 }
 
+# test <- c(1, 2, 3, 4)
+# class(test) == "numeric"

@@ -13,7 +13,7 @@ ui <- fluidPage(
   
   theme = shinytheme("flatly"),
   useShinyjs(),
-  tags$head(tags$style(type = "text/css", ".container-fluid { max-width: 66em; }")),
+  tags$head(tags$style(type = "text/css", ".container-fluid { max-width: 1000px; }")),
   
   fluidRow(
     column(12, h2("Seed Germination Modeling App"))
@@ -79,22 +79,39 @@ ui <- fluidPage(
       fluidRow(
         column(12,
           p(strong("Currently loaded dataset:")),
-          uiOutput("currentDataDisplay")
+          div(style = "overflow: auto;", uiOutput("currentDataDisplay"))
         )
       )
     ),
+    
+    # bsCollapsePanel(
+    #   title = "Define data columns",
+    #   value = "cols",
+    #   p(strong("Match required data to column names:")),
+    #   div(style = "vertical-align: baseline;",
+    #     lapply(1:nrow(columnDefaults), function(i) {
+    #       wellPanel(
+    #         style = "display: inline-block; min-width: 20em; vertical-align: baseline;",
+    #         uiOutput(paste0("colSelect", i)),
+    #         uiOutput(paste0("colValidate", i))
+    #       )
+    #     })
+    #   )
+    # )
     
     bsCollapsePanel(
       title = "Define data columns",
       value = "cols",
       p(strong("Match required data to column names:")),
-      lapply(1:nrow(columnDefaults), function(i) {
-        wellPanel(
-          style = "display: inline-block; min-width: 20em;",
-          uiOutput(paste0("colSelect", i)),
-          uiOutput(paste0("colValidate", i))
-        )
-      })
+      div(
+        lapply(1:nrow(columnDefaults), function(i) {
+          wellPanel(
+            style = "display: inline-block; vertical-align: top; min-width: 20em; margin: 5px;",
+            uiOutput(paste0("colSelect", i)),
+            uiOutput(paste0("colValidate", i))
+          )
+        })
+      )
     )
   ),
   br(),
