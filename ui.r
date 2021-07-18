@@ -11,6 +11,7 @@ library(DT)
 ui <- fluidPage(
   
   theme = shinytheme("flatly"),
+  useShinyjs(),
   
   fluidRow(
     column(12, h2("Seed Germination Modeling App"))
@@ -29,6 +30,15 @@ ui <- fluidPage(
     bsCollapsePanel(
       title = "Data format requirements",
       p(em("You must upload your seed germination data as a CSV file. If you do not use the default column names shown below, you will have to specify which columns correspond to each of the expected data types.")),
+      br(),
+      p(strong("Download sample datasets:")),
+      p(
+        downloadButton("downloadTemplate", "Empty data template"),
+        downloadButton("downloadSampleGermData", "Sample germination dataset"),
+        downloadButton("downloadSamplePrimingData", "Sample priming dataset")
+      ),
+      br(),
+      p(strong("Dataset column names and descriptions:")),
       tableOutput("columnTypes")
     )
   ),
@@ -38,64 +48,20 @@ ui <- fluidPage(
     bsCollapsePanel(
       title = "Data entry",
       value = "data",
-      p(strong("Download sample datasets:")),
-      p(
-        downloadButton("downloadTemplate", "Download empty dataset template"),
-        downloadButton("downloadSampleGermData", "Download sample Tomato germination dataset"),
-        downloadButton("downloadSamplePrimingData", "Download sample priming dataset")
-      ),
-      
       p(strong("Load sample datasets")),
       p(
         actionButton("loadSampleGermData", "Load germination sample data"),
         actionButton("loadSamplePrimingData", "Load priming sample data")
       ),
       br(),
-      fileInput("userData", "Upload your own data", accept = c(".csv"))
-      
-      
-      # tabsetPanel(
-      #   tabPanel(title = "Load data",
-      #     strong("Load sample datasets"),
-      #     p(
-      #       actionButton("loadSampleGermData", "Load germination sample data"),
-      #       actionButton("loadSamplePrimingData", "Load priming sample data")
-      #     ),
-      #     br(),
-      #     fileInput("userData", "Upload your own data", accept = c(".csv"))
-      #   ),
-      #   tabPanel(title = "Data format requirements",
-      #     tableOutput("columnTypes")
-      #   )
-      # )
+      fileInput("userData", "Upload your own data", accept = c(".csv")),
+      br(),
+      actionButton("clearData", "Clear loaded data")
     )
   ),
-  # wellPanel(
-  #   strong("Load sample datasets"),
-  #   p(
-  #     actionButton("loadSampleGermData", "Load germination sample data"),
-  #     actionButton("loadSamplePrimingData", "Load priming sample data")
-  #   ),
-  #   br(),
-  #   fileInput("userData", "Upload your own data", accept = c(".csv"))
-  # ),
   br(),
   
   h4("Current data:"),
-  # wellPanel(
-  #   conditionalPanel(
-  #     condition = "nrow(currentData$data) == 0",
-  #     textOutput("No data currently loaded.")
-  #   ),
-  #   conditionalPanel(
-  #     condition = "nrow(currentData$data) > 0",
-  #     dataTableOutput("currentDataDisplay")
-  #   ),
-  #   conditionalPanel(
-  #     condition = "TRUE",
-  #     textOutput("Default")
-  #   )
-  # ),
   fluidRow(
     column(12, uiOutput("currentDataDisplay"))
   )

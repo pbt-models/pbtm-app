@@ -2,6 +2,7 @@
 
 library(tidyverse)
 library(shiny)
+library(shinyjs)
 library(DT)
 # library(plotly)
 
@@ -19,7 +20,11 @@ server <- function(input, output, session) {
   # action buttons
   observeEvent(input$loadSampleGermData, {values$data <- sampleGermData})
   observeEvent(input$loadSamplePrimingData, {values$data <- samplePrimingData})
-  observeEvent(input$user_data, {values$data <- read_csv(input$userData$datapath, col_types = cols())})
+  observeEvent(input$userData, {values$data <- read_csv(input$userData$datapath, col_types = cols())})
+  observeEvent(input$clearData, {
+    values$data <- tibble()
+    reset("userData")
+  })
   
   
   
@@ -43,7 +48,7 @@ server <- function(input, output, session) {
   output$columnTypes <- renderTable({columnTypes})
   
   
-  output$currentDataTable <- renderTable({currentData$data})
+  output$currentDataTable <- renderTable({values$data})
   
   output$currentDataDisplay <- renderUI({
     if (nrow(values$data) == 0) {
