@@ -18,12 +18,24 @@ server <- function(input, output, session) {
   # Reactions ----
   
   # action buttons
-  observeEvent(input$loadSampleGermData, {values$data <- sampleGermData})
-  observeEvent(input$loadSamplePrimingData, {values$data <- samplePrimingData})
-  observeEvent(input$userData, {values$data <- read_csv(input$userData$datapath, col_types = cols())})
+  observeEvent(input$loadSampleGermData, {
+    values$data <- sampleGermData
+    updateCollapse(session, "data", open = "view")
+  })
+  observeEvent(input$loadSamplePrimingData, {
+    values$data <- samplePrimingData
+    updateCollapse(session, "data", open = "view")
+  })
+  observeEvent(input$userData, {
+    values$data <- read_csv(input$userData$datapath, col_types = cols())
+    updateCollapse(session, "data", open = "view")
+  })
   observeEvent(input$clearData, {
     values$data <- tibble()
     reset("userData")
+  })
+  observeEvent(input$viewColumnMatching, {
+    updateCollapse(session, "data", open = "cols")
   })
   
   
@@ -45,7 +57,7 @@ server <- function(input, output, session) {
   )
   
   
-  output$columnTypes <- renderTable({columnTypes})
+  output$columnDescriptions <- renderTable({columnDescriptions})
   
   output$currentDataTable <- renderDataTable({values$data})
   
@@ -62,31 +74,65 @@ server <- function(input, output, session) {
     names(values$data)
   })
   
-  output$columnMatching <- renderUI({
-    req(columnNames())
-    
-    choices <- setNames(as.list(c(NA, columnNames())), c("Not specified", columnNames()))
-    
-    if (length(columnNames()) == 0) {
-      p("No column names detected, load a valid dataset.")
-    } else {
-      lapply(1:nrow(columnDefaults), function(i) {
-        wellPanel(
-          style = "display: inline-block; min-width: 20em;",
-          selectInput(
-            inputId = paste0("col.", columnDefaults$defaultColumn[i]),
-            label = columnDefaults$description[i],
-            choices = choices,
-            selected = columnDefaults$defaultColumn[i]
-          ),
-          span("OK", style = "color: red;")
-        )
-      })
-    }
+  columnChoices <- reactive({
+    setNames(as.list(c(NA, columnNames())), c("Not specified", columnNames()))
   })
   
-  output$columnValidation <- renderText("Hello world.")
+  # observeEvent(values$data, {
+  #   updateCollapse(session, "data", open = "columns")
+  # })
   
+  
+  
+  # Column name matching ----
+  
+  # generate selection boxes
+  lapply(1:nrow(columnDefaults), function(i) {
+    output[[paste0("colSelect", i)]] <- renderUI({
+      selectInput(
+        inputId = paste0("colSelect", i),
+        label = columnDefaults$description[i],
+        choices = columnChoices(),
+        selected = columnDefaults$defaultColumn[i]
+      )
+    })
+  })
+  
+  # validation message handler
+  lapply(1:nrow(columnDefaults), function(i) {
+    outCol <- paste0("colValidate", i)
+    inCol <- paste0("colSelect", i)
+    # colName <- input[[inCol]]
+    # matchedCol <- values$data[[colName]]
+    
+    # output[[outCol]] <- renderUI({
+    #   p(
+    #     paste0("value =", input[[inCol]]), br(),
+    #     if (!is.na(input[[inCol]])) {
+    #       return(paste0("column type =", class(values$data[[input[[inCol]]]])))
+    #     }
+    #   )
+    # })
+    
+    output[[outCol]] <- renderUI({
+      
+      req(input[[inCol]])
+      
+      if (input[[inCol]] == "NA") {
+        ui <- list(
+          p("No column specified.")
+        )
+      } else {
+        ui <- list(
+          p(
+            paste0("value = ", input[[inCol]]), br(),
+            paste0("column type = ", class(values$data[[input[[inCol]]]]))
+          )
+        )
+      }
+      ui
+    })
+  })
   
   
 }

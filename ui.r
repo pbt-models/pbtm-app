@@ -2,6 +2,7 @@
 
 library(shiny)
 library(shinythemes)
+library(shinyjs)
 # library(shinyWidgets)
 library(shinyBS)
 library(DT)
@@ -12,6 +13,7 @@ ui <- fluidPage(
   
   theme = shinytheme("flatly"),
   useShinyjs(),
+  tags$head(tags$style(type = "text/css", ".container-fluid { max-width: 66em; }")),
   
   fluidRow(
     column(12, h2("Seed Germination Modeling App"))
@@ -39,37 +41,60 @@ ui <- fluidPage(
       ),
       br(),
       p(strong("Dataset column names and descriptions:")),
-      tableOutput("columnTypes")
+      tableOutput("columnDescriptions")
     )
   ),
   
   bsCollapse(
     id = "data",
-    open = "dataEntry",
+    open = "load",
+    
     bsCollapsePanel(
       title = "Data entry",
-      value = "dataEntry",
+      value = "load",
+      p(em("Upload your own data here or select one of our sample datasets to get started.")),
+      hr(),
       p(strong("Load sample datasets")),
-      p(
-        actionButton("loadSampleGermData", "Load germination sample data"),
-        actionButton("loadSamplePrimingData", "Load priming sample data")
+      fluidRow(
+        column(12,
+          actionButton("loadSampleGermData", "Load germination sample data"),
+          actionButton("loadSamplePrimingData", "Load priming sample data"),
+          actionButton("clearData", "Clear loaded data")
+        )
       ),
-      br(),
-      fileInput("userData", "Upload your own data", accept = c(".csv")),
-      br(),
-      actionButton("clearData", "Clear loaded data")
+      hr(),
+      fluidRow(
+        column(12, fileInput("userData", "Upload your own data", accept = c(".csv"))),
+      )
     ),
+    
     bsCollapsePanel(
       title = "View current dataset",
-      value = "dataView",
-      p(strong("Currently loaded dataset:")),
-      uiOutput("currentDataDisplay")
+      value = "view",
+      fluidRow(
+        column(10, p(em("This is a preview of the currently loaded dataset. If it looks good, click 'OK' to match your column names to the expected data values for germination modeling."))),
+        column(2, actionButton("viewColumnMatching", "OK"), align = "right")
+      ),
+      hr(),
+      fluidRow(
+        column(12,
+          p(strong("Currently loaded dataset:")),
+          uiOutput("currentDataDisplay")
+        )
+      )
     ),
+    
     bsCollapsePanel(
       title = "Define data columns",
-      value = "dataColumns",
+      value = "cols",
       p(strong("Match required data to column names:")),
-      uiOutput("columnMatching")
+      lapply(1:nrow(columnDefaults), function(i) {
+        wellPanel(
+          style = "display: inline-block; min-width: 20em;",
+          uiOutput(paste0("colSelect", i)),
+          uiOutput(paste0("colValidate", i))
+        )
+      })
     )
   ),
   br(),
