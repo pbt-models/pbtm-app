@@ -47,7 +47,8 @@ ui <- fluidPage(
   
   bsCollapse(
     id = "data",
-    open = "load",
+    multiple = T,
+    open = c("load", "view", "cols"),
     
     bsCollapsePanel(
       title = "Data entry",
@@ -73,7 +74,7 @@ ui <- fluidPage(
       value = "view",
       fluidRow(
         column(10, p(em("This is a preview of the currently loaded dataset. If it looks good, click 'OK' to match your column names to the expected data values for germination modeling. Column names matching the template dataset will be matched automatically."))),
-        column(2, actionButton("viewColumnMatching", "OK"), align = "right")
+        column(2, actionButton("confirmDataView", "OK"), align = "right")
       ),
       hr(),
       fluidRow(
@@ -87,7 +88,10 @@ ui <- fluidPage(
     bsCollapsePanel(
       title = "Define data columns",
       value = "cols",
-      p(em("If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range.")),
+      fluidRow(
+        column(10, p(em("If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range."))),
+        column(2, actionButton("confirmColView", "OK"), align = "right")
+      ),
       hr(),
       p(strong("Match required data to column names:")),
       div(
@@ -100,11 +104,30 @@ ui <- fluidPage(
         })
       ),
       hr(),
-      p(strong("Available models:")),
-      uiOutput("modelStatus")
+      fluidRow(
+        column(10, 
+          p(strong("Available models:")),
+          uiOutput("modelStatus")
+        ),
+        column(2, actionButton("confirmColView2", "OK"), align = "right")
+      )
     )
   ),
   br(),
+  
+  h3("Model outputs"),
+  # actionButton("runModels", "Run Models"),
+  tabsetPanel(
+    tabPanel(
+      title = "PlotRawDt",
+      plotOutput("PlotRawDt")
+    ),
+    tabPanel(
+      title = "PlotRateVsTreat",
+      sliderInput("GRInput", "Select Growth Rate", min = 10, max = 90, value = 50, step = 10),
+      plotOutput("PlotRateVsTreat")
+    )
+  )
 
   
 )

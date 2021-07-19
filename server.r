@@ -9,41 +9,54 @@ library(DT)
 
 server <- function(input, output, session) {
   
+  # On load ----
+  
+  # this forces the bscollapse panels to load their content by starting open then closing
+  updateCollapse(session, "data", close = c("view", "cols"))
+  
+  
+  
   # Data definitions ----
   
-  values <- reactiveValues(data = tibble())
-  colStatus <- reactiveValues()
-  modelStatus <- reactiveValues()
+  nCols <- nrow(columnValidation)
+  
+  rv <- reactiveValues(
+    data = tibble(),
+    colStatus = NULL
+  )
+  
+
   
   
-  # Reactions ----
+  # Action Buttons ----
   
-  # action buttons
   observeEvent(input$loadSampleGermData, {
-    values$data <- sampleGermData
-    updateCollapse(session, "data", open = "view")
+    rv$data <- sampleGermData
+    updateCollapse(session, "data", open = "view", close = "load")
   })
   observeEvent(input$loadSamplePrimingData, {
-    values$data <- samplePrimingData
-    updateCollapse(session, "data", open = "view")
+    rv$data <- samplePrimingData
+    updateCollapse(session, "data", open = "view", close = "load")
   })
   observeEvent(input$userData, {
-    values$data <- read_csv(input$userData$datapath, col_types = cols())
-    updateCollapse(session, "data", open = "view")
+    rv$data <- read_csv(input$userData$datapath, col_types = cols())
+    updateCollapse(session, "data", open = "view", close = "load")
   })
   observeEvent(input$clearData, {
-    values$data <- tibble()
+    rv$data <- tibble()
     reset("userData")
   })
-  observeEvent(input$viewColumnMatching, {
-    updateCollapse(session, "data", open = "cols")
+  observeEvent(input$confirmDataView, {
+    updateCollapse(session, "data", open = "cols", close = "view")
+  })
+  observeEvent(c(input$confirmColView, input$confirmColView2), {
+    updateCollapse(session, "data", close = "cols")
   })
   
   
   
-  # Outputs ----
+  # Download button handlers ----
   
-  # download buttons
   output$downloadTemplate <- downloadHandler(
     filename = "pbtm-data-template.csv",
     content = function(file) {write_csv(sampleTemplate, file)}
@@ -58,46 +71,56 @@ server <- function(input, output, session) {
   )
   
   
+  
+  # Column description table ----
+  
   output$columnDescriptions <- renderTable({columnDescriptions})
   
-  output$currentDataTable <- renderDataTable({values$data})
+  
+  
+  # Current data DT ----
+  
+  output$currentDataTable <- renderDataTable({rv$data})
   
   output$currentDataDisplay <- renderUI({
-    if (nrow(values$data) == 0) {
+    if (nrow(rv$data) == 0) {
       return("No data loaded.")
     } else {
       dataTableOutput("currentDataTable")
     }
   })
   
+
+  # Column matching boxes ----
+  
   columnNames <- reactive({
-    req(values$data)
-    names(values$data)
+    req(rv$data)
+    names(rv$data)
   })
   
   columnChoices <- reactive({
     setNames(as.list(c(NA, columnNames())), c("Not specified", columnNames()))
   })
   
-  
-  
-  # Column matching boxes ----
-  lapply(1:nrow(columnDefaults), function(i) {
+  lapply(1:nCols, function(i) {
     output[[paste0("colSelect", i)]] <- renderUI({
       selectInput(
-        inputId = paste0("colSelect", i),
-        label = columnDefaults$description[i],
+        inputId = columnValidation$InputId[i],
+        label = columnValidation$Description[i],
         choices = columnChoices(),
-        selected = columnDefaults$defaultColumn[i]
+        selected = columnValidation$Column[i]
       )
     })
   })
   
+  
+  
   # Column validation messages ----
-  lapply(1:nrow(columnDefaults), function(i) {
+  
+  lapply(1:nCols, function(i) {
     
     outCol <- paste0("colValidate", i)
-    inCol <- paste0("colSelect", i)
+    inputId <- columnValidation$InputId[i]
     expectedType <- columnValidation$Type[i]
     minValue <- columnValidation$Min[i]
     maxValue <- columnValidation$Max[i]
@@ -106,16 +129,16 @@ server <- function(input, output, session) {
     
     output[[outCol]] <- renderUI({
       
-      req(input[[inCol]])
+      req(input[[inputId]])
       
       # check if no column selected
-      if (input[[inCol]] == "NA") {
+      if (input[[inputId]] == "NA") {
         msg <- list(span("No column specified.", style = "color:orange"))
-        colStatus[[paste0("col", i)]] <- F
+        rv$colStatus[[paste0("col", i)]] <- F
         return(msg)
       }
       
-      col <- values$data[[input[[inCol]]]]
+      col <- rv$data[[input[[inputId]]]]
       
       if (anyNA(col)) {
         msg <- list(br(), span("Warning: Missing value in data", style = "color:red"))
@@ -156,9 +179,10 @@ server <- function(input, output, session) {
       
       if (is.null(msg)) {
         msg <- list(span(strong("OK"), style = "color:blue"))
-        colStatus[[paste0("col", i)]] <- T
+        rv$colStatus[[paste0("col", i)]] <- T
+        
       } else {
-        colStatus[[paste0("col", i)]] <- F
+        rv$colStatus[[paste0("col", i)]] <- F
       }
       
       list(p(ui), p(msg))
@@ -166,12 +190,36 @@ server <- function(input, output, session) {
     })
   })
   
+  # lapply(1:nrow(columnDefaults), function(i) {
+  #   observe({
+  #     rv$colMatch[[i]] <- input[[paste0("colSelect", i)]]
+  #     print(rv$colMatch[[i]])
+  #   })
+  # })
+  
+  
+  # cleanData <- reactive({
+  #   dfIn <- rv$data
+  #   dfOut <- sampleTemplate
+  #   lapply(1:nrow(columnDefaults), function(i) {
+  #     inCol <- paste0("colSelect", i)
+  #     req(input[[inCol]])
+  #     if (input[[inCol]] != "NA") {
+  #       dfOut[[columnDefaults$defaultColumn[i]]] <- dfIn[[]]
+  #     } else {
+  #       dfOut <- select(dfOut, -columnDefaults$defaultColumn[i])
+  #     }
+  #   })
+  # })
+  # 
+  # observe({print(cleanData())})
+  
   
   
   # Model readiness ----
   checkModelReadiness <- function(col) {
-    compare <- sapply(1:nrow(columnDefaults), function(i) {
-      test <- (col[i] == T & colStatus[[paste0("col", i)]] == T) | (col[i] == F)
+    compare <- sapply(1:nCols, function(i) {
+      test <- (col[i] == T & rv$colStatus[[paste0("col", i)]] == T) | (col[i] == F)
       if (length(test) == 0) {F} else {test}
     })
     !(F %in% compare)
@@ -212,6 +260,62 @@ server <- function(input, output, session) {
       )
     )
     
+  })
+  
+  
+  # Plot drafts ----
+  output$PlotRawDt <- renderPlot({
+    req(nrow(rv$data) > 0)
+    req(TTModelReady())
+    df <- tibble(
+      TrtId = as.factor(rv$data[[input$TrtId]]),
+      GermWP = as.factor(rv$data[[input$GermWP]]),
+      GermTemp = as.factor(rv$data[[input$GermTemp]]),
+      CumTime = rv$data[[input$CumTime]],
+      CumFrac = rv$data[[input$CumFraction]]
+    )
+    
+    df %>%
+      ggplot(aes(x = CumTime, y = CumFrac, color = GermWP, shape = GermTemp)) +
+      geom_line() +
+      geom_point(size = 2) +
+      scale_y_continuous(labels = scales::percent) +
+      labs(
+        x = "Time",
+        y = "Cumulative (%)",
+        title = "Cumulative germination"
+      ) +
+      theme_classic()
+      
+      
+    
+    # # from pbtm
+    # PlotRawDt <- function(df, t1, t2) {
+    #   gp <- "geom_point(shape=19, size=2)"
+    #     gp <- "geom_point(size=2)"
+    #     eval(parse(text = paste("TreatData$", Treat2, " <- (factor(TreatData$",
+    #       Treat2, "))", sep = "")))
+    #     T2 <- Treat2
+    #   df %>%
+    #     ggplot(data = TreatData, aes_string(x = "CumTime",
+    #     y = "CumFraction", color = T1, shape = T2)) + eval(parse(text = gp)) +
+    #     geom_line() + xlab("Time") + ylab("Cumulative (%)") +
+    #     scale_y_continuous(labels = scales::percent, expand = c(0,
+    #       0), limits = c(0, 1.02)) + scale_x_continuous(expand = c(0,
+    #         0)) + expand_limits(x = 0, y = 0)
+    # }
+    
+  })
+  
+  output$PlotRateVsTreat <- renderPlot({
+    req(nrow(rv$data) > 0)
+    req(TTModelReady())
+    df <- rv$data
+    gr <- input$GRInput / 100
+    t1 <- input[[paste0("colSelect", 7)]] # germ wp
+    t2 <- input[[paste0("colSelect", 8)]] # germ temp
+    try(speed <- CalcSpeed(df, gr, t1, t2))
+    try(PlotRateVsTreat(speed, t2, paste0("GR", gr * 100)))
   })
   
 }
