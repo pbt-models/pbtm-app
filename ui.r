@@ -115,18 +115,27 @@ ui <- fluidPage(
   ),
   br(),
   
-  h3("Model outputs"),
+  h3("Basic charts"),
   # actionButton("runModels", "Run Models"),
   tabsetPanel(
     tabPanel(
-      title = "PlotRawDt",
-      plotOutput("PlotRawDt")
-    ),
-    tabPanel(
-      title = "PlotRateVsTreat",
-      sliderInput("GRInput", "Select Growth Rate", min = 10, max = 90, value = 50, step = 10),
-      plotOutput("PlotRateVsTreat")
+      title = "Germination plot",
+      sidebarLayout(
+        sidebarPanel(
+          uiOutput("germPlotTrt1"),
+          uiOutput("germPlotTrt2")
+        ),
+        mainPanel(
+          plotOutput("germPlot")
+        )
+      )
     )
+    
+    # tabPanel(
+    #   title = "PlotRateVsTreat",
+    #   sliderInput("GRInput", "Select Growth Rate", min = 10, max = 90, value = 50, step = 10),
+    #   plotOutput("PlotRateVsTreat")
+    # )
   )
 
   

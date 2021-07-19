@@ -225,6 +225,7 @@ server <- function(input, output, session) {
     !(F %in% compare)
   }
   
+  BasicDataReady <- reactive({checkModelReadiness(columnValidation$AllModels)})
   HPModelReady <- reactive({checkModelReadiness(columnValidation$HydroPriming)})
   HTPModelReady <- reactive({checkModelReadiness(columnValidation$HydroThermalPriming)})
   HTModelReady <- reactive({checkModelReadiness(columnValidation$HydroTime)})
@@ -249,6 +250,7 @@ server <- function(input, output, session) {
     
     list(
       p(
+        "All plots and models:", status(BasicDataReady()), br(),
         "Hydro Priming model:", status(HPModelReady()), br(),
         "Hydro Thermal Priming model:", status(HTPModelReady()), br(),
         "Hydro Time model:", status(HTModelReady()), br(),
@@ -264,21 +266,95 @@ server <- function(input, output, session) {
   
   
   # Plot drafts ----
-  output$PlotRawDt <- renderPlot({
+  
+  output$germPlotTrt1 <- renderUI({
+    req(BasicDataReady())
+    list(
+      selectInput(
+        "germPlotTrt1",
+        "Treatment 1 (color)",
+        choices = columnChoices()
+      )
+    )
+  })
+  
+  output$germPlotTrt2 <- renderUI({
+    req(BasicDataReady())
+    req(input$germPlotTrt1)
+    req(input$germPlotTrt1 != "NA")
+    list(
+      selectInput(
+        "germPlotTrt2",
+        "Treatment 2 (shape)",
+        choices = columnChoices()
+      )
+    )
+  })
+  
+  
+  
+  
+  output$germPlot <- renderPlot({
     req(nrow(rv$data) > 0)
-    req(TTModelReady())
+    req(BasicDataReady())
+    
+    trts <- 0
+    
     df <- tibble(
       TrtId = as.factor(rv$data[[input$TrtId]]),
-      GermWP = as.factor(rv$data[[input$GermWP]]),
-      GermTemp = as.factor(rv$data[[input$GermTemp]]),
       CumTime = rv$data[[input$CumTime]],
       CumFrac = rv$data[[input$CumFraction]]
     )
     
-    df %>%
-      ggplot(aes(x = CumTime, y = CumFrac, color = GermWP, shape = GermTemp)) +
-      geom_line() +
-      geom_point(size = 2) +
+    if (req(input$germPlotTrt1) != "NA") {
+      df <- mutate(df, Trt1 = as.factor(rv$data[[input$germPlotTrt1]]))
+      trts <- 1
+      
+      if (req(input$germPlotTrt2) != "NA") {
+        df <- mutate(df, Trt2 = as.factor(rv$data[[input$germPlotTrt2]]))
+        trts <- 2
+      }
+      
+    }
+    
+    if (trts == 0) {
+      plt <- df %>%
+        group_by(TrtId) %>%
+        arrange(TrtId, CumTime, CumFrac) %>%
+        mutate(FracDiff = CumFrac - lag(CumFrac, default = 0)) %>%
+        group_by(CumTime) %>%
+        summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff)) %>%
+        ggplot(aes(x = CumTime, y = CumFrac)) +
+        geom_line() +
+        geom_point(size = 2)
+    } else if (trts == 1) {
+      plt <- df %>%
+        group_by(TrtId) %>%
+        arrange(TrtId, CumTime, CumFrac) %>%
+        mutate(FracDiff = CumFrac - lag(CumFrac, default = 0)) %>%
+        group_by(Trt1, CumTime) %>%
+        summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff)) %>%
+        ggplot(aes(x = CumTime, y = CumFrac, color = Trt1)) +
+        geom_line() +
+        geom_point(shape = 19, size = 2) +
+        labs(color = input$germPlotTrt1)
+    } else if (trts == 2) {
+      plt <- df %>%
+        group_by(TrtId) %>%
+        arrange(TrtId, CumTime, CumFrac) %>%
+        mutate(FracDiff = CumFrac - lag(CumFrac, default = 0)) %>%
+        group_by(Trt1, Trt2, CumTime) %>%
+        summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff)) %>%
+        ggplot(aes(x = CumTime, y = CumFrac, color = Trt1, shape = Trt2)) +
+        geom_line() +
+        geom_point(size = 2) +
+        labs(color = input$germPlotTrt1, shape = input$germPlotTrt2)
+    }
+    
+    plt +
       scale_y_continuous(labels = scales::percent) +
       labs(
         x = "Time",
@@ -286,7 +362,6 @@ server <- function(input, output, session) {
         title = "Cumulative germination"
       ) +
       theme_classic()
-      
       
     
     # # from pbtm
@@ -307,16 +382,16 @@ server <- function(input, output, session) {
     
   })
   
-  output$PlotRateVsTreat <- renderPlot({
-    req(nrow(rv$data) > 0)
-    req(TTModelReady())
-    df <- rv$data
-    gr <- input$GRInput / 100
-    t1 <- input[[paste0("colSelect", 7)]] # germ wp
-    t2 <- input[[paste0("colSelect", 8)]] # germ temp
-    try(speed <- CalcSpeed(df, gr, t1, t2))
-    try(PlotRateVsTreat(speed, t2, paste0("GR", gr * 100)))
-  })
+  # output$PlotRateVsTreat <- renderPlot({
+  #   req(nrow(rv$data) > 0)
+  #   req(TTModelReady())
+  #   df <- rv$data
+  #   gr <- input$GRInput / 100
+  #   t1 <- input[[paste0("colSelect", 7)]] # germ wp
+  #   t2 <- input[[paste0("colSelect", 8)]] # germ temp
+  #   try(speed <- CalcSpeed(df, gr, t1, t2))
+  #   try(PlotRateVsTreat(speed, t2, paste0("GR", gr * 100)))
+  # })
   
 }
 
