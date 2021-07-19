@@ -29,8 +29,13 @@ ui <- fluidPage(
   br(),
   
   bsCollapse(
+    id = "data",
+    multiple = T,
+    open = c("load", "view", "cols"),
+    
     bsCollapsePanel(
       title = "Data format requirements",
+      value = "template",
       p(em("You must upload your seed germination data as a CSV file. If you do not use the default column names shown below, you will have to specify which columns correspond to each of the expected data types.")),
       br(),
       p(strong("Download sample datasets:")),
@@ -42,13 +47,7 @@ ui <- fluidPage(
       br(),
       p(strong("Dataset column names and descriptions:")),
       tableOutput("columnDescriptions")
-    )
-  ),
-  
-  bsCollapse(
-    id = "data",
-    multiple = T,
-    open = c("load", "view", "cols"),
+    ),
     
     bsCollapsePanel(
       title = "Data entry",
@@ -136,7 +135,20 @@ ui <- fluidPage(
     #   sliderInput("GRInput", "Select Growth Rate", min = 10, max = 90, value = 50, step = 10),
     #   plotOutput("PlotRateVsTreat")
     # )
+  ),
+  br(),
+  hr(),
+  div(
+    align = "center",
+    style = "font-size:small; color:grey; border-top:2px darkgrey",
+    p("App developed by", a("Ben Bradford", href = "https://github.com/bzbradford")),
+    p(
+      "Based on the", a("PBTM R package", href = "https://github.com/pedrobello/pbtm"),
+      "developed by", a("Pedro Bello", href = "https://github.com/pedrobello")
+    ),
+    p(
+      "Seed germination models developed by", a("Kent Bradford", href = "https://www.plantsciences.ucdavis.edu/people/kent-bradford"),
+      "and", a("Pedro Bello", href = "https://www.plantsciences.ucdavis.edu/people/pedro-bello")
+    )
   )
-
-  
 )

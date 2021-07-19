@@ -250,7 +250,7 @@ server <- function(input, output, session) {
     
     list(
       p(
-        "All plots and models:", status(BasicDataReady()), br(),
+        "Basic plots and models:", status(BasicDataReady()), br(),
         "Hydro Priming model:", status(HPModelReady()), br(),
         "Hydro Thermal Priming model:", status(HTPModelReady()), br(),
         "Hydro Time model:", status(HTModelReady()), br(),
