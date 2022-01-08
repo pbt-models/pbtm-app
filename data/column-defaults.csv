@@ -1,0 +1,13 @@
+description,defaultColumn
+Treatment ID,Treat.ID
+Treatment description,Treat.desc
+Aging time,Treat.aging.time
+Priming water potential,Treat.priming.wp
+Priming temperature,Treat.priming.temp
+Priming duration,Treat.priming.duration
+Germination water potential,Germ.wp
+Germination temperature,Germ.temp
+Germination promoter dosage,Germ.promoter.dosage
+Germination inhibitor dosage,Germ.inhibitor.dosage
+Cumulative time,CumTime
+Cumulative germination fraction,CumFraction

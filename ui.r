@@ -6,7 +6,9 @@ library(shinyjs)
 # library(shinyWidgets)
 library(shinyBS)
 library(DT)
-# library(plotly)
+#library(plotly)
+
+
 
 
 ui <- fluidPage(
@@ -94,11 +96,11 @@ ui <- fluidPage(
       hr(),
       p(strong("Match required data to column names:")),
       div(
-        lapply(1:nrow(columnDefaults), function(i) {
+         lapply(1:nrow(columnDefaults), function(i) {
           wellPanel(
             style = "display: inline-block; vertical-align: top; width: 20em; margin: 5px;",
-            uiOutput(paste0("colSelect", i)),
-            uiOutput(paste0("colValidate", i))
+            uiOutput(paste0("colSelect", i)), # outputs the colSelect 1 - 12 
+            uiOutput(paste0("colValidate", i)) # outputs the colValidate 1 - 12
           )
         })
       ),
@@ -128,13 +130,14 @@ ui <- fluidPage(
           plotOutput("germPlot")
         )
       )
-    )
+    ),
     
-    # tabPanel(
-    #   title = "PlotRateVsTreat",
-    #   sliderInput("GRInput", "Select Growth Rate", min = 10, max = 90, value = 50, step = 10),
-    #   plotOutput("PlotRateVsTreat")
-    # )
+     tabPanel(
+       title = "Germination rate over treatment",
+       sliderInput("GRInput", "Select germination (%) to calculate rate", min = 10, max = 90, value = 50, step = 10),
+       plotOutput("PlotRateVsTreat"), #temp
+       tableOutput("SpeedTbl")
+     )
   ),
   br(),
   hr(),

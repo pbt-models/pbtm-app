@@ -4,10 +4,10 @@ Treat.desc,TrtDesc,Treatment description,,,,All models,T,T,T,T,T,T,T,T,T
 Treat.aging.time,TrtAgingTime,Aging time,numeric,0,,Aging,F,F,F,F,F,F,T,F,F
 Treat.priming.wp,TrtPrimingWP,Priming water potential,numeric,,0,Hydro and hydrothermal priming,F,T,T,F,F,F,F,F,F
 Treat.priming.temp,TrtPrimingTemp,Priming temperature,numeric,0,100,Hydrothermal priming,F,F,T,F,F,F,F,F,F
-Treat.priming.duration,TrtPrimingDuration,Priming duration,numeric,0,,Hydro and hydrothermal priming,F,T,T,T,F,T,F,F,F
+Treat.priming.duration,TrtPrimingDuration,Priming duration,numeric,0,,Hydro and hydrothermal priming,F,T,T,F,F,F,F,F,F
 Germ.wp,GermWP,Germination water potential,numeric,,0,Hydrotime and hydrothermal,F,F,F,T,F,T,F,F,F
 Germ.temp,GermTemp,Germination temperature,numeric,0,100,Thermal and hydrothermal time,F,F,F,F,T,T,F,F,F
-Germ.promoter.dosage,GermPromoterDosage,Germination promoter dosage,numeric,0,,Promoter model,F,F,F,F,F,F,F,T,T
-Germ.inhibitor.dosage,GermInhibitorDosage,Germination inhibitor dosage,numeric,0,,Inhibitor model,F,F,F,F,F,F,F,T,T
+Germ.promoter.dosage,GermPromoterDosage,Germination promoter dosage,numeric,0,,Promoter model,F,F,F,F,F,F,F,T,F
+Germ.inhibitor.dosage,GermInhibitorDosage,Germination inhibitor dosage,numeric,0,,Inhibitor model,F,F,F,F,F,F,F,F,T
 CumTime,CumTime,Cumulative time,numeric,0,,All models,T,T,T,T,T,T,T,T,T
 CumFraction,CumFraction,Cumulative germination fraction,numeric,0,1,All models,T,T,T,T,T,T,T,T,T
