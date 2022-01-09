@@ -268,24 +268,14 @@ server <- function(input, output, session) {
   })
   
   
-  # Germination Plot ----
+  # Germination Plot and Speed ----
   
-  # Get list of cols that have been defined and are factors
-  germTrtChoices <- reactive({
-    cols <- sapply(1:nCols, function(i) {
-      if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor") columnValidation$Column[i]
-    })
-    cols <- compact(cols)
-    setNames(as.list(c(NA, cols)), c("Not specified", cols))
-  })
-  
-  # observer <- observe({print(req(germTrtChoices()))})
-  
-  output$germPlotUI <- renderUI({
+  output$germUI <- renderUI({
     validate(
-      need(BasicDataReady(), "Please load a dataset and set required column types to show the plot.")
+      need(BasicDataReady(), "Please load a dataset and set required column types for germination analysis.")
     )
     list(
+      h4("Cumulative germination plot:"),
       sidebarLayout(
         sidebarPanel(
           uiOutput("germPlotTrt1"),
@@ -294,8 +284,34 @@ server <- function(input, output, session) {
         mainPanel(
           plotOutput("germPlot")
         )
+      ),
+      br(),
+      h4("Germination time analysis: (work in progress)"),
+      sidebarLayout(
+        sidebarPanel(
+          uiOutput("germSpeedTrts"),
+          uiOutput("germSpeedFracs"),
+          uiOutput("germSpeedType")
+        ),
+        mainPanel(
+          div(
+            dataTableOutput("germSpeedTable"),
+            style = "overflow-x: auto"
+          )
+        )
       )
     )
+  })
+  
+
+  ## Germination plot ----
+  
+  germTrtChoices <- reactive({
+    cols <- sapply(1:nCols, function(i) {
+      if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor") columnValidation$Column[i]
+    })
+    cols <- compact(cols)
+    setNames(as.list(c(NA, cols)), c("Not specified", cols))
   })
   
   output$germPlotTrt1 <- renderUI({
@@ -335,11 +351,7 @@ server <- function(input, output, session) {
     if (req(input$germPlotTrt1) != "NA") {
       df <- mutate(df, Trt1 = as.factor(rv$data[[input$germPlotTrt1]]))
       trts <- 1
-      validate(
-        need(n_distinct(df$Trt1) < 10, "Can't show more than 10 different treatments")
-      )
-      
-      
+
       if (req(input$germPlotTrt2) != "NA") {
         df <- mutate(df, Trt2 = as.factor(rv$data[[input$germPlotTrt2]]))
         trts <- 2
@@ -352,6 +364,7 @@ server <- function(input, output, session) {
       mutate(FracDiff = CumFrac - lag(CumFrac, default = 0))
     
     if (trts == 1) {
+      
       df <- df %>%
         group_by(Trt1, CumTime) %>%
         summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
@@ -390,6 +403,7 @@ server <- function(input, output, session) {
     } 
     
     plt <- plt +
+      scale_x_continuous(breaks = scales::pretty_breaks()) +
       scale_y_continuous(labels = scales::percent) +
       labs(
         title = "Cumulative germination",
@@ -398,23 +412,18 @@ server <- function(input, output, session) {
       ) +
       theme_classic()
     
+    # if (req(input$germSpeedFracs)) {
+    #   plt <- plt + geom_hline(yintercept = input$germSpeedFracs / 100)
+    # }
+    
+    lines = seq(0, 1, by = input$germSpeedRes / 100)
+    plt <- plt + geom_hline(yintercept = lines, color = "grey", size = 0.25, alpha = 0.5, linetype = "dashed")
+    
     plt
   })
   
-  # output$PlotRateVsTreat <- renderPlot({
-  #   req(nrow(rv$data) > 0)
-  #   req(TTModelReady())
-  #   df <- rv$data
-  #   gr <- input$GRInput / 100
-  #   t1 <- input[[paste0("colSelect", 7)]] # germ wp
-  #   t2 <- input[[paste0("colSelect", 8)]] # germ temp
-  #   try(speed <- CalcSpeed(df, gr, t1, t2))
-  #   try(PlotRateVsTreat(speed, t2, paste0("GR", gr * 100)))
-  # })
   
-  
-  
-  # Germination speed analysis ----
+  ## Germination speed ----
   
   germSpeedTrtChoices <- reactive({
     cols <- sapply(1:nCols, function(i) {
@@ -423,89 +432,118 @@ server <- function(input, output, session) {
     cols <- compact(cols)
   })
   
-  output$germSpeedUI <- renderUI({
-    validate(
-      need(BasicDataReady(), "Please load a dataset and set required column types to show the germination time analysis.")
-    )
-    list(
-      sidebarLayout(
-        sidebarPanel(
-          uiOutput("germSpeedTrts"),
-          uiOutput("germSpeedFracs")
-        ),
-        mainPanel(
-          h4("Time to germination fraction:"),
-          tableOutput("germSpeedTable")
-        )
-      )
-    )
-  })
-  
   output$germSpeedTrts <- renderUI({
-    list(
-      checkboxGroupInput(
-        inputId = "germSpeedTrtSelect",
-        label = "Select all treatment factors:",
-        choices = germSpeedTrtChoices(),
-        selected = c("TrtID")
-      )
+    checkboxGroupInput(
+      inputId = "germSpeedTrtSelect",
+      label = "Select all treatment factors:",
+      choices = germSpeedTrtChoices(),
+      selected = c("TrtID")
     )
   })
   
   output$germSpeedFracs <- renderUI({
-    list(
-      sliderInput(
-        inputId = "germSpeedRes",
-        label = "Germination fraction step",
-        min = 10,
-        max = 50,
-        step = 5,
-        value = 25
-      )
+    sliderInput(
+      inputId = "germSpeedRes",
+      label = "Germination fraction step",
+      min = 10,
+      max = 50,
+      step = 5,
+      value = 25
     )
-
+  })
+  
+  output$germSpeedType <- renderUI({
+    radioButtons(
+      inputId = "germSpeedType",
+      label = "Report values as:",
+      choiceNames = c("Time (to % germinated)", "Rate (% / time)"),
+      choiceValues = c("Time", "Rate")
+    )
   })
   
   # TODO: I should have a second reactive dataset that includes only renamed columns from the primary dataset. That would simplify the references to that data.
   
-  output$germSpeedTable <- renderTable({
+  output$germSpeedTable <- renderDataTable({
     req(input$germSpeedRes)
+    req(input$germSpeedType)
     
-    df <- tibble(
-      TrtID = as.character(rv$data[[input$TrtID]])
-    )
+    # construct working dataset
+    df <- tibble(TrtID = rv$data[[input$TrtID]])
     trts <- input$germSpeedTrtSelect
-    for (trt in trts) {
-      df[[trt]] <- rv$data[[input[[trt]]]]
-    }
+    for (trt in trts) { df[[trt]] <- rv$data[[input[[trt]]]] }
     df <- df %>% mutate(
       CumTime = rv$data[[input$CumTime]],
       CumFrac = rv$data[[input$CumFraction]]
     )
-    if (length(trts) > 0) {
-      df <- group_by_at(df, trts)
-    } else {
-      df <- group_by(df, TrtID)
-    }
-    df %>%
+    
+    # regenerate cumulative fractions depending on grouping trts
+    df <- df %>%
+      group_by(TrtID) %>%
+      arrange(TrtID, CumTime, CumFrac) %>%
+      mutate(FracDiff = CumFrac - lag(CumFrac, default = 0))
+    
+    # group by the selected treatments
+    df <- group_by_at(df, trts)
+    
+    # merge values that occur at the same timepoint
+    df <- df %>%
+      group_by(CumTime, .add = T) %>%
+      summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+      mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+    
+    # interpolate the curves to get the estimated value at given fraction
+    df <- df %>%
       arrange(CumTime) %>%
       summarise(
         {
-          df <- approx(CumFrac, CumTime, xout = seq(0, 1, by = input$germSpeedRes / 100), ties = "ordered")
+          df <- approx(CumFrac, CumTime, xout = seq(0, 1, by = input$germSpeedRes / 100), ties = "ordered", rule = 2)
           names(df) <- c("Frac", "Time")
           df <- as_tibble(df)
           drop_na(df)
         },
         .groups = "drop"
-      ) %>%
-      mutate(
-        Frac = paste0("T", Frac * 100),
-        Time = sprintf("%.2f", Time)) %>%
-      pivot_wider(
-        names_from = "Frac",
-        values_from = "Time"
       )
+    
+    # TODO: I'm not convinced that this rate calculation makes any sense
+    if (input$germSpeedType == "Rate") {
+      # show as rate
+      df <- df %>%
+        mutate(
+          Time = round(Frac / Time * 100, 2),
+          Frac = paste0("GRx", Frac * 100)) %>%
+        pivot_wider(
+          names_from = "Frac",
+          values_from = "Time"
+        )
+    } else {
+      # show as cumulative fraciton
+      df <- df %>%
+        mutate(
+          Frac = paste0("Tx", Frac * 100),
+          Time = round(Time, 1)) %>%
+        pivot_wider(
+          names_from = "Frac",
+          values_from = "Time"
+        )
     }
+    df
+  },
+    rownames = F,
+    server = F,
+    extensions = c("Buttons", "Select"),
+    selection = "none",
+    options = list(
+      searching = F,
+      paging = F,
+      select = T,
+      dom = "Bfrtip",
+      buttons = list(
+        list(
+          extend = "copy",
+          text = 'Copy'
+        )
+      )
+    )
   )
   
 }

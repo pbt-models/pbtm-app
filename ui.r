@@ -94,7 +94,7 @@ ui <- fluidPage(
       hr(),
       p(strong("Match required data to column names:")),
       div(
-        lapply(1:nrow(columnDefaults), function(i) {
+        lapply(1:nrow(columnValidation), function(i) {
           wellPanel(
             style = "display: inline-block; vertical-align: top; width: 20em; margin: 5px;",
             uiOutput(paste0("colSelect", i)),
@@ -114,16 +114,12 @@ ui <- fluidPage(
   ),
   br(),
   
-  h3("Basic charts"),
+  h3("Model outputs and analysis"),
   # actionButton("runModels", "Run Models"),
   tabsetPanel(
     tabPanel(
-      title = "Germination plot",
-      uiOutput("germPlotUI")
-    ),
-    tabPanel(
-      title = "Germination speed",
-      uiOutput("germSpeedUI")
+      title = "Germination models",
+      uiOutput("germUI")
     )
     
     # tabPanel(
