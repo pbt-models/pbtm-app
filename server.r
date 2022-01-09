@@ -20,6 +20,8 @@ server <- function(input, output, session) {
   
   nCols <- nrow(columnValidation)
   
+  factorCols <- filter(columnValidation, Role == "Factor")$Column
+  
   rv <- reactiveValues(
     data = tibble(),
     colStatus = NULL
@@ -39,7 +41,8 @@ server <- function(input, output, session) {
     updateCollapse(session, "data", open = "view", close = "load")
   })
   observeEvent(input$userData, {
-    rv$data <- read_csv(input$userData$datapath, col_types = cols())
+    rv$data <- read_csv(input$userData$datapath, col_types = cols()) %>%
+      distinct() # remove any duplicate rows
     updateCollapse(session, "data", open = "view", close = "load")
   })
   observeEvent(input$clearData, {
@@ -265,34 +268,57 @@ server <- function(input, output, session) {
   })
   
   
-  # Plot drafts ----
+  # Germination Plot ----
+  
+  # Get list of cols that have been defined and are factors
+  germTrtChoices <- reactive({
+    cols <- sapply(1:nCols, function(i) {
+      if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor") columnValidation$Column[i]
+    })
+    cols <- compact(cols)
+    setNames(as.list(c(NA, cols)), c("Not specified", cols))
+  })
+  
+  # observer <- observe({print(req(germTrtChoices()))})
+  
+  output$germPlotUI <- renderUI({
+    validate(
+      need(BasicDataReady(), "Please load a dataset and set required column types to show the plot.")
+    )
+    list(
+      sidebarLayout(
+        sidebarPanel(
+          uiOutput("germPlotTrt1"),
+          uiOutput("germPlotTrt2")
+        ),
+        mainPanel(
+          plotOutput("germPlot")
+        )
+      )
+    )
+  })
   
   output$germPlotTrt1 <- renderUI({
-    req(BasicDataReady())
     list(
       selectInput(
         "germPlotTrt1",
         "Treatment 1 (color)",
-        choices = columnChoices()
+        choices = germTrtChoices()
       )
     )
   })
   
   output$germPlotTrt2 <- renderUI({
-    req(BasicDataReady())
     req(input$germPlotTrt1)
     req(input$germPlotTrt1 != "NA")
     list(
       selectInput(
         "germPlotTrt2",
         "Treatment 2 (shape)",
-        choices = columnChoices()
+        choices = germTrtChoices()
       )
     )
   })
-  
-  
-  
   
   output$germPlot <- renderPlot({
     req(nrow(rv$data) > 0)
@@ -301,7 +327,7 @@ server <- function(input, output, session) {
     trts <- 0
     
     df <- tibble(
-      TrtId = as.factor(rv$data[[input$TrtId]]),
+      TrtID = as.factor(rv$data[[input$TrtID]]),
       CumTime = rv$data[[input$CumTime]],
       CumFrac = rv$data[[input$CumFraction]]
     )
@@ -309,77 +335,70 @@ server <- function(input, output, session) {
     if (req(input$germPlotTrt1) != "NA") {
       df <- mutate(df, Trt1 = as.factor(rv$data[[input$germPlotTrt1]]))
       trts <- 1
+      validate(
+        need(n_distinct(df$Trt1) < 10, "Can't show more than 10 different treatments")
+      )
+      
       
       if (req(input$germPlotTrt2) != "NA") {
         df <- mutate(df, Trt2 = as.factor(rv$data[[input$germPlotTrt2]]))
         trts <- 2
       }
-      
     }
     
-    if (trts == 0) {
-      plt <- df %>%
-        group_by(TrtId) %>%
-        arrange(TrtId, CumTime, CumFrac) %>%
-        mutate(FracDiff = CumFrac - lag(CumFrac, default = 0)) %>%
-        group_by(CumTime) %>%
-        summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff)) %>%
-        ggplot(aes(x = CumTime, y = CumFrac)) +
-        geom_line() +
-        geom_point(size = 2)
-    } else if (trts == 1) {
-      plt <- df %>%
-        group_by(TrtId) %>%
-        arrange(TrtId, CumTime, CumFrac) %>%
-        mutate(FracDiff = CumFrac - lag(CumFrac, default = 0)) %>%
+    df <- df %>%
+      group_by(TrtID) %>%
+      arrange(TrtID, CumTime, CumFrac) %>%
+      mutate(FracDiff = CumFrac - lag(CumFrac, default = 0))
+    
+    if (trts == 1) {
+      df <- df %>%
         group_by(Trt1, CumTime) %>%
         summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff)) %>%
+        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+      
+      plt <- df %>%
         ggplot(aes(x = CumTime, y = CumFrac, color = Trt1)) +
         geom_line() +
         geom_point(shape = 19, size = 2) +
         labs(color = input$germPlotTrt1)
+      
     } else if (trts == 2) {
-      plt <- df %>%
-        group_by(TrtId) %>%
-        arrange(TrtId, CumTime, CumFrac) %>%
-        mutate(FracDiff = CumFrac - lag(CumFrac, default = 0)) %>%
+      
+      df <- df %>%
         group_by(Trt1, Trt2, CumTime) %>%
         summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff)) %>%
+        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+      
+      plt <- df %>%
         ggplot(aes(x = CumTime, y = CumFrac, color = Trt1, shape = Trt2)) +
         geom_line() +
         geom_point(size = 2) +
         labs(color = input$germPlotTrt1, shape = input$germPlotTrt2)
-    }
+      
+    } else {
+      
+      df <- df %>%
+        group_by(CumTime) %>%
+        summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+      
+      plt <- df %>%
+        ggplot(aes(x = CumTime, y = CumFrac)) +
+        geom_line() +
+        geom_point(size = 2)
+    } 
     
-    plt +
+    plt <- plt +
       scale_y_continuous(labels = scales::percent) +
       labs(
+        title = "Cumulative germination",
         x = "Time",
-        y = "Cumulative (%)",
-        title = "Cumulative germination"
+        y = "Cumulative (%)"
       ) +
       theme_classic()
-      
     
-    # # from pbtm
-    # PlotRawDt <- function(df, t1, t2) {
-    #   gp <- "geom_point(shape=19, size=2)"
-    #     gp <- "geom_point(size=2)"
-    #     eval(parse(text = paste("TreatData$", Treat2, " <- (factor(TreatData$",
-    #       Treat2, "))", sep = "")))
-    #     T2 <- Treat2
-    #   df %>%
-    #     ggplot(data = TreatData, aes_string(x = "CumTime",
-    #     y = "CumFraction", color = T1, shape = T2)) + eval(parse(text = gp)) +
-    #     geom_line() + xlab("Time") + ylab("Cumulative (%)") +
-    #     scale_y_continuous(labels = scales::percent, expand = c(0,
-    #       0), limits = c(0, 1.02)) + scale_x_continuous(expand = c(0,
-    #         0)) + expand_limits(x = 0, y = 0)
-    # }
-    
+    plt
   })
   
   # output$PlotRateVsTreat <- renderPlot({
@@ -392,6 +411,102 @@ server <- function(input, output, session) {
   #   try(speed <- CalcSpeed(df, gr, t1, t2))
   #   try(PlotRateVsTreat(speed, t2, paste0("GR", gr * 100)))
   # })
+  
+  
+  
+  # Germination speed analysis ----
+  
+  germSpeedTrtChoices <- reactive({
+    cols <- sapply(1:nCols, function(i) {
+      if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor") columnValidation$Column[i]
+    })
+    cols <- compact(cols)
+  })
+  
+  output$germSpeedUI <- renderUI({
+    validate(
+      need(BasicDataReady(), "Please load a dataset and set required column types to show the germination time analysis.")
+    )
+    list(
+      sidebarLayout(
+        sidebarPanel(
+          uiOutput("germSpeedTrts"),
+          uiOutput("germSpeedFracs")
+        ),
+        mainPanel(
+          h4("Time to germination fraction:"),
+          tableOutput("germSpeedTable")
+        )
+      )
+    )
+  })
+  
+  output$germSpeedTrts <- renderUI({
+    list(
+      checkboxGroupInput(
+        inputId = "germSpeedTrtSelect",
+        label = "Select all treatment factors:",
+        choices = germSpeedTrtChoices(),
+        selected = c("TrtID")
+      )
+    )
+  })
+  
+  output$germSpeedFracs <- renderUI({
+    list(
+      sliderInput(
+        inputId = "germSpeedRes",
+        label = "Germination fraction step",
+        min = 10,
+        max = 50,
+        step = 5,
+        value = 25
+      )
+    )
+
+  })
+  
+  # TODO: I should have a second reactive dataset that includes only renamed columns from the primary dataset. That would simplify the references to that data.
+  
+  output$germSpeedTable <- renderTable({
+    req(input$germSpeedRes)
+    
+    df <- tibble(
+      TrtID = as.character(rv$data[[input$TrtID]])
+    )
+    trts <- input$germSpeedTrtSelect
+    for (trt in trts) {
+      df[[trt]] <- rv$data[[input[[trt]]]]
+    }
+    df <- df %>% mutate(
+      CumTime = rv$data[[input$CumTime]],
+      CumFrac = rv$data[[input$CumFraction]]
+    )
+    if (length(trts) > 0) {
+      df <- group_by_at(df, trts)
+    } else {
+      df <- group_by(df, TrtID)
+    }
+    df %>%
+      arrange(CumTime) %>%
+      summarise(
+        {
+          df <- approx(CumFrac, CumTime, xout = seq(0, 1, by = input$germSpeedRes / 100), ties = "ordered")
+          names(df) <- c("Frac", "Time")
+          df <- as_tibble(df)
+          drop_na(df)
+        },
+        .groups = "drop"
+      ) %>%
+      mutate(
+        Frac = paste0("T", Frac * 100),
+        Time = sprintf("%.2f", Time)) %>%
+      pivot_wider(
+        names_from = "Frac",
+        values_from = "Time"
+      )
+    }
+  )
   
 }
 

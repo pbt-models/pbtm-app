@@ -1,4 +1,4 @@
-﻿Treat.ID,Treat.desc,Germ.wp,Germ.temp,CumTime,CumPercent,CumFraction
+﻿TrtID,TrtDesc,GermWP,GermTemp,CumTime,CumPercent,CumFraction
 1,Tomato-15C-Water,0,15,95,6.25,0.0625
 1,Tomato-15C-Water,0,15,101,8.333333333,0.083333333
 1,Tomato-15C-Water,0,15,103,10.41666667,0.104166667

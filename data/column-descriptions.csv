@@ -1,13 +1,13 @@
 ﻿Default column name,Description,Data type,Usage
-Treat.ID,Unique treatment number,Text/Number,All models
-Treat.desc,Description of the lot and treatment,Text,All models
-Treat.aging.time,Aging time,Positive number,Aging
-Treat.priming.wp,Measured water potential used during priming,Negative number,Hydro and hydrothermal priming
-Treat.priming.temp,Measured temperature during priming (Celcius),Number (0-100),Hydrothermal priming
-Treat.priming.duration,Priming duration (hours or days),Positive number,Hydro and hydrothermal priming
-Germ.wp,Measured germination water potential,Negative number,Hydrotime and hydrothermal
-Germ.temp,Measured germination temperature (Celcius),Number (0-100),Thermal and hydrothermal time
-Germ.promoter.dosage,Measured concentration of the germination promoter,Positive number,Promoter model
-Germ.inhibitor.dosage,Measured concentration of the germination inhibitor,Positive number,Inhibitor model
+TrtID,Unique treatment number,Text/Number,All models
+TrtDesc,Description of the lot and treatment,Text,All models
+TrtAgingTime,Aging time,Positive number,Aging
+TrtPrimingWP,Measured water potential used during priming,Negative number,Hydro and hydrothermal priming
+TrtPrimingTemp,Measured temperature during priming (Celcius),Number (0-100),Hydrothermal priming
+TrtPrimingDuration,Priming duration (hours or days),Positive number,Hydro and hydrothermal priming
+GermWP,Measured germination water potential,Negative number,Hydrotime and hydrothermal
+GermTemp,Measured germination temperature (Celcius),Number (0-100),Thermal and hydrothermal time
+GermPromoterDosage,Measured concentration of the germination promoter,Positive number,Promoter model
+GermInhibitorDosage,Measured concentration of the germination inhibitor,Positive number,Inhibitor model
 CumTime,Cumulative elapsed time (hours),Positive number,All models
 CumFraction,Cumulative germinated fraction,Number (0-1),All models

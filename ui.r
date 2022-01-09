@@ -119,15 +119,11 @@ ui <- fluidPage(
   tabsetPanel(
     tabPanel(
       title = "Germination plot",
-      sidebarLayout(
-        sidebarPanel(
-          uiOutput("germPlotTrt1"),
-          uiOutput("germPlotTrt2")
-        ),
-        mainPanel(
-          plotOutput("germPlot")
-        )
-      )
+      uiOutput("germPlotUI")
+    ),
+    tabPanel(
+      title = "Germination speed",
+      uiOutput("germSpeedUI")
     )
     
     # tabPanel(
