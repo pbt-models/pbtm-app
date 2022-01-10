@@ -96,7 +96,7 @@ ui <- fluidPage(
       hr(),
       p(strong("Match required data to column names:")),
       div(
-         lapply(1:nrow(columnDefaults), function(i) {
+         lapply(1:nrow(columnValidation), function(i) {
           wellPanel(
             style = "display: inline-block; vertical-align: top; width: 20em; margin: 5px;",
             uiOutput(paste0("colSelect", i)), # outputs the colSelect 1 - 12 
@@ -115,29 +115,45 @@ ui <- fluidPage(
     )
   ),
   br(),
+
   
-  h3("Basic charts"),
+  h3("Model outputs and analysis"),
   # actionButton("runModels", "Run Models"),
   tabsetPanel(
     tabPanel(
-      title = "Germination plot",
-      sidebarLayout(
-        sidebarPanel(
-          uiOutput("germPlotTrt1"),
-          uiOutput("germPlotTrt2")
-        ),
-        mainPanel(
-          plotOutput("germPlot")
-        )
-      )
-    ),
+      title = "Germination models",
+      uiOutput("germUI")
+    )
     
-     tabPanel(
-       title = "Germination rate over treatment",
-       sliderInput("GRInput", "Select germination (%) to calculate rate", min = 10, max = 90, value = 50, step = 10),
-       plotOutput("PlotRateVsTreat"), #temp
-       tableOutput("SpeedTbl")
-     )
+    # tabPanel(
+    #   title = "PlotRateVsTreat",
+    #   sliderInput("GRInput", "Select Growth Rate", min = 10, max = 90, value = 50, step = 10),
+    #   plotOutput("PlotRateVsTreat")
+    # )
+#  ),
+  
+#  h3("Basic charts"),
+#  # actionButton("runModels", "Run Models"),
+#  tabsetPanel(
+#    tabPanel(
+#      title = "Germination plot",
+#      sidebarLayout(
+#        sidebarPanel(
+#          uiOutput("germPlotTrt1"),
+#          uiOutput("germPlotTrt2")
+#        ),
+#        mainPanel(
+#          plotOutput("germPlot")
+#        )
+#      )
+#    ),
+    
+#     tabPanel(
+#       title = "Germination rate over treatment",
+#       sliderInput("GRInput", "Select germination (%) to calculate rate", min = 10, max = 90, value = 50, step = 10),
+#       plotOutput("PlotRateVsTreat"), #temp
+#       tableOutput("SpeedTbl")
+#     )
   ),
   br(),
   hr(),

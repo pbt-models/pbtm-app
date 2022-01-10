@@ -1,11 +1,11 @@
 # ---- Server ---- #
 
-library(dplyr)
+#library(dplyr)
 library(tidyverse)
 library(shiny)
 library(shinyjs)
 library(DT)
-library(pbtmodels)
+#library(pbtmodels)
 
 # remove.packages("pbtm")
 
@@ -15,7 +15,8 @@ library(pbtmodels)
   # remove.packages("ggplot2")
   # install.packages("ggplot2", force = TRUE, dependencies = TRUE)
   # devtools::install_github("pedrobello/pbtm", force = TRUE, dependencies = TRUE)
-  # devtools::install_github("pedrobello/pbtm", dependencies = TRUE)
+  # devtools::install_github("pedrobello/pbtmodels", dependencies = TRUE)
+  # devtools::install_github("pedrobello/pbtmodels")
   # install.packages("tidyverse", force = TRUE, dependencies = TRUE)
 
 
@@ -53,7 +54,8 @@ server <- function(input, output, session) {
     updateCollapse(session, "data", open = "view", close = "load")
   })
   observeEvent(input$userData, {
-    rv$data <- read_csv(input$userData$datapath, col_types = cols()) # load data uploaded from user 
+    rv$data <- read_csv(input$userData$datapath, col_types = cols()) %>%
+      distinct() # remove any duplicate rows # load data uploaded from user 
     updateCollapse(session, "data", open = "view", close = "load")
   })
   observeEvent(input$clearData, {
@@ -283,28 +285,70 @@ server <- function(input, output, session) {
   })
   
   
-  # Plot drafts ----
+  # Germination Plot and Speed ----
+  
+  output$germUI <- renderUI({
+    validate(  #check if current data has basic requirements
+      need(BasicDataReady(), "Please load a dataset and set required column types for germination analysis.")
+    )
+    list(
+      h4("Cumulative germination plot:"),
+      sidebarLayout(
+        sidebarPanel(
+          uiOutput("germPlotTrt1"),
+          uiOutput("germPlotTrt2")
+        ),
+        mainPanel(
+          plotOutput("germPlot")
+        )
+      ),
+      br(),
+      h4("Germination speed parameters: (work in progress)"),
+      sidebarLayout(
+        sidebarPanel(
+          uiOutput("germSpeedTrts"),
+          uiOutput("germSpeedFracs")
+      #    uiOutput("germSpeedType")
+        ),
+        mainPanel(
+          div(
+            dataTableOutput("germSpeedTable"),
+            style = "overflow-x: auto"
+          )
+        )
+      )
+    )
+  })
+  
+  ## Germination plot ----
+  
+  germTrtChoices <- reactive({ # create choices with validated column names and factors 
+    cols <- sapply(1:nCols, function(i) {
+      if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor") columnValidation$Column[i] # TODO: need to fix this to display users column names instead otherwise error with custom column names. 
+    })
+    cols <- compact(cols) #remove all null entries 
+    setNames(as.list(c(NA, cols)), c("Not specified", cols))
+  })
   
   output$germPlotTrt1 <- renderUI({
-    req(BasicDataReady()) #check if current data has basic requirements
+    # req(BasicDataReady()) #check if current data has basic requirements
     list(
-      selectInput( #create combo box with available models
-        "germPlotTrt1",
+      selectInput( #create combo box with validated columns and factors
+        "germPlotTrt1", 
         "Treatment 1 (color)",
-        choices = columnChoices() 
+        choices = germTrtChoices()
       )
     )
   })
   
   output$germPlotTrt2 <- renderUI({
-    req(BasicDataReady()) #check if current data has basic requirements
     req(input$germPlotTrt1) #check if combo treatment is filled
     req(input$germPlotTrt1 != "NA") #check if combo treatment is not NA
     list(
-      selectInput( #create combo box with available models
+      selectInput(  #create combo box with validated columns and factors
         "germPlotTrt2",
         "Treatment 2 (shape)",
-        choices = columnChoices()
+        choices = germTrtChoices()
       )
     )
   })
@@ -316,7 +360,7 @@ server <- function(input, output, session) {
     trts <- 0
     
     df <- tibble(
-      TrtId = as.factor(rv$data[[input$TrtId]]),
+      TrtID = as.factor(rv$data[[input$TrtID]]),
       CumTime = rv$data[[input$CumTime]],
       CumFrac = rv$data[[input$CumFraction]]
     )
@@ -329,100 +373,231 @@ server <- function(input, output, session) {
         df <- mutate(df, Trt2 = as.factor(rv$data[[input$germPlotTrt2]]))
         trts <- 2
       }
-      
     }
     
-    if (trts == 0) { # setup plot data if no treatments were informed on combos
-      plt <- df %>%
-        group_by(TrtId) %>%
-        arrange(TrtId, CumTime, CumFrac) %>%
-        mutate(FracDiff = CumFrac - lag(CumFrac, default = 0)) %>%
-        group_by(CumTime) %>%
-        summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff)) %>%
-        ggplot(aes(x = CumTime, y = CumFrac)) +
-        geom_line() +
-        geom_point(size = 2)
-    } else if (trts == 1) { # setup plot data if treatment 1 informed only
-      plt <- df %>%
-        group_by(TrtId) %>%
-        arrange(TrtId, CumTime, CumFrac) %>%
-        mutate(FracDiff = CumFrac - lag(CumFrac, default = 0)) %>%
+    df <- df %>%
+      group_by(TrtID) %>%
+      arrange(TrtID, CumTime, CumFrac) %>%
+      mutate(FracDiff = CumFrac - lag(CumFrac, default = 0))
+    
+    if (trts == 1) { # setup plot data if treatment 1 informed only
+      
+      df <- df %>%
         group_by(Trt1, CumTime) %>%
         summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff)) %>%
+        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+      
+      plt <- df %>%
         ggplot(aes(x = CumTime, y = CumFrac, color = Trt1)) +
         geom_line() +
         geom_point(shape = 19, size = 2) +
         labs(color = input$germPlotTrt1)
+      
     } else if (trts == 2) { # setup plot data if both treatments were informed
-      plt <- df %>%
-        group_by(TrtId) %>%
-        arrange(TrtId, CumTime, CumFrac) %>%
-        mutate(FracDiff = CumFrac - lag(CumFrac, default = 0)) %>%
+      
+      df <- df %>%
         group_by(Trt1, Trt2, CumTime) %>%
         summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff)) %>%
+        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+      
+      plt <- df %>%
         ggplot(aes(x = CumTime, y = CumFrac, color = Trt1, shape = Trt2)) +
         geom_line() +
         geom_point(size = 2) +
         labs(color = input$germPlotTrt1, shape = input$germPlotTrt2)
-    }
+      
+    } else { # setup plot data if no treatments were informed on combos
+      
+      df <- df %>%
+        group_by(CumTime) %>%
+        summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+      
+      plt <- df %>%
+        ggplot(aes(x = CumTime, y = CumFrac)) +
+        geom_line() +
+        geom_point(size = 2)
+    } 
     
-    plt +
+    plt <- plt +
+      scale_x_continuous(breaks = scales::pretty_breaks()) +
       scale_y_continuous(labels = scales::percent) +
       labs(
+        title = "Cumulative germination",
         x = "Time",
-        y = "Cumulative (%)",
-        title = "Cumulative germination"
+        y = "Cumulative (%)"
       ) +
       theme_classic()
-      
     
-    # # from pbtm
-    # PlotRawDt <- function(df, t1, t2) {
-    #   gp <- "geom_point(shape=19, size=2)"
-    #     gp <- "geom_point(size=2)"
-    #     eval(parse(text = paste("TreatData$", Treat2, " <- (factor(TreatData$",
-    #       Treat2, "))", sep = "")))
-    #     T2 <- Treat2
-    #   df %>%
-    #     ggplot(data = TreatData, aes_string(x = "CumTime",
-    #     y = "CumFraction", color = T1, shape = T2)) + eval(parse(text = gp)) +
-    #     geom_line() + xlab("Time") + ylab("Cumulative (%)") +
-    #     scale_y_continuous(labels = scales::percent, expand = c(0,
-    #       0), limits = c(0, 1.02)) + scale_x_continuous(expand = c(0,
-    #         0)) + expand_limits(x = 0, y = 0)
+    # if (req(input$germSpeedFracs)) {
+    #   plt <- plt + geom_hline(yintercept = input$germSpeedFracs / 100)
     # }
     
+    lines = seq(0, 1, by = input$germSpeedRes / 100)
+    plt <- plt + geom_hline(yintercept = lines, color = "grey", size = 0.25, alpha = 0.5, linetype = "dashed")
+    
+    plt
   })
   
-
-     output$PlotRateVsTreat <- renderPlot({ #temp
-     req(nrow(rv$data) > 0)
-     req(TTModelReady())
-     df <- rv$data # get all the user data
-     # revert Time and fraction column names to Cumtime and CumFraction
-     if (input$CumTime != "CumTime") {
-     names(df)[names(df) == input$CumTime] <- "CumTime" }
-     if (input$CumFraction != "CumFraction") {
-     names(df)[names(df) == input$CumFraction] <- "CumFraction" }
-     gr <- input$GRInput / 100
-     t1 <- input$GermWP # germ wp
-     t2 <- input$GermTemp # germ wp
-     try(speed <- CalcSpeed(df, gr, t1, t2))
-     try(PlotRateVsTreat(speed, t2, paste0("GR", gr * 100)))
-   })
   
-   output$SpeedTbl <- renderTable({
-     df <- rv$data
-     gr <- input$GRInput / 100
-     t1 <- input$GermWP # germ wp
-     t2 <- input$GermTemp
-     try(speed <- CalcSpeed(df, gr, t1, t2))
-     speed})
+  ## Germination speed ----
+  
+  germSpeedTrtChoices <- reactive({
+    cols <- sapply(1:nCols, function(i) {
+      if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor") columnValidation$Column[i]
+    })
+    cols <- compact(cols)
+  })
+  
+  output$germSpeedTrts <- renderUI({
+    checkboxGroupInput(
+      inputId = "germSpeedTrtSelect",
+      label = "Select all treatment factors:",
+      choices = germSpeedTrtChoices(),
+      selected = c("TrtID")
+    )
+  })
+  
+  output$germSpeedFracs <- renderUI({
+    sliderInput(
+      inputId = "germSpeedRes",
+      label = "Germination (%) basis",
+      min = 10,
+      max = 100,
+      step = 10,
+      value = 50
+    )
+  })
+  
+  #output$germSpeedType <- renderUI({
+  #  radioButtons(
+  #    inputId = "germSpeedType",
+  #    label = "Report values as:",
+  #    choiceNames = c("Time (to % germinated)", "Rate (% / time)"),
+  #    choiceValues = c("Time", "Rate")
+  #  )
+  #})
+  
+  # TODO: I should have a second reactive dataset that includes only renamed columns from the primary dataset. That would simplify the references to that data.
+  
+  output$germSpeedTable <- renderDataTable({
+    req(input$germSpeedRes)
+    #req(input$germSpeedType)
+    
+    # construct working dataset
+    df <- tibble(TrtID = rv$data[[input$TrtID]])
+    trts <- input$germSpeedTrtSelect
+    for (trt in trts) { df[[trt]] <- rv$data[[input[[trt]]]] }
+    df <- df %>% mutate(
+      CumTime = rv$data[[input$CumTime]],
+      CumFrac = rv$data[[input$CumFraction]]
+    )
+    
+    # regenerate cumulative fractions depending on grouping trts
+    df <- df %>%
+      group_by(TrtID) %>%
+      arrange(TrtID, CumTime, CumFrac) %>%
+      mutate(FracDiff = CumFrac - lag(CumFrac, default = 0))
+    
+    # group by the selected treatments
+    df <- group_by_at(df, trts)
+    
+    # merge values that occur at the same timepoint 
+    ### TODO: Is this dropping values at the same timepoint? We actually need to drop the last value of similar fraction that occur at different time points (no increase in germination since earlier observation) that is the function of the cleandata function from the pbtm package 
+    df <- df %>%
+      group_by(CumTime, .add = T) %>%
+      summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+      mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+    
+    # interpolate the curves to get the estimated value at given fraction
+    df <- df %>%
+      arrange(CumTime) %>%
+      summarise(
+        {
+          #df <- approx(CumFrac, CumTime, xout = seq(0, 1, by = input$germSpeedRes / 100), ties = "ordered", rule = 2) # rule 2 returns the closest data which can be misleading, better return NA with rule = 1
+          df <- approx(CumFrac, CumTime, xout =  (input$germSpeedRes / 100), ties = "ordered", rule = 1)
+          names(df) <- c("Frac", "Time") # saving x (Frac) and y (Time) 
+          df <- as_tibble(df)
+          drop_na(df)
+        },
+        .groups = "drop"
+      )
+    
+    # Calculation of the time to desired germ % and respective rate.
+    #if (input$germSpeedType == "Rate") {
+      # show as rate
+      df <- df %>%
+        mutate(
+          #Time = round(Frac / Time * 100, 2),
+          Tx = paste0("T", Frac * 100),
+          GRx = paste0("GR", Frac * 100),
+          Time = round(Time, 1),
+          Frac = round(1 / Time, 3)) %>%
+        pivot_wider(
+          names_from = c(Tx, GRx), # TODO: Need to fix these labes...
+          values_from = c("Time", "Frac")
+        )
+    #} else {
+      # show as cumulative fraction
+    #  df <- df %>%
+    #    mutate(
+    #      Frac = (Frac * 100),
+    #      Time = round(Time, 1)) %>%
+    #    pivot_wider(
+    #      names_from = "Frac",
+    #      values_from = "Time"
+    #    )
+    # }
+    df
+  },
+  rownames = F,
+  server = F,
+  extensions = c("Buttons", "Select"),
+  selection = "none",
+  options = list(
+    searching = F,
+    paging = F,
+    select = T,
+    dom = "Bfrtip",
+    buttons = list(
+      list(
+        extend = "copy",
+        text = 'Copy'
+      )
+    )
+  )
+  )
+  
+}
+  
+  
+  ## Germination speed ----
+  
+ #    output$PlotRateVsTreat <- renderPlot({ #temp
+#     req(nrow(rv$data) > 0)
+#     req(TTModelReady())
+#     df <- rv$data # get all the user data
+#     # revert Time and fraction column names to Cumtime and CumFraction
+#     if (input$CumTime != "CumTime") {
+#     names(df)[names(df) == input$CumTime] <- "CumTime" }
+#     if (input$CumFraction != "CumFraction") {
+#     names(df)[names(df) == input$CumFraction] <- "CumFraction" }
+#     gr <- input$GRInput / 100
+#     t1 <- input$GermWP # germ wp
+#     t2 <- input$GermTemp # germ wp
+#     try(speed <- calcspeed(df, gr, t1, t2))
+#     # try(PlotRateVsTreat(speed, t2, paste0("GR", gr * 100)))
+#   })
+  
+#   output$SpeedTbl <- renderTable({
+#     df <- rv$data
+#     gr <- input$GRInput / 100
+#     t1 <- input$GermWP # germ wp
+#     t2 <- input$GermTemp
+#     try(speed <- calcspeed(df, gr, t1, t2))
+#     speed})
    
      
      
-}
+#}
 

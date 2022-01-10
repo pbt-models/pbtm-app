@@ -1,6 +1,6 @@
 # ---- Global ---- #
 
-library(dplyr)
+#library(dplyr)
 library(tidyverse)
 
 options(rsconnect.http.trace = TRUE)
@@ -14,7 +14,7 @@ sampleGermData <- read_csv("data/sample-germ-data.csv", col_types = cols())
 samplePrimingData <- read_csv("data/sample-priming-data.csv", col_types = cols())
 
 #Added because of compilation error
-columnDefaults <- read_csv("data/column-defaults.csv", col_types = cols())
+#columnDefaults <- read_csv("data/column-defaults.csv", col_types = cols())
 
 # test stuff
 
