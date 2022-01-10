@@ -10,14 +10,14 @@ library(DT)
 # remove.packages("pbtm")
 
 #Install required package for GitHub repository
-  # install.packages("plyr") # for some reason needed to install pbtm... (CHECK)
-  # install.packages("dplyr")
-  # remove.packages("ggplot2")
-  # install.packages("ggplot2", force = TRUE, dependencies = TRUE)
-  # devtools::install_github("pedrobello/pbtm", force = TRUE, dependencies = TRUE)
-  # devtools::install_github("pedrobello/pbtmodels", dependencies = TRUE)
-  # devtools::install_github("pedrobello/pbtmodels")
-  # install.packages("tidyverse", force = TRUE, dependencies = TRUE)
+# install.packages("plyr") # for some reason needed to install pbtm... (CHECK)
+# install.packages("dplyr")
+# remove.packages("ggplot2")
+# install.packages("ggplot2", force = TRUE, dependencies = TRUE)
+# devtools::install_github("pedrobello/pbtm", force = TRUE, dependencies = TRUE)
+# devtools::install_github("pedrobello/pbtmodels", dependencies = TRUE)
+# devtools::install_github("pedrobello/pbtmodels")
+# install.packages("tidyverse", force = TRUE, dependencies = TRUE)
 
 
 server <- function(input, output, session) {
@@ -31,16 +31,16 @@ server <- function(input, output, session) {
   
   # Data definitions ----
   
-   # - number of columns (rows) in the column validation file= 12
+  # - number of columns (rows) in the column validation file= 12
   nCols <- nrow(columnValidation)
   
-    # Create object to store reactive values - full table
+  # Create object to store reactive values - full table
   rv <- reactiveValues(
     data = tibble(),
     colStatus = NULL
   )
   
-
+  
   
   
   # Action Buttons ----
@@ -106,7 +106,7 @@ server <- function(input, output, session) {
     }
   })
   
-
+  
   # Column matching boxes ----
   
   columnNames <- reactive({ # Reactive function to check and load column names from current data
@@ -170,9 +170,9 @@ server <- function(input, output, session) {
       if (!is.na(expectedType) & colType != expectedType) {
         newmsg <- list(br(), span("Error: Incorrect column type, expected", expectedType, style = "color:red"))
         msg <- append(msg, newmsg)
-      
+        
       } else if (colType == "numeric") {
-
+        
         # min check
         if(!is.na(minValue) & min(col, na.rm = TRUE) < minValue) {
           newmsg <- list(br(), span("Error: Min value less than", minValue, style = "color:red"))
@@ -278,7 +278,7 @@ server <- function(input, output, session) {
         "Inhibitor model:", status(InhibitorModelReady()), br(),
         "Hydropriming model:", status(HPModelReady()), br(),
         "Hydrothermal priming model:", status(HTPModelReady())
-
+        
       )
     )
     
@@ -292,7 +292,7 @@ server <- function(input, output, session) {
       need(BasicDataReady(), "Please load a dataset and set required column types for germination analysis.")
     )
     list(
-      h4("Cumulative germination plot:"),
+      h4("Cumulative germination:"),
       sidebarLayout(
         sidebarPanel(
           uiOutput("germPlotTrt1"),
@@ -303,17 +303,29 @@ server <- function(input, output, session) {
         )
       ),
       br(),
-      h4("Germination speed parameters: (work in progress)"),
+      h4("Germination speed parameters:"),
       sidebarLayout(
         sidebarPanel(
           uiOutput("germSpeedTrts"),
           uiOutput("germSpeedFracs")
-      #    uiOutput("germSpeedType")
+          #    uiOutput("germSpeedType")
         ),
         mainPanel(
           div(
             dataTableOutput("germSpeedTable"),
             style = "overflow-x: auto"
+          )
+        )
+      ),
+      br(),
+      h4("Germination rates over treatments: (in progress)"),
+      sidebarLayout(
+        sidebarPanel(
+          uiOutput("germRateTreat")
+        ),
+        mainPanel(
+          div(
+            plotOutput("germRateTrtPlot")
           )
         )
       )
@@ -525,29 +537,19 @@ server <- function(input, output, session) {
     
     # Calculation of the time to desired germ % and respective rate.
     #if (input$germSpeedType == "Rate") {
-      # show as rate
-      df <- df %>%
-        mutate(
-          #Time = round(Frac / Time * 100, 2),
-          Tx = paste0("T", Frac * 100),
-          GRx = paste0("GR", Frac * 100),
-          Time = round(Time, 1),
-          Frac = round(1 / Time, 3)) %>%
-        pivot_wider(
-          names_from = c(Tx, GRx), # TODO: Need to fix these labes...
-          values_from = c("Time", "Frac")
-        )
-    #} else {
-      # show as cumulative fraction
-    #  df <- df %>%
-    #    mutate(
-    #      Frac = (Frac * 100),
-    #      Time = round(Time, 1)) %>%
-    #    pivot_wider(
-    #      names_from = "Frac",
-    #      values_from = "Time"
-    #    )
-    # }
+    # show as rate
+    df <- df %>%
+      mutate(
+        #Time = round(Frac / Time * 100, 2),
+        Tx = paste0("T", Frac * 100),
+        GRx = paste0("GR", Frac * 100),
+        Time = round(Time, 1),
+        Frac = round(1 / Time, 3)) %>%
+      pivot_wider(
+        names_from = c(Tx, GRx), # TODO: Need to fix these labels...
+        values_from = c("Time", "Frac")
+      )
+     
     df
   },
   rownames = F,
@@ -568,12 +570,53 @@ server <- function(input, output, session) {
   )
   )
   
+  ## Germination rate plot against treatment ----
+  
+  germTrtChoicesRate <- reactive({ # create choices with validated column namesand numeric factors 
+    colsRt <- sapply(1:nCols, function(i) {
+      if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor"  && !is.na(columnValidation$Type[i])) columnValidation$Column[i] # TODO: need to fix this to display users column names instead otherwise error with custom column names. 
+    })
+    colsRt <- compact(colsRt) #remove all null entries 
+    setNames(colsRt, colsRt)
+  })
+  
+  # construct working dataset
+  output$germRateTreat <- renderUI({
+    radioButtons(
+      inputId = "germSpeedRateTrtSelect",
+      label = "Select treatment for x axis:",
+      choices = germTrtChoicesRate()
+    )
+    
+  })
+  
+  # Plot selected GRx (from the section above) in the y-axis and the numeric factor in the x axis based in the radiobutton germSpeedRateTrtSelect
+
+   output$germRateTrtPlot <- renderPlot({
+    req(nrow(rv$data) > 0)
+   req(BasicDataReady())
+   
+  # TODO: how to get the values from the table in the section above?
+  pltRt <- df() %>%
+    ggplot(aes(x = input$germSpeedRateTrtSelect, y = Frac)) +
+    geom_point(shape = 19, size = 2) +
+  labs(
+    title = "Germination Rate Vs bbb",
+    x = "Temp",
+    y = "GRx") +
+  theme_classic()
+  
+  pltRt
+   })
+  
+  
+  
 }
-  
-  
-  ## Germination speed ----
-  
- #    output$PlotRateVsTreat <- renderPlot({ #temp
+
+
+## Germination speed ----
+
+#    output$PlotRateVsTreat <- renderPlot({ #temp
 #     req(nrow(rv$data) > 0)
 #     req(TTModelReady())
 #     df <- rv$data # get all the user data
@@ -588,7 +631,7 @@ server <- function(input, output, session) {
 #     try(speed <- calcspeed(df, gr, t1, t2))
 #     # try(PlotRateVsTreat(speed, t2, paste0("GR", gr * 100)))
 #   })
-  
+
 #   output$SpeedTbl <- renderTable({
 #     df <- rv$data
 #     gr <- input$GRInput / 100
@@ -596,8 +639,8 @@ server <- function(input, output, session) {
 #     t2 <- input$GermTemp
 #     try(speed <- calcspeed(df, gr, t1, t2))
 #     speed})
-   
-     
-     
+
+
+
 #}
 

@@ -117,20 +117,26 @@ ui <- fluidPage(
   br(),
 
   
-  h3("Model outputs and analysis"),
+  h3("Data outputs and model analysis"),
   # actionButton("runModels", "Run Models"),
   tabsetPanel(
     tabPanel(
-      title = "Germination models",
+      title = "Germination rate",
       uiOutput("germUI")
-    )
+    ),
     
-    # tabPanel(
-    #   title = "PlotRateVsTreat",
-    #   sliderInput("GRInput", "Select Growth Rate", min = 10, max = 90, value = 50, step = 10),
-    #   plotOutput("PlotRateVsTreat")
-    # )
-#  ),
+    #TODO: How to show/hide tabpanels based in the model readiness.  
+    tabPanel(
+       title = "Thermal time model",
+       #sliderInput("GRInput", "Select Growth Rate", min = 10, max = 90, value = 50, step = 10),
+       #plotOutput("PlotRateVsTreat")
+     ),
+  
+    tabPanel(
+      title = "hydrotime model",
+
+     )
+  
   
 #  h3("Basic charts"),
 #  # actionButton("runModels", "Run Models"),
