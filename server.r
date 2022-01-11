@@ -64,87 +64,9 @@ server <- function(input, output, session) {
   })
   observeEvent(input$confirmDataView, {
     updateCollapse(session, "data", open = "cols", close = "view")
-    status <- function(x) { # receive model validation status
-      if (x) {
-        TRUE  # if T is ready
-      } else {
-        FALSE # if F not ready
-      }
-    }
-    
-    if (status(TTModelReady())) { showTab(inputId = "tabs", target = "Thermal time")
-    } else { hideTab(inputId = "tabs", target = "Thermal time")
-    }
-    
-    if (status(HTModelReady())) { showTab(inputId = "tabs", target = "Hydrotime")
-    } else { hideTab(inputId = "tabs", target = "Hydrotime")
-    }
-    
-    if (status(HTTModelReady())) { showTab(inputId = "tabs", target = "Hydrothermal time")
-    } else { hideTab(inputId = "tabs", target = "Hydrothermal time")
-    }
-    
-    if (status(AgingModelReady())) { showTab(inputId = "tabs", target = "Aging")
-    } else { hideTab(inputId = "tabs", target = "Aging")
-    }
-    
-    if (status(PromoterModelReady())) { showTab(inputId = "tabs", target = "Promoter")
-    } else { hideTab(inputId = "tabs", target = "Promoter")
-    }
-    
-    if (status(InhibitorModelReady())) { showTab(inputId = "tabs", target = "Inhibitor")
-    } else { hideTab(inputId = "tabs", target = "Inhibitor")
-    }
-    
-    if (status(HPModelReady())) { showTab(inputId = "tabs", target = "Hydropriming")
-    } else { hideTab(inputId = "tabs", target = "Hydropriming")
-    }
-    
-    if (status(HTPModelReady())) { showTab(inputId = "tabs", target = "Hydrothermal priming")
-    } else { hideTab(inputId = "tabs", target = "Hydrothermal priming")
-    }
   })
   observeEvent(c(input$confirmColView, input$confirmColView2), {
     updateCollapse(session, "data", close = "cols")
-    status <- function(x) { # receive model validation status
-      if (x) {
-        TRUE  # if T is ready
-      } else {
-        FALSE # if F not ready
-      }
-    }
-    
-    if (status(TTModelReady())) { showTab(inputId = "tabs", target = "Thermal time")
-    } else { hideTab(inputId = "tabs", target = "Thermal time")
-    }
-    
-    if (status(HTModelReady())) { showTab(inputId = "tabs", target = "Hydrotime")
-    } else { hideTab(inputId = "tabs", target = "Hydrotime")
-    }
-    
-    if (status(HTTModelReady())) { showTab(inputId = "tabs", target = "Hydrothermal time")
-    } else { hideTab(inputId = "tabs", target = "Hydrothermal time")
-    }
-    
-    if (status(AgingModelReady())) { showTab(inputId = "tabs", target = "Aging")
-    } else { hideTab(inputId = "tabs", target = "Aging")
-    }
-    
-    if (status(PromoterModelReady())) { showTab(inputId = "tabs", target = "Promoter")
-    } else { hideTab(inputId = "tabs", target = "Promoter")
-    }
-    
-    if (status(InhibitorModelReady())) { showTab(inputId = "tabs", target = "Inhibitor")
-    } else { hideTab(inputId = "tabs", target = "Inhibitor")
-    }
-    
-    if (status(HPModelReady())) { showTab(inputId = "tabs", target = "Hydropriming")
-    } else { hideTab(inputId = "tabs", target = "Hydropriming")
-    }
-    
-    if (status(HTPModelReady())) { showTab(inputId = "tabs", target = "Hydrothermal priming")
-    } else { hideTab(inputId = "tabs", target = "Hydrothermal priming")
-    }
   })
   
   
@@ -333,6 +255,72 @@ server <- function(input, output, session) {
   InhibitorModelReady <- reactive({checkModelReadiness(columnValidation$Inhibitor)})
   
   
+  # Update visible tabs based in the model readiness
+  observeEvent(TTModelReady(), {
+    if (TTModelReady ()) {
+      showTab(inputId = "tabs", target = "Thermal time")
+    } else {
+      hideTab(inputId = "tabs", target = "Thermal time")
+    }
+  })
+  
+  observeEvent(HTModelReady(), {
+    if (HTModelReady ()) {
+      showTab(inputId = "tabs", target = "Hydrotime")
+    } else {
+      hideTab(inputId = "tabs", target = "Hydrotime")
+    }
+  })
+  
+  observeEvent(HTTModelReady(), {
+    if (HTTModelReady ()) {
+      showTab(inputId = "tabs", target = "Hydrothermal time")
+    } else {
+      hideTab(inputId = "tabs", target = "Hydrothermal time")
+    }
+  })
+  
+  observeEvent(AgingModelReady(), {
+    if (AgingModelReady ()) {
+      showTab(inputId = "tabs", target = "Aging")
+    } else {
+      hideTab(inputId = "tabs", target = "Aging")
+    }
+  })
+  
+  observeEvent(PromoterModelReady(), {
+    if (PromoterModelReady ()) {
+      showTab(inputId = "tabs", target = "Promoter")
+    } else {
+      hideTab(inputId = "tabs", target = "Promoter")
+    }
+  })
+  
+  observeEvent(InhibitorModelReady(), {
+    if (InhibitorModelReady ()) {
+      showTab(inputId = "tabs", target = "Inhibitor")
+    } else {
+      hideTab(inputId = "tabs", target = "Inhibitor")
+    }
+  })
+  
+  observeEvent(HPModelReady(), {
+    if (HPModelReady ()) {
+      showTab(inputId = "tabs", target = "Hydropriming")
+    } else {
+      hideTab(inputId = "tabs", target = "Hydropriming")
+    }
+  })
+  
+  observeEvent(HTPModelReady(), {
+    if (HTPModelReady ()) {
+      showTab(inputId = "tabs", target = "Hydrothermal priming")
+    } else {
+      hideTab(inputId = "tabs", target = "Hydrothermal priming")
+    }
+  })
+  
+
   
   # Model readiness display ----
   output$modelStatus <- renderUI({
@@ -727,16 +715,41 @@ server <- function(input, output, session) {
   pltRt
    })
   
+  # Thermal time TAB -------------------
+   
+   # Treatment SelectInputs ---    
+   
+   germTrtThermalChoices <- reactive({ # create choices with validated column names and factors 
+     cols <- sapply(1:nCols, function(i) {
+       if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor") columnValidation$Column[i] # TODO: need to fix this to display users column names instead otherwise error with custom column names. 
+     })
+     cols <- compact(cols) #remove all null entries 
+     setNames(as.list(c(NA, cols)), c("Not specified", cols))
+   })
+   
+   output$germThermalPlotTrt1 <- renderUI({
+     # req(BasicDataReady()) #check if current data has basic requirements
+     list(
+       selectInput( #create combo box with validated columns and factors
+         "germPlotTrt1", 
+         "Treatment 1 (color)",
+         choices = germTrtThermalChoices()
+       )
+     )
+   })
+   
+
+   
    output$ThermaltimeUI <- renderUI({
      validate(  #check if current data has basic requirements
        need(TTModelReady(), "Please load a dataset and set required column types for the thermal time model analysis.")
      )
      list(
-       h4("Cumulative germination:"),
+       h4("Thermal time model calculation:"),
        sidebarLayout(
          sidebarPanel(
-           uiOutput("germPlotTrt1"),
-           uiOutput("germPlotTrt2")
+           uiOutput("germThermalPlotTrt1"),
+           uiOutput("germSpeedTrts")
          ),
          mainPanel(
            plotOutput("germPlot")
@@ -746,8 +759,8 @@ server <- function(input, output, session) {
        h4("Germination speed parameters:"),
        sidebarLayout(
          sidebarPanel(
-           uiOutput("germSpeedTrts"),
-           uiOutput("germSpeedFracs")
+           #uiOutput("germSpeedTrts"),
+           #uiOutput("germSpeedFracs")
            #    uiOutput("germSpeedType")
          ),
          mainPanel(
