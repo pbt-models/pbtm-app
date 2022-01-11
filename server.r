@@ -110,7 +110,7 @@ server <- function(input, output, session) {
   # Column matching boxes ----
   
   columnNames <- reactive({ # Reactive function to check and load column names from current data
-    req(rv$data) # check if rv$data is correct, no missing inputs or preconditions
+    req(rv$data) # check if rv$data is present/correct, no missing inputs or preconditions
     names(rv$data) # get names of columns 
   })
   
@@ -349,54 +349,6 @@ server <- function(input, output, session) {
     
   })
   
-  # Update visible tabs based in Model readiness
-  
-  observeEvent(input$hideTab, {
-    status <- function(x) { # receive model validation status
-      if (x) {
-        TRUE  # if T is ready
-      } else {
-        FALSE # if F not ready
-      }
-    }
-    
-  if (status(TTModelReady())) { showTab(inputId = "tabs", target = "Thermal time")
-  } else { hideTab(inputId = "tabs", target = "Thermal time")
-  }
-  
-  if (status(HTModelReady())) { showTab(inputId = "tabs", target = "Hydrotime")
-  } else { hideTab(inputId = "tabs", target = "Hydrotime")
-  }
-
-  if (status(HTTModelReady())) { showTab(inputId = "tabs", target = "Hydrothermal time")
-  } else { hideTab(inputId = "tabs", target = "Hydrothermal time")
-  }
-    
-  if (status(AgingModelReady())) { showTab(inputId = "tabs", target = "Aging")
-  } else { hideTab(inputId = "tabs", target = "Aging")
-  }
-  
-  if (status(PromoterModelReady())) { showTab(inputId = "tabs", target = "Promoter")
-  } else { hideTab(inputId = "tabs", target = "Promoter")
-    }
-  
-  if (status(InhibitorModelReady())) { showTab(inputId = "tabs", target = "Inhibitor")
-  } else { hideTab(inputId = "tabs", target = "Inhibitor")
-  }
-    
-  if (status(HPModelReady())) { showTab(inputId = "tabs", target = "Hydropriming")
-  } else { hideTab(inputId = "tabs", target = "Hydropriming")
-  }
-  
-  if (status(HTPModelReady())) { showTab(inputId = "tabs", target = "Hydrothermal priming")
-  } else { hideTab(inputId = "tabs", target = "Hydrothermal priming")
-  }
-    
-  })
-  
-  
-  
-  
   
   
   # Germination Plot and Speed ----
@@ -435,11 +387,13 @@ server <- function(input, output, session) {
       h4("Germination rates over treatments: (in progress)"),
       sidebarLayout(
         sidebarPanel(
-          uiOutput("germRateTreat")
+          uiOutput("xAxisTreat")
         ),
         mainPanel(
           div(
-            plotOutput("germRateTrtPlot")
+            plotOutput("germRateTrtPlot"),
+            textOutput("msg"),
+            tableOutput("msg2")
           )
         )
       )
@@ -483,7 +437,9 @@ server <- function(input, output, session) {
   
   # Germination rate plot ---
   
-  output$germPlot <- renderPlot({
+  # Reactive data ---
+  
+  germRateData <- reactive({
     req(nrow(rv$data) > 0)
     req(BasicDataReady())
     
@@ -517,11 +473,6 @@ server <- function(input, output, session) {
         summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
         mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
       
-      plt <- df %>%
-        ggplot(aes(x = CumTime, y = CumFrac, color = Trt1)) +
-        geom_line() +
-        geom_point(shape = 19, size = 2) +
-        labs(color = input$germPlotTrt1)
       
     } else if (trts == 2) { # setup plot data if both treatments were informed
       
@@ -530,6 +481,44 @@ server <- function(input, output, session) {
         summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
         mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
       
+    } else { # setup plot data if no treatments were informed on combos
+      
+      df <- df %>%
+        group_by(CumTime) %>%
+        summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+    
+    } 
+  })
+  
+  
+  # Render Plot----
+  output$germPlot <- renderPlot({
+    req(nrow(rv$data) > 0)
+    req(BasicDataReady())
+    
+    trts <- 0
+    
+    df <- germRateData()
+    
+    if (req(input$germPlotTrt1) != "NA") {
+      trts <- 1
+      
+      if (req(input$germPlotTrt2) != "NA") {
+      trts <- 2
+      }
+    }
+    
+    if (trts == 1) { # setup plot data if treatment 1 informed only
+      
+      plt <- df %>%
+        ggplot(aes(x = CumTime, y = CumFrac, color = Trt1)) +
+        geom_line() +
+        geom_point(shape = 19, size = 2) +
+        labs(color = input$germPlotTrt1)
+      
+    } else if (trts == 2) { # setup plot data if both treatments were informed
+      
       plt <- df %>%
         ggplot(aes(x = CumTime, y = CumFrac, color = Trt1, shape = Trt2)) +
         geom_line() +
@@ -537,11 +526,6 @@ server <- function(input, output, session) {
         labs(color = input$germPlotTrt1, shape = input$germPlotTrt2)
       
     } else { # setup plot data if no treatments were informed on combos
-      
-      df <- df %>%
-        group_by(CumTime) %>%
-        summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
       
       plt <- df %>%
         ggplot(aes(x = CumTime, y = CumFrac)) +
@@ -598,7 +582,9 @@ server <- function(input, output, session) {
   
   # TODO: I should have a second reactive dataset that includes only renamed columns from the primary dataset. That would simplify the references to that data.
   
-  output$germSpeedTable <- renderDataTable({
+  # Prepare df for table and plot ---
+  
+  GRData <- reactive({
     req(input$germSpeedRes)
     #req(input$germSpeedType)
     
@@ -647,16 +633,29 @@ server <- function(input, output, session) {
     df <- df %>%
       mutate(
         #Time = round(Frac / Time * 100, 2),
-        Tx = paste0("T", Frac * 100),
-        GRx = paste0("GR", Frac * 100),
+        Tx = paste0("T", input$germSpeedRes),
+        GRx = paste0("GR", input$germSpeedRes),
         Time = round(Time, 1),
         Frac = round(1 / Time, 3)) %>%
       pivot_wider(
         names_from = c(Tx, GRx), # TODO: Need to fix these labels...
         values_from = c("Time", "Frac")
-      )
-     
+      ) 
+    
+    names(df)[names(df) == paste0("Time_T", input$germSpeedRes, "_GR", input$germSpeedRes)] <- paste0("T", input$germSpeedRes)
+    names(df)[names(df) == paste0("Frac_T", input$germSpeedRes, "_GR", input$germSpeedRes)] <- paste0("GR", input$germSpeedRes)
+    
     df
+    
+  })
+  
+  # Render germSpeedTable -----
+  
+  output$germSpeedTable <- renderDataTable({
+    req(input$germSpeedRes)
+    #req(input$germSpeedType)
+    
+    df <- GRData()
   },
   rownames = F,
   server = F,
@@ -678,7 +677,9 @@ server <- function(input, output, session) {
   
   ## Germination rate plot against treatment ----
   
-  germTrtChoicesRate <- reactive({ # create choices with validated column namesand numeric factors 
+  #length(input$germSpeedTrtSelect)
+  
+  germTrtChoicesRate <- reactive({ # create choices with validated column names and numeric factors
     colsRt <- sapply(1:nCols, function(i) {
       if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor"  && !is.na(columnValidation$Type[i])) columnValidation$Column[i] # TODO: need to fix this to display users column names instead otherwise error with custom column names. 
     })
@@ -686,35 +687,62 @@ server <- function(input, output, session) {
     setNames(colsRt, colsRt)
   })
   
-  # construct working dataset
-  output$germRateTreat <- renderUI({
+  output$xAxisTreat <- renderUI({
     radioButtons(
       inputId = "germSpeedRateTrtSelect",
       label = "Select treatment for x axis:",
       choices = germTrtChoicesRate()
     )
-    
   })
   
+  
+
+  
   # Plot selected GRx (from the section above) in the y-axis and the numeric factor in the x axis based in the radiobutton germSpeedRateTrtSelect
+  
+  # TODO: Show plot only if the numeric treatment is present in the table above.
 
    output$germRateTrtPlot <- renderPlot({
     req(nrow(rv$data) > 0)
-   req(BasicDataReady())
+    req(BasicDataReady())
    
-  # TODO: how to get the values from the table in the section above?
-  pltRt <- df() %>%
-    ggplot(aes(x = input$germSpeedRateTrtSelect, y = Frac)) +
+  df <- GRData()
+  
+  xTreat <- input$germSpeedRateTrtSelect
+  yGR <- paste0("GR",  input$germSpeedRes)
+  
+  pltRt <- df %>%
+    ggplot(aes(x = !!as.name(xTreat), y = !!as.name(yGR))) +
     geom_point(shape = 19, size = 2) +
-  labs(
-    title = "Germination Rate Vs bbb",
-    x = "Temp",
-    y = "GRx") +
-  theme_classic()
+    scale_x_continuous(breaks = scales::pretty_breaks()) +
+    #scale_y_continuous(labels = scales::percent) +
+    labs(
+      x = "Water potential",
+      y = "Germination rate"
+    ) +
+    theme_classic()
+  
   
   pltRt
    })
+   
+  # output$msg <- renderText({
+  #   xAxis <- length(input$germSpeedTrtSelect)
+  #   xAxis
+  # })
+   
+  # output$msg2 <- renderTable({
+  #   df <- GRData()
+  #   xAxis <- df
+  #   xAxis
+  # })
   
+   
+   
+   
+   
+   
+   
   # Thermal time TAB -------------------
    
    # Treatment SelectInputs ---    
