@@ -115,28 +115,41 @@ ui <- fluidPage(
     )
   ),
   br(),
-
+  
   
   h3("Data outputs and model analysis"),
   # actionButton("runModels", "Run Models"),
-  tabsetPanel(
+  tabsetPanel(id = "tabs",
     tabPanel(
       title = "Germination rate",
       uiOutput("germUI")
     ),
     
-    #TODO: How to show/hide tabpanels based in the model readiness.  
-    tabPanel(
-       title = "Thermal time model",
-       #sliderInput("GRInput", "Select Growth Rate", min = 10, max = 90, value = 50, step = 10),
-       #plotOutput("PlotRateVsTreat")
+    tabPanel("Thermal time",
+      uiOutput("ThermaltimeUI")
      ),
   
-    tabPanel(
-      title = "hydrotime model",
+    tabPanel("Hydrotime", "Under construction"
+    ),
+    
+    tabPanel("Hydrothermal time", "Under construction"
+    ),
+    
+    tabPanel("Aging", "Under construction"
+    ),
+    
+    tabPanel("Promoter", "Under construction"
+    ),
+    
+    tabPanel("Inhibitor", "Under construction"
+    ),
+    
+    tabPanel("Hydropriming", "Under construction"
+    ),
+    
+    tabPanel("Hydrothermal priming", "Under construction"
+    )
 
-     )
-  
   
 #  h3("Basic charts"),
 #  # actionButton("runModels", "Run Models"),
@@ -161,6 +174,10 @@ ui <- fluidPage(
 #       tableOutput("SpeedTbl")
 #     )
   ),
+  br(),
+  
+    
+
   br(),
   hr(),
   div(

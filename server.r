@@ -64,9 +64,87 @@ server <- function(input, output, session) {
   })
   observeEvent(input$confirmDataView, {
     updateCollapse(session, "data", open = "cols", close = "view")
+    status <- function(x) { # receive model validation status
+      if (x) {
+        TRUE  # if T is ready
+      } else {
+        FALSE # if F not ready
+      }
+    }
+    
+    if (status(TTModelReady())) { showTab(inputId = "tabs", target = "Thermal time")
+    } else { hideTab(inputId = "tabs", target = "Thermal time")
+    }
+    
+    if (status(HTModelReady())) { showTab(inputId = "tabs", target = "Hydrotime")
+    } else { hideTab(inputId = "tabs", target = "Hydrotime")
+    }
+    
+    if (status(HTTModelReady())) { showTab(inputId = "tabs", target = "Hydrothermal time")
+    } else { hideTab(inputId = "tabs", target = "Hydrothermal time")
+    }
+    
+    if (status(AgingModelReady())) { showTab(inputId = "tabs", target = "Aging")
+    } else { hideTab(inputId = "tabs", target = "Aging")
+    }
+    
+    if (status(PromoterModelReady())) { showTab(inputId = "tabs", target = "Promoter")
+    } else { hideTab(inputId = "tabs", target = "Promoter")
+    }
+    
+    if (status(InhibitorModelReady())) { showTab(inputId = "tabs", target = "Inhibitor")
+    } else { hideTab(inputId = "tabs", target = "Inhibitor")
+    }
+    
+    if (status(HPModelReady())) { showTab(inputId = "tabs", target = "Hydropriming")
+    } else { hideTab(inputId = "tabs", target = "Hydropriming")
+    }
+    
+    if (status(HTPModelReady())) { showTab(inputId = "tabs", target = "Hydrothermal priming")
+    } else { hideTab(inputId = "tabs", target = "Hydrothermal priming")
+    }
   })
   observeEvent(c(input$confirmColView, input$confirmColView2), {
     updateCollapse(session, "data", close = "cols")
+    status <- function(x) { # receive model validation status
+      if (x) {
+        TRUE  # if T is ready
+      } else {
+        FALSE # if F not ready
+      }
+    }
+    
+    if (status(TTModelReady())) { showTab(inputId = "tabs", target = "Thermal time")
+    } else { hideTab(inputId = "tabs", target = "Thermal time")
+    }
+    
+    if (status(HTModelReady())) { showTab(inputId = "tabs", target = "Hydrotime")
+    } else { hideTab(inputId = "tabs", target = "Hydrotime")
+    }
+    
+    if (status(HTTModelReady())) { showTab(inputId = "tabs", target = "Hydrothermal time")
+    } else { hideTab(inputId = "tabs", target = "Hydrothermal time")
+    }
+    
+    if (status(AgingModelReady())) { showTab(inputId = "tabs", target = "Aging")
+    } else { hideTab(inputId = "tabs", target = "Aging")
+    }
+    
+    if (status(PromoterModelReady())) { showTab(inputId = "tabs", target = "Promoter")
+    } else { hideTab(inputId = "tabs", target = "Promoter")
+    }
+    
+    if (status(InhibitorModelReady())) { showTab(inputId = "tabs", target = "Inhibitor")
+    } else { hideTab(inputId = "tabs", target = "Inhibitor")
+    }
+    
+    if (status(HPModelReady())) { showTab(inputId = "tabs", target = "Hydropriming")
+    } else { hideTab(inputId = "tabs", target = "Hydropriming")
+    }
+    
+    if (status(HTPModelReady())) { showTab(inputId = "tabs", target = "Hydrothermal priming")
+    } else { hideTab(inputId = "tabs", target = "Hydrothermal priming")
+    }
   })
   
   
@@ -278,11 +356,59 @@ server <- function(input, output, session) {
         "Inhibitor model:", status(InhibitorModelReady()), br(),
         "Hydropriming model:", status(HPModelReady()), br(),
         "Hydrothermal priming model:", status(HTPModelReady())
-        
       )
     )
     
   })
+  
+  # Update visible tabs based in Model readiness
+  
+  observeEvent(input$hideTab, {
+    status <- function(x) { # receive model validation status
+      if (x) {
+        TRUE  # if T is ready
+      } else {
+        FALSE # if F not ready
+      }
+    }
+    
+  if (status(TTModelReady())) { showTab(inputId = "tabs", target = "Thermal time")
+  } else { hideTab(inputId = "tabs", target = "Thermal time")
+  }
+  
+  if (status(HTModelReady())) { showTab(inputId = "tabs", target = "Hydrotime")
+  } else { hideTab(inputId = "tabs", target = "Hydrotime")
+  }
+
+  if (status(HTTModelReady())) { showTab(inputId = "tabs", target = "Hydrothermal time")
+  } else { hideTab(inputId = "tabs", target = "Hydrothermal time")
+  }
+    
+  if (status(AgingModelReady())) { showTab(inputId = "tabs", target = "Aging")
+  } else { hideTab(inputId = "tabs", target = "Aging")
+  }
+  
+  if (status(PromoterModelReady())) { showTab(inputId = "tabs", target = "Promoter")
+  } else { hideTab(inputId = "tabs", target = "Promoter")
+    }
+  
+  if (status(InhibitorModelReady())) { showTab(inputId = "tabs", target = "Inhibitor")
+  } else { hideTab(inputId = "tabs", target = "Inhibitor")
+  }
+    
+  if (status(HPModelReady())) { showTab(inputId = "tabs", target = "Hydropriming")
+  } else { hideTab(inputId = "tabs", target = "Hydropriming")
+  }
+  
+  if (status(HTPModelReady())) { showTab(inputId = "tabs", target = "Hydrothermal priming")
+  } else { hideTab(inputId = "tabs", target = "Hydrothermal priming")
+  }
+    
+  })
+  
+  
+  
+  
   
   
   # Germination Plot and Speed ----
@@ -332,7 +458,9 @@ server <- function(input, output, session) {
     )
   })
   
-  ## Germination plot ----
+  ## Germination rate plots -----
+  
+  # Treatment SelectInputs ---    
   
   germTrtChoices <- reactive({ # create choices with validated column names and factors 
     cols <- sapply(1:nCols, function(i) {
@@ -364,6 +492,8 @@ server <- function(input, output, session) {
       )
     )
   })
+  
+  # Germination rate plot ---
   
   output$germPlot <- renderPlot({
     req(nrow(rv$data) > 0)
@@ -441,10 +571,6 @@ server <- function(input, output, session) {
       ) +
       theme_classic()
     
-    # if (req(input$germSpeedFracs)) {
-    #   plt <- plt + geom_hline(yintercept = input$germSpeedFracs / 100)
-    # }
-    
     lines = seq(0, 1, by = input$germSpeedRes / 100)
     plt <- plt + geom_hline(yintercept = lines, color = "grey", size = 0.25, alpha = 0.5, linetype = "dashed")
     
@@ -452,13 +578,14 @@ server <- function(input, output, session) {
   })
   
   
-  ## Germination speed ----
+  ## Germination speed parameters ----
   
   germSpeedTrtChoices <- reactive({
     cols <- sapply(1:nCols, function(i) {
       if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor") columnValidation$Column[i]
     })
     cols <- compact(cols)
+    
   })
   
   output$germSpeedTrts <- renderUI({
@@ -480,15 +607,6 @@ server <- function(input, output, session) {
       value = 50
     )
   })
-  
-  #output$germSpeedType <- renderUI({
-  #  radioButtons(
-  #    inputId = "germSpeedType",
-  #    label = "Report values as:",
-  #    choiceNames = c("Time (to % germinated)", "Rate (% / time)"),
-  #    choiceValues = c("Time", "Rate")
-  #  )
-  #})
   
   # TODO: I should have a second reactive dataset that includes only renamed columns from the primary dataset. That would simplify the references to that data.
   
@@ -609,7 +727,50 @@ server <- function(input, output, session) {
   pltRt
    })
   
-  
+   output$ThermaltimeUI <- renderUI({
+     validate(  #check if current data has basic requirements
+       need(TTModelReady(), "Please load a dataset and set required column types for the thermal time model analysis.")
+     )
+     list(
+       h4("Cumulative germination:"),
+       sidebarLayout(
+         sidebarPanel(
+           uiOutput("germPlotTrt1"),
+           uiOutput("germPlotTrt2")
+         ),
+         mainPanel(
+           plotOutput("germPlot")
+         )
+       ),
+       br(),
+       h4("Germination speed parameters:"),
+       sidebarLayout(
+         sidebarPanel(
+           uiOutput("germSpeedTrts"),
+           uiOutput("germSpeedFracs")
+           #    uiOutput("germSpeedType")
+         ),
+         mainPanel(
+           div(
+             dataTableOutput("germSpeedTable"),
+             style = "overflow-x: auto"
+           )
+         )
+       ),
+       br(),
+       h4("Germination rates over treatments: (in progress)"),
+       sidebarLayout(
+         sidebarPanel(
+           uiOutput("germRateTreat")
+         ),
+         mainPanel(
+           div(
+             plotOutput("germRateTrtPlot")
+           )
+         )
+       )
+     )
+   })
   
 }
 
