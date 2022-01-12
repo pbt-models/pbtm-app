@@ -384,16 +384,15 @@ server <- function(input, output, session) {
         )
       ),
       br(),
-      h4("Germination rates over treatments: (in progress)"),
+      h4("Germination rates over treatments:"),
       sidebarLayout(
         sidebarPanel(
+          uiOutput("yAxisTreat"),
           uiOutput("xAxisTreat")
         ),
         mainPanel(
           div(
-            plotOutput("germRateTrtPlot"),
-            textOutput("msg"),
-            tableOutput("msg2")
+            plotOutput("germRateTrtPlot")
           )
         )
       )
@@ -638,7 +637,7 @@ server <- function(input, output, session) {
         Time = round(Time, 1),
         Frac = round(1 / Time, 3)) %>%
       pivot_wider(
-        names_from = c(Tx, GRx), # TODO: Need to fix these labels...
+        names_from = c(Tx, GRx), 
         values_from = c("Time", "Frac")
       ) 
     
@@ -653,7 +652,6 @@ server <- function(input, output, session) {
   
   output$germSpeedTable <- renderDataTable({
     req(input$germSpeedRes)
-    #req(input$germSpeedType)
     
     df <- GRData()
   },
@@ -677,24 +675,39 @@ server <- function(input, output, session) {
   
   ## Germination rate plot against treatment ----
   
-  #length(input$germSpeedTrtSelect)
-  
-  germTrtChoicesRate <- reactive({ # create choices with validated column names and numeric factors
-    colsRt <- sapply(1:nCols, function(i) {
-      if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor"  && !is.na(columnValidation$Type[i])) columnValidation$Column[i] # TODO: need to fix this to display users column names instead otherwise error with custom column names. 
-    })
-    colsRt <- compact(colsRt) #remove all null entries 
-    setNames(colsRt, colsRt)
+  germTrtChoicesRate <- reactive({
+    input$germSpeedTrtSelect
   })
   
   output$xAxisTreat <- renderUI({
+    req(GRData()>0) #check if combo treatment is filled
+    req(input$germSpeedTrtSelect) #check if combo treatment is filled
+    req(input$germSpeedTrtSelect != "NA") #check if combo treatment is not NA
     radioButtons(
-      inputId = "germSpeedRateTrtSelect",
+      inputId = "germSpeedRateTrtSelectX",
       label = "Select treatment for x axis:",
       choices = germTrtChoicesRate()
+      
     )
   })
   
+  output$yAxisTreat <- renderUI({
+    req(GRData()>0) #check if combo treatment is filled
+    req(input$germSpeedTrtSelect) #check if combo treatment is filled
+    req(input$germSpeedTrtSelect != "NA") #check if combo treatment is not NA
+    
+    opt1 <- paste0("GR",  input$germSpeedRes)
+    opt2 <- paste0("T",  input$germSpeedRes)
+    
+    radioButtons(
+      inputId = "germSpeedRateTrtSelectY",
+      label = "Select germination parameter for y axis:",
+      choices = c(opt1, opt2),
+      selected = opt1
+      #choices = germSpeedTrtChoices()
+      
+    )
+  })
   
 
   
@@ -703,84 +716,51 @@ server <- function(input, output, session) {
   # TODO: Show plot only if the numeric treatment is present in the table above.
 
    output$germRateTrtPlot <- renderPlot({
-    req(nrow(rv$data) > 0)
-    req(BasicDataReady())
+     req(GRData()>0) #check if combo treatment is filled
+     req(input$germSpeedTrtSelect) #check if combo treatment is filled
+     req(input$germSpeedTrtSelect != "NA") #check if combo treatment is not NA
    
   df <- GRData()
   
-  xTreat <- input$germSpeedRateTrtSelect
-  yGR <- paste0("GR",  input$germSpeedRes)
+  xTreat <- input$germSpeedRateTrtSelectX
+  yTreat <- input$germSpeedRateTrtSelectY
   
   pltRt <- df %>%
-    ggplot(aes(x = !!as.name(xTreat), y = !!as.name(yGR))) +
+    ggplot(aes(x = !!as.name(xTreat), y = !!as.name(yTreat))) +
     geom_point(shape = 19, size = 2) +
     scale_x_continuous(breaks = scales::pretty_breaks()) +
     #scale_y_continuous(labels = scales::percent) +
-    labs(
-      x = "Water potential",
-      y = "Germination rate"
-    ) +
+    # TODO: make nicer axis labels based on columns / treatments
     theme_classic()
   
   
   pltRt
    })
-   
-  # output$msg <- renderText({
-  #   xAxis <- length(input$germSpeedTrtSelect)
-  #   xAxis
-  # })
-   
-  # output$msg2 <- renderTable({
-  #   df <- GRData()
-  #   xAxis <- df
-  #   xAxis
-  # })
   
    
    
    
    
-   
-   
   # Thermal time TAB -------------------
-   
-   # Treatment SelectInputs ---    
-   
-   germTrtThermalChoices <- reactive({ # create choices with validated column names and factors 
-     cols <- sapply(1:nCols, function(i) {
-       if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor") columnValidation$Column[i] # TODO: need to fix this to display users column names instead otherwise error with custom column names. 
-     })
-     cols <- compact(cols) #remove all null entries 
-     setNames(as.list(c(NA, cols)), c("Not specified", cols))
-   })
-   
-   output$germThermalPlotTrt1 <- renderUI({
-     # req(BasicDataReady()) #check if current data has basic requirements
-     list(
-       selectInput( #create combo box with validated columns and factors
-         "germPlotTrt1", 
-         "Treatment 1 (color)",
-         choices = germTrtThermalChoices()
-       )
-     )
-   })
-   
 
    
+   # Render Thermal time model UI
    output$ThermaltimeUI <- renderUI({
-     validate(  #check if current data has basic requirements
-       need(TTModelReady(), "Please load a dataset and set required column types for the thermal time model analysis.")
-     )
      list(
        h4("Thermal time model calculation:"),
        sidebarLayout(
          sidebarPanel(
            uiOutput("germThermalPlotTrt1"),
-           uiOutput("germSpeedTrts")
+           uiOutput("thermalFactorsSelect"),
+           br(),
+           h5("Select factor levels for model:"),
+           uiOutput("tempFactorLevelSelect"),
+           uiOutput("WPFactorLevelSelect"),
+           uiOutput("TrtIDFactorLevelSelect")
+           
          ),
          mainPanel(
-           plotOutput("germPlot")
+           plotOutput("germPlotThermal")
          )
        ),
        br(),
@@ -793,7 +773,7 @@ server <- function(input, output, session) {
          ),
          mainPanel(
            div(
-             dataTableOutput("germSpeedTable"),
+             #dataTableOutput("germSpeedTable"),
              style = "overflow-x: auto"
            )
          )
@@ -802,47 +782,221 @@ server <- function(input, output, session) {
        h4("Germination rates over treatments: (in progress)"),
        sidebarLayout(
          sidebarPanel(
-           uiOutput("germRateTreat")
+           #uiOutput("germRateTreat")
          ),
          mainPanel(
            div(
-             plotOutput("germRateTrtPlot")
+             #plotOutput("germRateTrtPlot")
            )
          )
        )
      )
    })
-  
+
+   # Treatment SelectInputs ---    
+   
+   
+   output$germThermalPlotTrt1 <- renderUI({
+     #req(TTModelReady()) #check if current data has basic requirements
+     #req(germTrtThermalChoices()>0) 
+     list(
+       selectInput( #create combo box with validated columns and factors
+         "germThermalPlotTrt1", 
+         "Main treatment factor",
+         choices = columnValidation$Column[8],
+         selected = columnValidation$Column[8] #TODO: Adapt this for user column
+       )
+     )
+   })
+   
+   germTrtThermalChoices <- reactive({ # create choices with validated column names and factors withut the temperature
+     cols <- sapply(1:nCols, function(i) {
+       if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor" && columnValidation$InputId[i] != "GermTemp") columnValidation$Column[i] # TODO: need to fix this to display users column names instead otherwise error with custom column names. 
+     })
+     cols <- compact(cols) #remove all null entries 
+     setNames(as.list(c(cols)), c(cols))
+   })
+   
+   output$thermalFactorsSelect <- renderUI({
+     checkboxGroupInput(
+       inputId = "thermalFactorsSelect",
+       label = "Select other treatment factors:",
+       choices = germTrtThermalChoices()
+       #, selected = c("TrtID")
+     )
+   })
+   
+   # create choices with all germ temperature levels 
+   TempFactorLevelChoices <- reactive({
+     req(TTModelReady())
+     df <- as.factor(rv$data[[input$GermTemp]])
+     #df <- germRateDataThermal() # This may need to come from rv$data
+     cols <- levels(df)
+   })
+   
+   # Create checkbox with all Temperature levels to be included in the model analysis
+   output$tempFactorLevelSelect <- renderUI({
+     checkboxGroupInput(
+       inputId = "tempFactorLevelSelect",
+       label = "Temperature:",
+       choices = TempFactorLevelChoices(),
+       selected = TempFactorLevelChoices()
+     )
+   })
+   
+   # create choices with all germ wp levels
+   WPFactorLevelChoices <- reactive({
+     req(TTModelReady())
+     req("GermWP" %in% input$thermalFactorsSelect)
+     df <- as.factor(rv$data[[input$GermWP]])
+     #df <- germRateDataThermal() # This may need to come from rv$data
+     cols <- levels(df)
+   })
+   
+   # Create checkbox with all WP levels to be included in the model analysis
+   output$WPFactorLevelSelect <- renderUI({
+     req(TTModelReady())
+     req("GermWP" %in% input$thermalFactorsSelect)
+     checkboxGroupInput(
+       inputId = "WPFactorLevelSelect",
+       label = "Water Potential:",
+       choices = WPFactorLevelChoices(),
+       selected = 0
+     )
+   })
+   
+   # create choices with all germ wp levels
+   TrtIDFactorLevelChoices <- reactive({
+     req(TTModelReady())
+     req("TrtID" %in% input$thermalFactorsSelect)
+     df <- as.factor(rv$data[[input$TrtID]])
+     #df <- germRateDataThermal() # This may need to come from rv$data
+     cols <- levels(df)
+   })
+   
+   # Create checkbox with all WP levels to be included in the model analysis
+   output$TrtIDFactorLevelSelect <- renderUI({
+     req(TTModelReady())
+     req("TrtID" %in% input$thermalFactorsSelect)
+     checkboxGroupInput(
+       inputId = "TrtIDFactorLevelSelect",
+       label = "Treatment ID:",
+       choices = TrtIDFactorLevelChoices(),
+       selected = TrtIDFactorLevelChoices()
+     )
+   })
+   
+   # Germination rate plot for thermal time model ---
+   
+   # Reactive data ---
+   
+   germRateDataThermal <- reactive({
+     req(nrow(rv$data) > 0)
+     req(TTModelReady())
+     
+     # construct working dataset
+     df <- tibble(TrtID = rv$data[[input$TrtID]])
+     trts <- append("GermTemp", input$thermalFactorsSelect)  # get all selected other factors + GermTemp
+     for (trt in trts) { df[[trt]] <- as.factor(rv$data[[input[[trt]]]]) } #input all factors and respective data
+     df <- df %>% mutate(
+       CumTime = rv$data[[input$CumTime]],
+       CumFrac = rv$data[[input$CumFraction]]
+     )
+     
+     # regenerate cumulative fractions depending on grouping trts
+     df <- df %>%
+       group_by(TrtID) %>%
+       arrange(TrtID, CumTime, CumFrac) %>%
+       mutate(FracDiff = CumFrac - lag(CumFrac, default = 0)) %>%
+       mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+     
+     # group by the selected treatments
+     df <- group_by_at(df, trts)
+     
+     # merge values that occur at the same timepoint 
+     ### TODO: Is this dropping values at the same timepoint? We actually need to drop the last value of similar fraction that occur at different time points (no increase in germination since earlier observation) that is the function of the cleandata function from the pbtm package 
+     df <- df %>%
+       group_by(CumTime, .add = T) %>%
+       summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+       mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+     
+     if (length(input$thermalFactorsSelect)>0){
+       
+       if ("GermWP" %in% input$thermalFactorsSelect) {
+         df <- subset(df, subset = GermWP %in% input$WPFactorLevelSelect)
+       }
+       if ("TrtID" %in% input$thermalFactorsSelect) {
+         df <- subset(df, subset = TrtID %in% input$TrtIDFactorLevelSelect)
+       }
+       
+     }
+     
+     df <- subset(df, subset = GermTemp %in% input$tempFactorLevelSelect)
+ })
+   
+   
+   # Render Plot----
+   output$germPlotThermal <- renderPlot({
+     req(nrow(rv$data) > 0)
+     req(BasicDataReady())
+     
+     # trts <- 0
+     
+     df <- germRateDataThermal()
+     #Trt1 <- input$germThermalPlotTrt1
+     
+    # if (req(input$germPlotTrt1) != "NA") {
+    #   trts <- 1
+       
+    #   if (req(input$germPlotTrt2) != "NA") {
+    #     trts <- 2
+    #   }
+    # }
+     
+    # if (trts == 1) { # setup plot data if treatment 1 informed only
+       
+       plt <- df %>%
+         ggplot(aes(x = CumTime, y = CumFrac, color = GermTemp)) +
+         #geom_line() +
+         geom_point(shape = 19, size = 2) 
+          #+
+         #labs(color = GermTemp)
+       
+    
+    # } else if (trts == 2) { # setup plot data if both treatments were informed
+       
+    #   plt <- df %>%
+    #     ggplot(aes(x = CumTime, y = CumFrac, color = Trt1, shape = Trt2)) +
+    #     geom_line() +
+    #     geom_point(size = 2) +
+    #     labs(color = input$germPlotTrt1, shape = input$germPlotTrt2)
+       
+    # } else { # setup plot data if no treatments were informed on combos
+       
+    #   plt <- df %>%
+    #     ggplot(aes(x = CumTime, y = CumFrac)) +
+    #     geom_line() +
+    #     geom_point(size = 2)
+    #} 
+     
+     plt <- plt +
+       scale_x_continuous(breaks = scales::pretty_breaks()) +
+       scale_y_continuous(labels = scales::percent) +
+       labs(
+         title = "Cumulative germination",
+         x = "Time",
+         y = "Cumulative (%)"
+       ) +
+       theme_classic()
+     
+     lines = seq(0, 1, by = input$germSpeedRes / 100)
+     plt <- plt + geom_hline(yintercept = lines, color = "grey", size = 0.25, alpha = 0.5, linetype = "dashed")
+     
+     plt
+   })
+   
+   
+      
 }
 
-
-## Germination speed ----
-
-#    output$PlotRateVsTreat <- renderPlot({ #temp
-#     req(nrow(rv$data) > 0)
-#     req(TTModelReady())
-#     df <- rv$data # get all the user data
-#     # revert Time and fraction column names to Cumtime and CumFraction
-#     if (input$CumTime != "CumTime") {
-#     names(df)[names(df) == input$CumTime] <- "CumTime" }
-#     if (input$CumFraction != "CumFraction") {
-#     names(df)[names(df) == input$CumFraction] <- "CumFraction" }
-#     gr <- input$GRInput / 100
-#     t1 <- input$GermWP # germ wp
-#     t2 <- input$GermTemp # germ wp
-#     try(speed <- calcspeed(df, gr, t1, t2))
-#     # try(PlotRateVsTreat(speed, t2, paste0("GR", gr * 100)))
-#   })
-
-#   output$SpeedTbl <- renderTable({
-#     df <- rv$data
-#     gr <- input$GRInput / 100
-#     t1 <- input$GermWP # germ wp
-#     t2 <- input$GermTemp
-#     try(speed <- calcspeed(df, gr, t1, t2))
-#     speed})
-
-
-
-#}
 
