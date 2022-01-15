@@ -71,6 +71,8 @@ server <- function(input, output, session) {
   
   
   
+  
+  
   # Download button handlers ----
   
   output$downloadTemplate <- downloadHandler(
@@ -320,7 +322,7 @@ server <- function(input, output, session) {
     }
   })
   
-
+  
   
   # Model readiness display ----
   output$modelStatus <- renderUI({
@@ -486,7 +488,7 @@ server <- function(input, output, session) {
         group_by(CumTime) %>%
         summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
         mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
-    
+      
     } 
   })
   
@@ -504,7 +506,7 @@ server <- function(input, output, session) {
       trts <- 1
       
       if (req(input$germPlotTrt2) != "NA") {
-      trts <- 2
+        trts <- 2
       }
     }
     
@@ -635,7 +637,7 @@ server <- function(input, output, session) {
         Tx = paste0("T", input$germSpeedRes),
         GRx = paste0("GR", input$germSpeedRes),
         Time = round(Time, 1),
-        Frac = round(1 / Time, 3)) %>%
+        Frac = round(1 / Time, 6)) %>%
       pivot_wider(
         names_from = c(Tx, GRx), 
         values_from = c("Time", "Frac")
@@ -709,294 +711,588 @@ server <- function(input, output, session) {
     )
   })
   
-
+  
   
   # Plot selected GRx (from the section above) in the y-axis and the numeric factor in the x axis based in the radiobutton germSpeedRateTrtSelect
   
   # TODO: Show plot only if the numeric treatment is present in the table above.
-
-   output$germRateTrtPlot <- renderPlot({
-     req(GRData()>0) #check if combo treatment is filled
-     req(input$germSpeedTrtSelect) #check if combo treatment is filled
-     req(input$germSpeedTrtSelect != "NA") #check if combo treatment is not NA
-   
-  df <- GRData()
   
-  xTreat <- input$germSpeedRateTrtSelectX
-  yTreat <- input$germSpeedRateTrtSelectY
-  
-  pltRt <- df %>%
-    ggplot(aes(x = !!as.name(xTreat), y = !!as.name(yTreat))) +
-    geom_point(shape = 19, size = 2) +
-    scale_x_continuous(breaks = scales::pretty_breaks()) +
-    #scale_y_continuous(labels = scales::percent) +
-    # TODO: make nicer axis labels based on columns / treatments
-    theme_classic()
-  
-  
-  pltRt
-   })
-  
-   
-   
-   
-   
-  # Thermal time TAB -------------------
-
-   
-   # Render Thermal time model UI
-   output$ThermaltimeUI <- renderUI({
-     list(
-       h4("Thermal time model calculation:"),
-       sidebarLayout(
-         sidebarPanel(
-           uiOutput("germThermalPlotTrt1"),
-           uiOutput("thermalFactorsSelect"),
-           br(),
-           h5("Select factor levels for model:"),
-           uiOutput("tempFactorLevelSelect"),
-           uiOutput("WPFactorLevelSelect"),
-           uiOutput("TrtIDFactorLevelSelect")
-           
-         ),
-         mainPanel(
-           plotOutput("germPlotThermal")
-         )
-       ),
-       br(),
-       h4("Germination speed parameters:"),
-       sidebarLayout(
-         sidebarPanel(
-           #uiOutput("germSpeedTrts"),
-           #uiOutput("germSpeedFracs")
-           #    uiOutput("germSpeedType")
-         ),
-         mainPanel(
-           div(
-             #dataTableOutput("germSpeedTable"),
-             style = "overflow-x: auto"
-           )
-         )
-       ),
-       br(),
-       h4("Germination rates over treatments: (in progress)"),
-       sidebarLayout(
-         sidebarPanel(
-           #uiOutput("germRateTreat")
-         ),
-         mainPanel(
-           div(
-             #plotOutput("germRateTrtPlot")
-           )
-         )
-       )
-     )
-   })
-
-   # Treatment SelectInputs ---    
-   
-   
-   output$germThermalPlotTrt1 <- renderUI({
-     #req(TTModelReady()) #check if current data has basic requirements
-     #req(germTrtThermalChoices()>0) 
-     list(
-       selectInput( #create combo box with validated columns and factors
-         "germThermalPlotTrt1", 
-         "Main treatment factor",
-         choices = columnValidation$Column[8],
-         selected = columnValidation$Column[8] #TODO: Adapt this for user column
-       )
-     )
-   })
-   
-   germTrtThermalChoices <- reactive({ # create choices with validated column names and factors withut the temperature
-     cols <- sapply(1:nCols, function(i) {
-       if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor" && columnValidation$InputId[i] != "GermTemp") columnValidation$Column[i] # TODO: need to fix this to display users column names instead otherwise error with custom column names. 
-     })
-     cols <- compact(cols) #remove all null entries 
-     setNames(as.list(c(cols)), c(cols))
-   })
-   
-   output$thermalFactorsSelect <- renderUI({
-     checkboxGroupInput(
-       inputId = "thermalFactorsSelect",
-       label = "Select other treatment factors:",
-       choices = germTrtThermalChoices()
-       #, selected = c("TrtID")
-     )
-   })
-   
-   # create choices with all germ temperature levels 
-   TempFactorLevelChoices <- reactive({
-     req(TTModelReady())
-     df <- as.factor(rv$data[[input$GermTemp]])
-     #df <- germRateDataThermal() # This may need to come from rv$data
-     cols <- levels(df)
-   })
-   
-   # Create checkbox with all Temperature levels to be included in the model analysis
-   output$tempFactorLevelSelect <- renderUI({
-     checkboxGroupInput(
-       inputId = "tempFactorLevelSelect",
-       label = "Temperature:",
-       choices = TempFactorLevelChoices(),
-       selected = TempFactorLevelChoices()
-     )
-   })
-   
-   # create choices with all germ wp levels
-   WPFactorLevelChoices <- reactive({
-     req(TTModelReady())
-     req("GermWP" %in% input$thermalFactorsSelect)
-     df <- as.factor(rv$data[[input$GermWP]])
-     #df <- germRateDataThermal() # This may need to come from rv$data
-     cols <- levels(df)
-   })
-   
-   # Create checkbox with all WP levels to be included in the model analysis
-   output$WPFactorLevelSelect <- renderUI({
-     req(TTModelReady())
-     req("GermWP" %in% input$thermalFactorsSelect)
-     checkboxGroupInput(
-       inputId = "WPFactorLevelSelect",
-       label = "Water Potential:",
-       choices = WPFactorLevelChoices(),
-       selected = 0
-     )
-   })
-   
-   # create choices with all germ wp levels
-   TrtIDFactorLevelChoices <- reactive({
-     req(TTModelReady())
-     req("TrtID" %in% input$thermalFactorsSelect)
-     df <- as.factor(rv$data[[input$TrtID]])
-     #df <- germRateDataThermal() # This may need to come from rv$data
-     cols <- levels(df)
-   })
-   
-   # Create checkbox with all WP levels to be included in the model analysis
-   output$TrtIDFactorLevelSelect <- renderUI({
-     req(TTModelReady())
-     req("TrtID" %in% input$thermalFactorsSelect)
-     checkboxGroupInput(
-       inputId = "TrtIDFactorLevelSelect",
-       label = "Treatment ID:",
-       choices = TrtIDFactorLevelChoices(),
-       selected = TrtIDFactorLevelChoices()
-     )
-   })
-   
-   # Germination rate plot for thermal time model ---
-   
-   # Reactive data ---
-   
-   germRateDataThermal <- reactive({
-     req(nrow(rv$data) > 0)
-     req(TTModelReady())
-     
-     # construct working dataset
-     df <- tibble(TrtID = rv$data[[input$TrtID]])
-     trts <- append("GermTemp", input$thermalFactorsSelect)  # get all selected other factors + GermTemp
-     for (trt in trts) { df[[trt]] <- as.factor(rv$data[[input[[trt]]]]) } #input all factors and respective data
-     df <- df %>% mutate(
-       CumTime = rv$data[[input$CumTime]],
-       CumFrac = rv$data[[input$CumFraction]]
-     )
-     
-     # regenerate cumulative fractions depending on grouping trts
-     df <- df %>%
-       group_by(TrtID) %>%
-       arrange(TrtID, CumTime, CumFrac) %>%
-       mutate(FracDiff = CumFrac - lag(CumFrac, default = 0)) %>%
-       mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
-     
-     # group by the selected treatments
-     df <- group_by_at(df, trts)
-     
-     # merge values that occur at the same timepoint 
-     ### TODO: Is this dropping values at the same timepoint? We actually need to drop the last value of similar fraction that occur at different time points (no increase in germination since earlier observation) that is the function of the cleandata function from the pbtm package 
-     df <- df %>%
-       group_by(CumTime, .add = T) %>%
-       summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-       mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
-     
-     if (length(input$thermalFactorsSelect)>0){
-       
-       if ("GermWP" %in% input$thermalFactorsSelect) {
-         df <- subset(df, subset = GermWP %in% input$WPFactorLevelSelect)
-       }
-       if ("TrtID" %in% input$thermalFactorsSelect) {
-         df <- subset(df, subset = TrtID %in% input$TrtIDFactorLevelSelect)
-       }
-       
-     }
-     
-     df <- subset(df, subset = GermTemp %in% input$tempFactorLevelSelect)
- })
-   
-   
-   # Render Plot----
-   output$germPlotThermal <- renderPlot({
-     req(nrow(rv$data) > 0)
-     req(BasicDataReady())
-     
-     # trts <- 0
-     
-     df <- germRateDataThermal()
-     #Trt1 <- input$germThermalPlotTrt1
-     
-    # if (req(input$germPlotTrt1) != "NA") {
-    #   trts <- 1
-       
-    #   if (req(input$germPlotTrt2) != "NA") {
-    #     trts <- 2
-    #   }
-    # }
-     
-    # if (trts == 1) { # setup plot data if treatment 1 informed only
-       
-       plt <- df %>%
-         ggplot(aes(x = CumTime, y = CumFrac, color = GermTemp)) +
-         #geom_line() +
-         geom_point(shape = 19, size = 2) 
-          #+
-         #labs(color = GermTemp)
-       
+  output$germRateTrtPlot <- renderPlot({
+    req(GRData()>0) #check if combo treatment is filled
+    req(input$germSpeedTrtSelect) #check if combo treatment is filled
+    req(input$germSpeedTrtSelect != "NA") #check if combo treatment is not NA
     
-    # } else if (trts == 2) { # setup plot data if both treatments were informed
-       
-    #   plt <- df %>%
-    #     ggplot(aes(x = CumTime, y = CumFrac, color = Trt1, shape = Trt2)) +
-    #     geom_line() +
-    #     geom_point(size = 2) +
-    #     labs(color = input$germPlotTrt1, shape = input$germPlotTrt2)
-       
-    # } else { # setup plot data if no treatments were informed on combos
-       
-    #   plt <- df %>%
-    #     ggplot(aes(x = CumTime, y = CumFrac)) +
-    #     geom_line() +
-    #     geom_point(size = 2)
-    #} 
-     
-     plt <- plt +
-       scale_x_continuous(breaks = scales::pretty_breaks()) +
-       scale_y_continuous(labels = scales::percent) +
-       labs(
-         title = "Cumulative germination",
-         x = "Time",
-         y = "Cumulative (%)"
-       ) +
-       theme_classic()
-     
-     lines = seq(0, 1, by = input$germSpeedRes / 100)
-     plt <- plt + geom_hline(yintercept = lines, color = "grey", size = 0.25, alpha = 0.5, linetype = "dashed")
-     
-     plt
-   })
-   
-   
+    df <- GRData()
+    
+    xTreat <- input$germSpeedRateTrtSelectX
+    yTreat <- input$germSpeedRateTrtSelectY
+    
+    pltRt <- df %>%
+      ggplot(aes(x = !!as.name(xTreat), y = !!as.name(yTreat))) +
+      geom_point(shape = 19, size = 2) +
+      scale_x_continuous(breaks = scales::pretty_breaks()) +
+      #scale_y_continuous(labels = scales::percent) +
+      # TODO: make nicer axis labels based on columns / treatments
+      theme_classic()
+    
+    
+    pltRt
+  })
+  
+  
+  
+  
+  
+  # Thermal time TAB -------------------
+  
+  
+  # Render Thermal time model UI
+  output$ThermaltimeUI <- renderUI({
+    list(
+      #h4("Thermal time model calculation"),
+      sidebarLayout(
+        sidebarPanel(
+          h4("Model data input", align = "center"),
+          uiOutput("germThermalPlotTrt1"),
+          uiOutput("thermalFactorsSelect"),
+          h5("Select factor levels for model:"),
+          uiOutput("tempFactorLevelSelect"),
+          uiOutput("WPFactorLevelSelect"),
+          uiOutput("TrtIDFactorLevelSelect"),
+          uiOutput("TrtDescFactorLevelSelect")
+          #uiOutput("germFracRange"),
+          #uiOutput("maxGermThermal")
+          
+        ),
+        mainPanel(
+          br(),
+          h4("Cumulative germination observed and predicted", align = "center"),
+          plotOutput("germPlotThermal"),
+          splitLayout(cellWidths = c("50%", "50%"), uiOutput("germFracRange", align = "center"), uiOutput("maxGermThermal", align = "center"))
+        ),
+      ), 
+      #br(),
+      #h4("Germination speed parameters:"),
+      sidebarLayout(
+        sidebarPanel(
+          h4("Model parameters", align = "center"),
+          uiOutput("Tb"),
+          uiOutput("ThetaT50"),
+          uiOutput("ThetaTsigma"),
+          actionButton("optimizeThermalTModel", "Optimize model"), align = "center",
+          
+        ),
+        mainPanel(
+          fluidRow(
+            splitLayout(cellWidths = c("50%", "50%"), plotOutput("distThetaThermal"), plotOutput("modelFitThermal")),
+            dataTableOutput("ThermalTParamTable"),
+            #style = "overflow-x: auto",
+            
+            actionLink("ShowStatsThermalT", "Show stats"), align = "right",
+            hidden(
+              div(id='text_div',
+                  verbatimTextOutput("text")
+              )
+            )
+
+          )
+        )
+      )
+      #br(),
+    )
+  })
+  
+  # Treatment SelectInputs ---    
+  
+  
+  output$germThermalPlotTrt1 <- renderUI({
+    #req(TTModelReady()) #check if current data has basic requirements
+    #req(germTrtThermalChoices()>0) 
+    list(
+      selectInput( #create combo box with validated columns and factors
+        "germThermalPlotTrt1", 
+        "Main treatment factor",
+        choices = columnValidation$Column[8],
+        selected = columnValidation$Column[8] #TODO: Adapt this for user column
+      )
+    )
+  })
+  
+  germTrtThermalChoices <- reactive({ # create choices with validated column names and factors withut the temperature
+    cols <- sapply(1:nCols, function(i) {
+      if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor" && columnValidation$InputId[i] != "GermTemp") columnValidation$Column[i] # TODO: need to fix this to display users column names instead otherwise error with custom column names. 
+    })
+    cols <- compact(cols) #remove all null entries 
+    setNames(as.list(c(cols)), c(cols))
+  })
+  
+  output$thermalFactorsSelect <- renderUI({
+    checkboxGroupInput(
+      inputId = "thermalFactorsSelect",
+      label = "Select other treatment factors:",
+      choices = germTrtThermalChoices()
+      #, selected = c("TrtID")
+    )
+  })
+  
+  # create choices with all germ temperature levels 
+  TempFactorLevelChoices <- reactive({
+    req(TTModelReady())
+    df <- as.factor(rv$data[[input$GermTemp]])
+    cols <- levels(df)
+  })
+  
+  # Create checkbox with all Temperature levels to be included in the model analysis
+  output$tempFactorLevelSelect <- renderUI({
+    checkboxGroupInput(
+      inputId = "tempFactorLevelSelect",
+      label = "Temperature:",
+      choices = TempFactorLevelChoices(),
+      selected = TempFactorLevelChoices()
+    )
+  })
+  
+  # create choices with all germ wp levels
+  WPFactorLevelChoices <- reactive({
+    req(TTModelReady())
+    req("GermWP" %in% input$thermalFactorsSelect)
+    df <- as.factor(rv$data[[input$GermWP]])
+    cols <- levels(df)
+  })
+  
+  # Create checkbox with all WP levels to be included in the model analysis
+  output$WPFactorLevelSelect <- renderUI({
+    req(TTModelReady())
+    req("GermWP" %in% input$thermalFactorsSelect)
+    checkboxGroupInput(
+      inputId = "WPFactorLevelSelect",
+      label = "Water Potential:",
+      choices = WPFactorLevelChoices(),
+      selected = 0
+    )
+  })
+  
+  # create choices with all germ wp levels
+  TrtIDFactorLevelChoices <- reactive({
+    req(TTModelReady())
+    req("TrtID" %in% input$thermalFactorsSelect)
+    df <- as.factor(rv$data[[input$TrtID]])
+    cols <- levels(df)
+  })
+  
+  # Create checkbox with all WP levels to be included in the model analysis
+  output$TrtIDFactorLevelSelect <- renderUI({
+    req(TTModelReady())
+    req("TrtID" %in% input$thermalFactorsSelect)
+    checkboxGroupInput(
+      inputId = "TrtIDFactorLevelSelect",
+      label = "Treatment ID:",
+      choices = TrtIDFactorLevelChoices(),
+      selected = TrtIDFactorLevelChoices()
+    )
+  })
+  
+  # create choices with all germ wp levels
+  TrtDescFactorLevelChoices <- reactive({
+    req(TTModelReady())
+    req("TrtDesc" %in% input$thermalFactorsSelect)
+    df <- as.factor(rv$data[[input$TrtDesc]])
+    cols <- levels(df)
+  })
+  
+  # Create checkbox with all WP levels to be included in the model analysis
+  output$TrtDescFactorLevelSelect <- renderUI({
+    req(TTModelReady())
+    req("TrtDesc" %in% input$thermalFactorsSelect)
+    checkboxGroupInput(
+      inputId = "TrtDescFactorLevelSelect",
+      label = "Treatment description:",
+      choices = TrtDescFactorLevelChoices(),
+      selected = TrtDescFactorLevelChoices()
+    )
+  })
+  
+  output$germFracRange <- renderUI({
+    sliderInput(
+      inputId = "germFracRange",
+      label = "Included interval (%):",
+      min = 0,
+      max = 100,
+      value = c(0,100)
+    )
+  })
+  
+  output$maxGermThermal <- renderUI({
+    sliderInput(
+      inputId = "maxGermThermal",
+      label = "Maximum germination (%) observed:",
+      min = 20,
+      max = 100,
+      step = 1,
+      value = 100
+    )
+  })
+  
+  HTML(paste0("Label (unit = m",tags$sup("2"), ')'))
+  
+  output$Tb <- renderUI({
+    numericInput(
+      inputId = "Tb",
+      label = HTML(paste0("Temperature base (T",tags$sub("b"), "):")),
+      min = 0,
+      max = 15,
+      value = 6
+    )
+  })
+  
+  output$ThetaT50 <- renderUI({
+    numericInput(
+      inputId = "ThetaT50",
+      label = HTML(paste0("Thermal time (log θ" ,tags$sub("T"), "(50):")),
+      min = 0.5,
+      max = 50,
+      value = 3
+    )
+  })
+  
+  output$ThetaTsigma <- renderUI({
+    numericInput(
+      inputId = "ThetaTsigma",
+      label = HTML(paste0("Standard deviation (log σ",tags$sub(("θ"), tags$sub("T")), "):")),
+      min = 0.0001,
+      max = 0.8,
+      value = 0.1
+    )
+  })
+  
+  
+  
+  # Germination rate plot for thermal time model ---
+  # Reactive data ---
+  
+  germRateDataThermal <- reactive({
+    req(nrow(rv$data) > 0)
+    req(TTModelReady())
+    req(input$germFracRange)
+    
+    # construct working dataset
+    df <- tibble(TrtID = rv$data[[input$TrtID]])
+    trts <- append("GermTemp", input$thermalFactorsSelect)  # get all selected other factors + GermTemp
+    for (trt in trts) { df[[trt]] <- as.factor(rv$data[[input[[trt]]]]) } #input all factors and respective data
+    df <- df %>% mutate(
+      CumTime = rv$data[[input$CumTime]],
+      CumFrac = rv$data[[input$CumFraction]]
+    )
+    
+    # regenerate cumulative fractions depending on grouping trts
+    df <- df %>%
+      group_by(TrtID) %>%
+      arrange(TrtID, CumTime, CumFrac) %>%
+      mutate(FracDiff = CumFrac - lag(CumFrac, default = 0)) %>%
+      mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+    
+    # group by the selected treatments
+    df <- group_by_at(df, trts)
+    
+    # merge values that occur at the same timepoint 
+    ### TODO: Is this dropping values at the same timepoint? We actually need to drop the last value of similar fraction that occur at different time points (no increase in germination since earlier observation) that is the function of the cleandata function from the pbtm package 
+    df <- df %>%
+      group_by(CumTime, .add = T) %>%
+      summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+      mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+    
+    if (length(input$thermalFactorsSelect)>0){
       
+      if ("GermWP" %in% input$thermalFactorsSelect) {
+        df <- subset(df, subset = GermWP %in% input$WPFactorLevelSelect)
+      }
+      if ("TrtID" %in% input$thermalFactorsSelect) {
+        df <- subset(df, subset = TrtID %in% input$TrtIDFactorLevelSelect)
+      }
+      if ("TrtDesc" %in% input$thermalFactorsSelect) {
+        df <- subset(df, subset = TrtDesc %in% input$TrtDescFactorLevelSelect)
+      }
+      
+    }
+    
+    df <- df %>% 
+      filter(CumFrac >= (input$germFracRange[1]/100) & CumFrac <= (input$germFracRange[2]/100))
+    
+    df <- subset(df, subset = GermTemp %in% input$tempFactorLevelSelect)
+  })
+  
+  
+  
+  # Action button - Thermal time model optimization ---
+  observeEvent(input$optimizeThermalTModel, {
+    req(nrow(rv$data) > 0)
+    req(TTModelReady())
+    req(input$maxGermThermal)
+    req(input$Tb)
+    req(input$ThetaT50)
+    req(input$ThetaTsigma)
+    
+    # retrieve working dataset and parameters
+    df <- germRateDataThermal()
+    CumFrac <- as.numeric(as.character(df$CumFrac))
+    CumTime <- as.numeric(as.character(df$CumTime))
+    GermTemp <- as.numeric(as.character(df$GermTemp))
+    
+    # retrieve working dataset and parameters
+    ithetaT50 <- as.numeric(input$ThetaT50)
+    iTb <- as.numeric(input$Tb)
+    MaxCumFraction <- as.numeric(input$maxGermThermal)/100
+    iSigma <- as.numeric(input$ThetaTsigma)
+    
+    #lower limits
+    lTb <- 0
+    lthetaT50 <- 0.5 
+    lSigma <- 0.01
+    
+    #higher limits
+    uTb <- 15
+    uthetaT50 <- 50
+    uSigma <- 0.8
+    
+
+   # while(TRUE) {
+  #  TTSubOModel <- NULL
+      
+    #Calculate Thermaltime Suboptimal Model Parameters- nls plus algorithm port used to add constraints on the parameters
+    
+    try(TTSubOModel <- nls(CumFrac ~ pnorm(log(CumTime, base = 10), mean = thetaT50 - log(GermTemp - Tb, base = 10), sd = sigma, log = FALSE) * MaxCumFraction,
+                           control = list(maxiter = 50000, minFactor = 1/5000, warnOnly = TRUE),
+                           start = list(Tb = iTb, thetaT50 = ithetaT50, sigma = iSigma),
+                           lower = list(Tb = lTb, thetaT50 = lthetaT50, sigma = lSigma), 
+                           upper = list(Tb = uTb, thetaT50 = uthetaT50, sigma = uSigma), algorithm ="port"))
+    
+   # if(!is.null(TTSubOModel)) break; # if nls works, then quit from the loop
+  #  }
+
+      
+    #Passing fitted Thermal time Model Parameters
+    TbN <- round(summary(TTSubOModel)$coefficients[[1]],2)
+    thetaT50N <- round(summary(TTSubOModel)$coefficients[[2]],2)
+    sigmaN <- round(summary(TTSubOModel)$coefficients[[3]],3)
+    
+    updateNumericInput(session, "Tb", value = TbN)
+    updateNumericInput(session, "ThetaT50", value = thetaT50N)
+    updateNumericInput(session, "ThetaTsigma", value = sigmaN)
+    
+  })
+  
+
+  
+  
+  # Thermal time model current parameters  ---
+  # Reactive data ---
+  
+  ThermalTimeCurrentParam <- reactive({
+    req(nrow(rv$data) > 0)
+    req(TTModelReady())
+    req(input$maxGermThermal)
+    req(input$Tb)
+    req(input$ThetaT50)
+    req(input$ThetaTsigma)
+    
+    # retrieve working dataset and parameters
+    
+    df <- germRateDataThermal()
+    CumFrac <- as.numeric(as.character(df$CumFrac))
+    CumTime <- as.numeric(as.character(df$CumTime))
+    GermTemp <- as.numeric(as.character(df$GermTemp))
+
+    cThetaT50 <- as.numeric(input$ThetaT50)
+    cTb <- as.numeric(input$Tb)
+    MaxCumFraction <- as.numeric(input$maxGermThermal)/100
+    cSigma <- as.numeric(input$ThetaTsigma)
+    
+   # while(TRUE) {
+  #    TTSubOModel <- NULL
+    
+    try(TTSubOModel <- nls(CumFrac ~ pnorm(log(CumTime, base = 10), mean = thetaT50 - log(GermTemp - Tb, base = 10), sd = sigma, log = FALSE) * MaxCumFraction, 
+                       start = list(Tb = cTb, thetaT50 = cThetaT50, sigma = cSigma), 
+                       lower = list(Tb = cTb, thetaT50 = cThetaT50, sigma = cSigma), 
+                       upper = list(Tb = cTb, thetaT50 = cThetaT50, sigma = cSigma), algorithm ="port"))
+    
+  #    if(!is.null(TTSubOModel)) break; # if nls works, then quit from the loop
+  #  }   
+     
+    #Passing fitted Hydrotime Model Parameters
+    Tb <- round(summary(TTSubOModel)$coefficients[[1]],2)
+    thetaT50 <- round(summary(TTSubOModel)$coefficients[[2]],2)
+    sigma <- round(summary(TTSubOModel)$coefficients[[3]],2)
+    
+    #get some estimation of goodness of fit
+    Correlation <- round(cor(CumFrac,predict(TTSubOModel))^2,3)
+    df2 <- data.frame(CumFrac,predict(TTSubOModel))  
+    colnames(df2) <- c("observed", "predicted")
+    
+    Model <- "TTsuboptimal"
+    df1 <- data.frame(Model,Tb,thetaT50,sigma,Correlation)
+
+    df3 <- data.frame(Model,cTb,cThetaT50,cSigma,MaxCumFraction)
+    
+    df4 <- summary(TTSubOModel)
+    
+    df <- list(df1, df2, df3, df4)
+    
+  })
+
+  
+  
+  #Thermal time model parameters table
+  output$ThermalTParamTable <- renderDataTable({
+    df <- ThermalTimeCurrentParam()
+    df <- df[[1]]
+    
+    df$Theta50Antilog <- round(10^df$thetaT50,0)
+    
+    colnames(df)[2] <- "T<sub>b</sub>"
+    colnames(df)[3] <- HTML(paste0("log θ" ,tags$sub("T"), "(50)"))
+    colnames(df)[4] <- HTML(paste0("log σ" ,tags$sub(("θ"), tags$sub("T"))))
+    colnames(df)[5] <- "Correlation (R<sup>2</sup>)"
+    colnames(df)[6] <- HTML(paste0("θ" ,tags$sub("T"), "(°h)"))
+
+    datatable(df[,c(1,2,3,4,6,5)], 
+              rownames = F,
+              extensions = c("Buttons", "Select"),
+              selection = "none",
+              escape = F,
+              options = list(
+              searching = F,
+              paging = F,
+              select = T,
+              ordering = F,
+              columnDefs = list(list(className = 'dt-center', targets = "_all")),
+              dom = "Bt",
+              buttons = list(
+              list(
+                  extend = "copy",
+                  text = 'Copy'
+                  )
+                )
+              ))
+  })
+  
+  
+  
+  # Render cumulative germination Thermal time Plot----
+  output$germPlotThermal <- renderPlot({
+    req(nrow(rv$data) > 0)
+    req(TTModelReady())
+    
+    df <- germRateDataThermal()
+    
+    Temp <- as.factor(as.numeric(as.character(df$GermTemp)))
+    
+    #Parameters for modellines
+    ThetaT50 <- as.numeric(input$ThetaT50)
+    Tb <- as.numeric(input$Tb)
+    MaxCumFraction <- as.numeric(input$maxGermThermal)/100
+    Sigma <- as.numeric(input$ThetaTsigma)
+    
+    
+    #Get temperature factors to build modellines
+    TreatmentsTemp <- as.numeric(levels(Temp))
+    
+    #Function to plot all predicted treatments by the Thermaltime model
+    modellines <-
+    plyr::alply(as.matrix(TreatmentsTemp), 1, function(GermTemp) {
+        stat_function(fun=function(x) { pnorm(log(x, base = 10), ThetaT50 - log(GermTemp - Tb, base = 10), Sigma,log=FALSE) * MaxCumFraction}, aes_(colour = factor(GermTemp)), size = 1.5)
+     })
+    
+    plt <- df %>%
+      ggplot(aes(x = CumTime, y = CumFrac, color = GermTemp)) +
+      geom_point(shape = 19, size = 2)
+    
+    plt <- plt + 
+      modellines +
+      scale_x_continuous(breaks = scales::pretty_breaks()) +
+      scale_y_continuous(labels = scales::percent) +
+      labs(
+        #title = "Cumulative germination",
+        x = "Time",
+        y = "Cumulative (%)"
+      ) +
+      theme_classic()
+    
+    lines = seq(0, 1, by = input$germSpeedRes / 100)
+    plt <- plt + geom_hline(yintercept = lines, color = "grey", size = 0.25, alpha = 0.5, linetype = "dashed")
+    
+    plt
+  })
+  
+  # Render model distribution Thermal time Plot----
+  output$distThetaThermal <- renderPlot({
+    req(TTModelReady())
+    
+    #df <- germRateDataThermal()
+    
+    # Create a sequence of numbers between -10 and 10 incrementing by 0.1.
+    cThetaT50 <- as.numeric(input$ThetaT50)
+    cSigma <- as.numeric(input$ThetaTsigma)
+    xll <- as.numeric(input$ThetaT50) - as.numeric(input$ThetaTsigma) - 1 # x lower limit
+    xhl <- as.numeric(input$ThetaT50) + as.numeric(input$ThetaTsigma) + 1 # x lower limit
+    
+    plt <-
+      ggplot(data = data.frame(x = c(xll, xhl)), aes(x)) +
+      stat_function(fun = dnorm, n=101, args = list(mean = cThetaT50, sd = cSigma), size = 1.5) 
+    
+    plt <- plt +
+      #scale_x_continuous(breaks = scales::pretty_breaks()) +
+      #scale_y_continuous(labels = scales::percent) +
+      labs(
+        title = "Model distribution",
+        x = "ThetaT(g)",
+        y = "Desnsity"
+      ) +
+      theme_classic() + theme(plot.title = element_text(hjust = 0.5, size=18))
+    
+    lines = seq(0, 1, by = input$germSpeedRes / 100)
+    plt <- plt + geom_hline(yintercept = lines, color = "grey", size = 0.25, alpha = 0.5, linetype = "dashed")
+    
+    plt
+  })
+  
+  # Render model fit Thermal time Plot----
+  output$modelFitThermal <- renderPlot({
+    req(TTModelReady())
+    
+    df <- ThermalTimeCurrentParam()
+    ModelParam <- df[[1]]
+    data_mod <- df[[2]]  #dataframe for model
+    
+    plt <-
+      ggplot(data = data_mod, aes(x = predicted, y = observed)) +
+
+      geom_point() +
+      geom_abline(intercept = 0,
+                   slope = 1,
+                   color = "red", 
+                   size = 2)
+      
+    plt <- plt +
+      labs(
+        title = "Model fit",
+        x = "Predicted",
+        y = "Observed"
+      ) +
+      theme_classic() + theme(plot.title = element_text(hjust = 0.5, size=18))
+    
+    plt
+  })
+  
+  
+   observeEvent(input$ShowStatsThermalT, {
+     toggle('text_div')
+     output$text <- renderPrint({
+          df <- ThermalTimeCurrentParam()
+          capture.output(df[4])
+          })
+   })
+  
+  
 }
 
 

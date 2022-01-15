@@ -183,14 +183,14 @@ ui <- fluidPage(
   div(
     align = "center",
     style = "font-size:small; color:grey; border-top:2px darkgrey",
-    p("App developed by", a("Ben Bradford", href = "https://github.com/bzbradford")),
+    p("App developed by", a("Pedro Bello", href = "https://github.com/pedrobello"),
+      "and", a("Ben Bradford", href = "https://github.com/bzbradford")),
     p(
       "Based on the", a("PBTM R package", href = "https://github.com/pedrobello/pbtm"),
       "developed by", a("Pedro Bello", href = "https://github.com/pedrobello")
     ),
     p(
-      "Seed germination models developed by", a("Kent Bradford", href = "https://www.plantsciences.ucdavis.edu/people/kent-bradford"),
-      "and", a("Pedro Bello", href = "https://www.plantsciences.ucdavis.edu/people/pedro-bello")
+      "Seed germination models developed by", a("Kent Bradford", href = "https://www.plantsciences.ucdavis.edu/people/kent-bradford")
     )
   )
 )
