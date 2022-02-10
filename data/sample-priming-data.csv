@@ -1,4 +1,4 @@
-﻿TrtID,TrtDesc,TrtPrimingWP,TrtPrimingTemp,TrtPrimingDuration,GermWP,GermTemp,CumTime,CumPercent,CumFraction
+﻿TrtID,TrtDesc,PrimingWP,PrimingTemp,PrimingDuration,GermWP,GermTemp,CumTime,CumPercent,CumFraction
 1,Control,0,0,0,0,20,0,0,0
 1,Control,0,0,0,0,20,23.8,0,0
 1,Control,0,0,0,0,20,46,0,0

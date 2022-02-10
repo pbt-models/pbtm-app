@@ -77,7 +77,15 @@ server <- function(input, output, session) {
   
   # Column description table ----
   
-  output$columnDescriptions <- renderTable({columnDescriptions})
+  output$columnDescriptions <- renderTable({
+    columnValidation %>%
+      select(
+        `Default column name` = Column,
+        Description = LongDescription,
+        `Data type` = TypeDescription,
+        Usage
+      )
+  })
   
   
   
