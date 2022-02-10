@@ -93,15 +93,16 @@ ui <- fluidPage(
       ),
       hr(),
       p(strong("Match required data to column names:")),
-      div(
-        lapply(1:nrow(columnValidation), function(i) {
-          wellPanel(
-            style = "display: inline-block; vertical-align: top; width: 20em; margin: 5px;",
-            uiOutput(paste0("colSelect", i)),
-            uiOutput(paste0("colValidate", i))
-          )
-        })
-      ),
+      uiOutput("colSelectUI"),
+      # div(
+      #   lapply(1:nrow(columnValidation), function(i) {
+      #     wellPanel(
+      #       style = "display: inline-block; vertical-align: top; width: 100%; margin: 5px;",
+      #       uiOutput(paste0("colSelect", i)),
+      #       uiOutput(paste0("colValidate", i))
+      #     )
+      #   })
+      # ),
       hr(),
       fluidRow(
         column(10, 

@@ -146,86 +146,81 @@ server <- function(input, output, session) {
       if (input[[inputId]] == "NA") {
         msg <- list(span("No column specified.", style = "color:orange"))
         rv$colStatus[[paste0("col", i)]] <- F
-        return(msg)
-      }
-      
-      col <- rv$data[[input[[inputId]]]]
-      
-      if (anyNA(col)) {
-        msg <- list(br(), span("Warning: Missing value in data", style = "color:red"))
-      }
-      
-      colType <- class(col)
-      ui <- list(paste("Type =", colType))
-      
-      if (colType == "numeric") {
-        add <- list(
-          br(),
-          paste0("Min = ", round(min(col), 2), ", Max = ", round(max(col), 2))
-        )
-        ui <- append(ui, add)
+      } else {
         
-        # column type mismatch
-        if (!is.na(expectedType) & colType != expectedType) {
+        col <- rv$data[[input[[inputId]]]]
+        
+        if (anyNA(col)) {
+          msg <- list(br(), span("Warning: Missing value in data", style = "color:red"))
+        }
+        
+        colType <- class(col)
+        ui <- list(paste("Type:", colType))
+        
+        if (colType == "numeric") {
+          add <- list(br(), paste0("Range: ", round(min(col), 2), " => ", round(max(col), 2)))
+          ui <- append(ui, add)
+          
+          # column type mismatch
+          if (!is.na(expectedType) & colType != expectedType) {
+            newmsg <- list(br(), span("Error: Incorrect column type, expected", expectedType, style = "color:red"))
+            msg <- append(msg, newmsg)
+          }
+          
+          # min check
+          if (!is.na(minValue) & min(col) < minValue) {
+            newmsg <- list(br(), span("Error: Min value less than", minValue, style = "color:red"))
+            msg <- append(msg, newmsg)
+          }
+          
+          # max check
+          if (!is.na(maxValue) & max(col) > maxValue) {
+            newmsg <- list(br(), span("Error: Max value greater than ", maxValue, style = "color:red"))
+            msg <- append(msg, newmsg)
+          }
+          
+        } else if (!is.na(expectedType) & colType != expectedType) {
           newmsg <- list(br(), span("Error: Incorrect column type, expected", expectedType, style = "color:red"))
           msg <- append(msg, newmsg)
         }
         
-        # min check
-        if (!is.na(minValue) & min(col) < minValue) {
-          newmsg <- list(br(), span("Error: Min value less than", minValue, style = "color:red"))
-          msg <- append(msg, newmsg)
+        # check if any messages
+        if (is.null(msg)) {
+          msg <- list(span(strong("OK"), style = "color:blue"))
+          rv$colStatus[[paste0("col", i)]] <- T
+        } else {
+          msg[1] <- NULL
+          rv$colStatus[[paste0("col", i)]] <- F
         }
-        
-        # max check
-        if (!is.na(maxValue) & max(col) > maxValue) {
-          newmsg <- list(br(), span("Error: Max value greater than ", maxValue, style = "color:red"))
-          msg <- append(msg, newmsg)
-        }
-        
-      } else if (!is.na(expectedType) & colType != expectedType) {
-        newmsg <- list(br(), span("Error: Incorrect column type, expected", expectedType, style = "color:red"))
-        msg <- append(msg, newmsg)
       }
       
-      if (is.null(msg)) {
-        msg <- list(span(strong("OK"), style = "color:blue"))
-        rv$colStatus[[paste0("col", i)]] <- T
-        
-      } else {
-        rv$colStatus[[paste0("col", i)]] <- F
-      }
-      
-      list(p(ui), p(msg))
-      
+      # display the validation
+      fluidRow(
+        style = "margin-top: 5px; padding-top: 1em;",
+        column(6, msg),
+        column(6, ui)
+      )
     })
   })
   
-  # lapply(1:nrow(columnDefaults), function(i) {
-  #   observe({
-  #     rv$colMatch[[i]] <- input[[paste0("colSelect", i)]]
-  #     print(rv$colMatch[[i]])
-  #   })
-  # })
-  
-  
-  # cleanData <- reactive({
-  #   dfIn <- rv$data
-  #   dfOut <- sampleTemplate
-  #   lapply(1:nrow(columnDefaults), function(i) {
-  #     inCol <- paste0("colSelect", i)
-  #     req(input[[inCol]])
-  #     if (input[[inCol]] != "NA") {
-  #       dfOut[[columnDefaults$defaultColumn[i]]] <- dfIn[[]]
-  #     } else {
-  #       dfOut <- select(dfOut, -columnDefaults$defaultColumn[i])
-  #     }
-  #   })
-  # })
-  # 
-  # observe({print(cleanData())})
-  
-  
+  output$colSelectUI <- renderUI({
+    ui <- list()
+    style <- "border-bottom: 1px solid #cccccc; margin-bottom: 1em;"
+    
+    for (i in 1:nCols) {
+      if (i == nCols) { style <- "" }
+      row <- list(
+        fluidRow(
+          style = style,
+          column(6, uiOutput(paste0("colSelect", i))),
+          column(6, uiOutput(paste0("colValidate", i)))
+        )
+      )
+      ui <- append(ui, row)
+    }
+    wellPanel(ui)
+  })
+
   
   # Model readiness ----
   checkModelReadiness <- function(col) {
