@@ -18,16 +18,24 @@ server <- function(input, output, session) {
   
   # Data definitions ----
   
-  nCols <- nrow(columnValidation)
-  
-  factorCols <- filter(columnValidation, Role == "Factor")$Column
-  
   rv <- reactiveValues(
     data = tibble(),
     colStatus = NULL
   )
   
-
+  # Render sidebar ----
+  # output$sidebarUI_basics <- renderMenu({
+  #   
+  # })
+  # 
+  # output$sidebarUI_models <- renderMenu({
+  #   menuItem("PBT Models",
+  #     startExpanded = T,
+  #     lapply(modelNames, function(m) {
+  #         menuSubItem(m, tabName = m)
+  #     })
+  #   )
+  # })
   
   
   # Action Buttons ----
@@ -204,6 +212,9 @@ server <- function(input, output, session) {
   })
   
   output$colSelectUI <- renderUI({
+    validate(
+      need(nrow(rv$data) > 0, "Load a dataset first.")
+    )
     ui <- list()
     style <- "border-bottom: 1px solid #cccccc; margin-bottom: 1em;"
     
