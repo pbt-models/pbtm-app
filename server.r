@@ -9,54 +9,19 @@ library(DT)
 
 server <- function(input, output, session) {
   
-  # On load ----
-  
-  # this forces the bscollapse panels to load their content by starting open then closing
-  updateCollapse(session, "data", close = c("view", "cols"))
-  
-  
-  
   # Data definitions ----
   
   rv <- reactiveValues(
     data = tibble(),
-    colStatus = NULL
+    colStatus = NULL,
+    modelReady = list()
   )
-  
-  # Render sidebar ----
-  # output$sidebarUI_basics <- renderMenu({
-  #   
-  # })
-  # 
-  # output$sidebarUI_models <- renderMenu({
-  #   menuItem("PBT Models",
-  #     startExpanded = T,
-  #     lapply(modelNames, function(m) {
-  #         menuSubItem(m, tabName = m)
-  #     })
-  #   )
-  # })
   
   
   # Action Buttons ----
   
-  observeEvent(input$loadSampleGermData, {
-    rv$data <- sampleGermData
-    updateCollapse(session, "data", open = "view", close = "load")
-  })
-  observeEvent(input$loadSamplePrimingData, {
-    rv$data <- samplePrimingData
-    updateCollapse(session, "data", open = "view", close = "load")
-  })
-  observeEvent(input$userData, {
-    rv$data <- read_csv(input$userData$datapath, col_types = cols()) %>%
-      distinct() # remove any duplicate rows
-    updateCollapse(session, "data", open = "view", close = "load")
-  })
-  observeEvent(input$clearData, {
-    rv$data <- tibble()
-    reset("userData")
-  })
+
+
   observeEvent(input$confirmDataView, {
     updateCollapse(session, "data", open = "cols", close = "view")
   })
@@ -66,27 +31,25 @@ server <- function(input, output, session) {
   
   
   
-  # Download button handlers ----
+  # Format tab ----
   
+  ## download buttons ----
   output$downloadTemplate <- downloadHandler(
     filename = "pbtm-data-template.csv",
-    content = function(file) {write_csv(sampleTemplate, file)}
-  )
+    content = function(file) {write_csv(sampleTemplate, file)})
+  
   output$downloadSampleGermData <- downloadHandler(
     filename = "pbtm-sample-germination-data.csv",
-    content = function(file) {write_csv(sampleGermData, file)}
-  )
+    content = function(file) {write_csv(sampleGermData, file)})
+  
   output$downloadSamplePrimingData <- downloadHandler(
     filename = "pbtm-sample-priming-data.csv",
-    content = function(file) {write_csv(samplePrimingData, file)}
-  )
+    content = function(file) {write_csv(samplePrimingData, file)})
   
   
-  
-  # Column description table ----
-  
+  ## data format description table ----
   output$columnDescriptions <- renderTable({
-    columnValidation %>%
+    colValidation %>%
       select(
         `Default column name` = Column,
         Description = LongDescription,
@@ -95,8 +58,74 @@ server <- function(input, output, session) {
       )
   })
   
-
-  # Column matching boxes ----
+  
+  
+  
+  
+  # Load tab ----
+  
+  ## menu badge handler ----
+  output$loadMenu <- renderMenu({
+    if (DataLoaded()) {
+      label = "OK"; color = "green"
+    } else {
+      label = "!"; color = "yellow"
+    }
+    menuItem("Upload data", tabName = "load", badgeLabel = label, badgeColor = color)
+  })
+  
+  ## action buttons ----
+  observeEvent(input$loadSampleGermData, {
+    rv$data <- sampleGermData
+    # updateCollapse(session, "data", open = "view", close = "load")
+  })
+  
+  observeEvent(input$loadSamplePrimingData, {
+    rv$data <- samplePrimingData
+    # updateCollapse(session, "data", open = "view", close = "load")
+  })
+  
+  observeEvent(input$userData, {
+    rv$data <- read_csv(input$userData$datapath, col_types = cols()) %>%
+      distinct() # remove any duplicate rows
+    # updateCollapse(session, "data", open = "view", close = "load")
+  })
+  
+  observeEvent(input$clearData, {
+    rv$data <- tibble()
+    reset("userData")
+  })
+  
+  
+  ## current data display ----
+  
+  # the table
+  output$currentDataTable <- renderDataTable({rv$data})
+  
+  # the ui, which shows the table and the matching boxes only when data loaded
+  output$currentDataDisplay <- renderUI({
+    validate(need(DataLoaded(), "Please load a dataset."))
+    
+    list(
+      h3("Current dataset:"),
+      div(style = "overflow: auto;", dataTableOutput("currentDataTable")),
+      hr(),
+      h3("Match column names to expected roles:"),
+      p(em("If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range.")),
+      div(style = "display: flex; flex-wrap: wrap;",
+        lapply(1:nCols, function(i) {
+          wellPanel(
+            style = "flex: 1; vertical-align: top; min-width: 15em; margin: 5px;",
+            uiOutput(paste0("colSelect", i)),
+            uiOutput(paste0("colValidate", i))
+          )
+        })
+      )
+    )
+  })
+  
+  
+  ## column matching ----
   
   columnNames <- reactive({
     req(rv$data)
@@ -110,25 +139,24 @@ server <- function(input, output, session) {
   lapply(1:nCols, function(i) {
     output[[paste0("colSelect", i)]] <- renderUI({
       selectInput(
-        inputId = columnValidation$InputId[i],
-        label = columnValidation$Description[i],
+        inputId = colValidation$InputId[i],
+        label = colValidation$Description[i],
         choices = columnChoices(),
-        selected = columnValidation$Column[i]
+        selected = colValidation$Column[i]
       )
     })
   })
   
   
-  
-  # Column validation messages ----
+  ## column validation messages ----
   
   lapply(1:nCols, function(i) {
     
     outCol <- paste0("colValidate", i)
-    inputId <- columnValidation$InputId[i]
-    expectedType <- columnValidation$Type[i]
-    minValue <- columnValidation$Min[i]
-    maxValue <- columnValidation$Max[i]
+    inputId <- colValidation$InputId[i]
+    expectedType <- colValidation$Type[i]
+    minValue <- colValidation$Min[i]
+    maxValue <- colValidation$Max[i]
     ui <- NULL
     msg <- NULL
     
@@ -178,12 +206,12 @@ server <- function(input, output, session) {
           msg <- append(msg, newmsg)
         }
         
-        # check if any messages
+        # set status TRUE if no messages
         if (is.null(msg)) {
           msg <- list(span(strong("OK"), style = "color:blue"))
           rv$colStatus[[paste0("col", i)]] <- T
         } else {
-          msg[1] <- NULL
+          msg[1] <- NULL # remove the first br()
           rv$colStatus[[paste0("col", i)]] <- F
         }
       }
@@ -193,37 +221,10 @@ server <- function(input, output, session) {
     })
   })
   
-  # Current data DT ----
-  
-  output$currentDataTable <- renderDataTable({rv$data})
-  
-  output$currentDataDisplay <- renderUI({
-    validate(
-      need(DataLoaded(), "Load a dataset first.")
-    )
-    list(
-      div(
-        style = "overflow: auto;",
-        dataTableOutput("currentDataTable")
-      ),
-      hr(),
-      h3("Match column names to expected roles:"),
-      p(em("If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range.")),
-      div(
-        style = "display: flex; flex-wrap: wrap;",
-        lapply(1:nCols, function(i) {
-          wellPanel(
-            style = "flex: 1; vertical-align: top; min-width: 15em; margin: 5px;",
-            uiOutput(paste0("colSelect", i)),
-            uiOutput(paste0("colValidate", i))
-          )
-        })
-      )
-    )
-  })
 
-  
   # Model readiness ----
+  
+  # returns false if colStatus is false for that column
   checkModelReadiness <- function(col) {
     compare <- sapply(1:nCols, function(i) {
       test <- (col[i] == T & rv$colStatus[[paste0("col", i)]] == T) | (col[i] == F)
@@ -233,15 +234,25 @@ server <- function(input, output, session) {
   }
   
   DataLoaded <- reactive({nrow(rv$data) > 0})
-  BasicDataReady <- reactive({checkModelReadiness(columnValidation$AllModels)})
-  HPModelReady <- reactive({checkModelReadiness(columnValidation$HydroPriming)})
-  HTPModelReady <- reactive({checkModelReadiness(columnValidation$HydroThermalPriming)})
-  HTModelReady <- reactive({checkModelReadiness(columnValidation$HydroTime)})
-  TTModelReady <- reactive({checkModelReadiness(columnValidation$ThermalTime)})
-  HTTModelReady <- reactive({checkModelReadiness(columnValidation$HydroThermalTime)})
-  AgingModelReady <- reactive({checkModelReadiness(columnValidation$Aging)})
-  PromoterModelReady <- reactive({checkModelReadiness(columnValidation$Promoter)})
-  InhibitorModelReady <- reactive({checkModelReadiness(columnValidation$Inhibitor)})
+  BasicDataReady <- reactive({checkModelReadiness(colValidation$AllModels)})
+  TTModelReady <- reactive({checkModelReadiness(colValidation$ThermalTime)})
+  HTModelReady <- reactive({checkModelReadiness(colValidation$HydroTime)})
+  HTTModelReady <- reactive({checkModelReadiness(colValidation$HydroThermalTime)})
+  HPModelReady <- reactive({checkModelReadiness(colValidation$HydroPriming)})
+  HTPModelReady <- reactive({checkModelReadiness(colValidation$HydroThermalPriming)})
+  AgingModelReady <- reactive({checkModelReadiness(colValidation$Aging)})
+  PromoterModelReady <- reactive({checkModelReadiness(colValidation$Promoter)})
+  InhibitorModelReady <- reactive({checkModelReadiness(colValidation$Inhibitor)})
+  
+  # lapply(modelNames, function(m) {
+  #   rv$modelReady[[m]] <- reactive({checkModelReadiness(colValidation[[m]])})
+  # })
+  
+  observe({
+    lapply(modelNames, function(m) {
+      rv$modelReady[[m]] <- checkModelReadiness(colValidation[[m]])
+    })
+  })
   
   
   
@@ -274,14 +285,7 @@ server <- function(input, output, session) {
   
   # Menus ----
   
-  output$loadMenu <- renderMenu({
-    if (DataLoaded()) {
-      label = "OK"; color = "green"
-    } else {
-      label = "!"; color = "yellow"
-    }
-    menuItem("Upload data", tabName = "load", badgeLabel = label, badgeColor = color)
-  })
+
   
   
   # Germination Plot and Speed ----
@@ -292,7 +296,7 @@ server <- function(input, output, session) {
     } else {
       label = "X"; color = "red"
     }
-    menuItem("Germination analysis", tabName = "germ", badgeLabel = label, badgeColor = color)
+    menuItem("Germination analysis", tabName = "germTab", badgeLabel = label, badgeColor = color)
   })
   
   output$germUI <- renderUI({
@@ -329,11 +333,11 @@ server <- function(input, output, session) {
   })
   
 
-  ## Germination plot ----
+  ## germination plot ----
   
   germTrtChoices <- reactive({
     cols <- sapply(1:nCols, function(i) {
-      if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor") columnValidation$Column[i]
+      if (rv$colStatus[[paste0("col", i)]] == T && colValidation$Role[i] == "Factor") colValidation$Column[i]
     })
     cols <- compact(cols)
     setNames(as.list(c(NA, cols)), c("Not specified", cols))
@@ -450,11 +454,11 @@ server <- function(input, output, session) {
   })
   
   
-  ## Germination speed ----
+  ## germination speed ----
   
   germSpeedTrtChoices <- reactive({
     cols <- sapply(1:nCols, function(i) {
-      if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor") columnValidation$Column[i]
+      if (rv$colStatus[[paste0("col", i)]] == T && colValidation$Role[i] == "Factor") colValidation$Column[i]
     })
     cols <- compact(cols)
   })
@@ -488,7 +492,6 @@ server <- function(input, output, session) {
     )
   })
   
-  # TODO: I should have a second reactive dataset that includes only renamed columns from the primary dataset. That would simplify the references to that data.
   
   output$germSpeedTable <- renderDataTable({
     req(DataLoaded())
@@ -532,22 +535,21 @@ server <- function(input, output, session) {
         .groups = "drop"
       )
     
-    # TODO: I'm not convinced that this rate calculation makes any sense
     if (input$germSpeedType == "Rate") {
       # show as rate
       df <- df %>%
         mutate(
-          Time = round(Frac / Time * 100, 2),
-          Frac = paste0("GRx", Frac * 100)) %>%
+          Time = round(1 / Time, 6),
+          Frac = paste0("GR", Frac * 100)) %>%
         pivot_wider(
           names_from = "Frac",
           values_from = "Time"
         )
     } else {
-      # show as cumulative fraciton
+      # show as cumulative fraction
       df <- df %>%
         mutate(
-          Frac = paste0("Tx", Frac * 100),
+          Frac = paste0("T", Frac * 100),
           Time = round(Time, 1)) %>%
         pivot_wider(
           names_from = "Frac",
@@ -568,11 +570,76 @@ server <- function(input, output, session) {
       buttons = list(
         list(
           extend = "copy",
-          text = 'Copy'
+          text = 'Copy table to clipboard'
         )
       )
     )
   )
+  
+  
+  # Render menus ----
+  
+  lapply(modelNames, function(m) {
+    output[[paste0(m, "Menu")]] <- renderMenu({
+      if (rv$modelReady[[m]]) {label = "OK"; color = "green"} else {label = "X"; color = "red"}
+      menuItem(m, tabName = paste0(m, "Tab"), badgeLabel = label, badgeColor = color)
+    })
+  })
+  
+  
+  # ThermalTime ----
+  output$ttMenu <- renderMenu({
+    if (TTModelReady()) {label = "OK"; color = "green"} else {label = "X"; color = "red"}
+    menuItem("ThermalTime", tabName = "ttTab", badgeLabel = label, badgeColor = color)
+  })
+  
+  output$ttUI <- renderUI({
+    p("Under construction.")
+  })
+  
+  
+  
+  # HydroTime model ----
+  output$htMenu <- renderMenu({
+    if (HTModelReady()) {label = "OK"; color = "green"} else {label = "X"; color = "red"}
+    menuItem("HydroTime", tabName = "htTab", badgeLabel = label, badgeColor = color)
+  })
+  
+  output$htUI <- renderUI({
+    p("Under construction.")
+  })
+  
+  
+  # HydroThermalTime ----
+  output$httMenu <- renderMenu({
+    if (HTTModelReady()) {label = "OK"; color = "green"} else {label = "X"; color = "red"}
+    menuItem("HydroThermalTime", tabName = "httTab", badgeLabel = label, badgeColor = color)
+  })
+  
+  output$httUI <- renderUI({
+    p("Under construction.")
+  })
+  
+  
+  # HydroPriming model ----
+  
+  
+  
+  # HydroThermalPriming model ----
+  
+  
+  
+  # Aging model ----
+  
+  
+  
+  # Promoter model ----
+  
+  
+  
+  # Inhibitor model ----
+  
+  
   
 }
 

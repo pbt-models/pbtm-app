@@ -25,12 +25,17 @@ sidebar <- dashboardSidebar(
     menuItem("Data format", tabName = "format"),
     menuItemOutput("loadMenu"),
     menuItemOutput("germMenu"),
-    menuItem("PBT models",
-      startExpanded = T,
-      lapply(modelNames, function(m) {
-        menuSubItem(m, tabName = m)
-      })
-    )
+    lapply(modelNames, function(m) {
+      menuItemOutput(paste0(m, "Menu"))
+    })
+    # menuItemOutput("ttMenu"),
+    # menuItemOutput("htMenu"),
+    # menuItemOutput("httMenu"),
+    # menuItemOutput("hpMenu"),
+    # menuItemOutput("htpMenu"),
+    # menuItemOutput("agingMenu"),
+    # menuItemOutput("promoterMenu"),
+    # menuItemOutput("inhibitorMenu")
   )
 )
 
@@ -76,13 +81,7 @@ bodyparts$load <- list(
   p(strong("Start over:")),
   actionButton("clearData", "Clear loaded data"),
   hr(),
-  h3("Current dataset:"),
   uiOutput("currentDataDisplay")
-)
-
-bodyparts$germ <- list(
-  h3("Germination models"),
-  uiOutput("germUI")
 )
 
 body <- dashboardBody(
@@ -91,8 +90,21 @@ body <- dashboardBody(
     tabItem("intro", bodyparts$intro),
     tabItem("format", bodyparts$format),
     tabItem("load", bodyparts$load),
-    tabItem("germ", bodyparts$germ)
-    # add analysis items here
+    tabItem("germTab", list(
+      h3("Germination models"),
+      uiOutput("germUI"))),
+    tabItem("ttTab", list(
+      h3("ThermalTime model"),
+      uiOutput("ttUI")
+    )),
+    tabItem("htTab", list(
+      h3("HydroTime model"),
+      uiOutput("htUI")
+    )),
+    tabItem("httTab", list(
+      h3("HydroThermalTime model"),
+      uiOutput("httUI")
+    ))
   )
 )
 
