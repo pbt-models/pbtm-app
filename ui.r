@@ -28,14 +28,6 @@ sidebar <- dashboardSidebar(
     lapply(modelNames, function(m) {
       menuItemOutput(paste0(m, "Menu"))
     })
-    # menuItemOutput("ttMenu"),
-    # menuItemOutput("htMenu"),
-    # menuItemOutput("httMenu"),
-    # menuItemOutput("hpMenu"),
-    # menuItemOutput("htpMenu"),
-    # menuItemOutput("agingMenu"),
-    # menuItemOutput("promoterMenu"),
-    # menuItemOutput("inhibitorMenu")
   )
 )
 
@@ -48,6 +40,7 @@ bodyparts <- list()
 bodyparts$intro <- list(
   h3("Introduction to the models"),
   p("Population-based Threshold Models (PBTM) Calculator – version 0.2.0. This R package combines existing PBTMs calculations, parameters output and respective plots. The package uses a nonlinear least squares function (Bates and Watts, 1988; Bates and Chambers, 1992) for each model by comparing the raw data and respective treatments directly with the curves predicted by the selected model and minimizing the error."),
+  br(),
   h3("Required data structure"),
   p("Proper data preparation is required to avoid issues when working with the pbtm package. The use of these templates is not required, and users can work with their own data objects as long as the column names are modified to mirror exactly (caps included) the column names described below (Table 1) or visible in the templates. The treatment information (e.g., germination water potential (Germ.wp) needs to be repeated for every cumulative data point (columns CumTime and CumFraction) for the pertinent treatment or these data points will not be used on calculations. Data should be properly filtered to work with the desired model.")
 )
@@ -86,6 +79,7 @@ bodyparts$load <- list(
 
 body <- dashboardBody(
   useShinyjs(),
+  tags$head(tags$style(type = "text/css", "h3 { margin-top: 0px; border-bottom: 1px solid rgba(0, 0, 0, 0.25); }")),
   tabItems(
     tabItem("intro", bodyparts$intro),
     tabItem("format", bodyparts$format),
@@ -93,18 +87,30 @@ body <- dashboardBody(
     tabItem("germTab", list(
       h3("Germination models"),
       uiOutput("germUI"))),
-    tabItem("ttTab", list(
+    tabItem("ThermalTimeTab", list(
       h3("ThermalTime model"),
-      uiOutput("ttUI")
-    )),
-    tabItem("htTab", list(
+      uiOutput("ThermalTimeUI"))),
+    tabItem("HydroTimeTab", list(
       h3("HydroTime model"),
-      uiOutput("htUI")
-    )),
-    tabItem("httTab", list(
+      uiOutput("HydroTimeUI"))),
+    tabItem("HydroThermalTimeTab", list(
       h3("HydroThermalTime model"),
-      uiOutput("httUI")
-    ))
+      uiOutput("HydroThermalTimeUI"))),
+    tabItem("HydroPrimingTab", list(
+      h3("HydroPriming model"),
+      uiOutput("HydroPrimingUI"))),
+    tabItem("HydroThermalPrimingTab", list(
+      h3("HydroThermalPriming model"),
+      uiOutput("HydroThermalPrimingUI"))),
+    tabItem("AgingTab", list(
+      h3("Aging model"),
+      uiOutput("AgingUI"))),
+    tabItem("PromoterTab", list(
+      h3("Promoter model"),
+      uiOutput("PromoterUI"))),
+    tabItem("InhibitorTab", list(
+      h3("Inhibitor model"),
+      uiOutput("InhibitorUI")))
   )
 )
 

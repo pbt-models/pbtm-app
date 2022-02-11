@@ -4,10 +4,13 @@ library(tidyverse)
 library(shiny)
 library(shinyjs)
 library(DT)
+library(Cairo)
 # library(plotly)
 
 
 server <- function(input, output, session) {
+  
+  # options(shiny.usecairo = TRUE)
   
   # Data definitions ----
   
@@ -235,56 +238,12 @@ server <- function(input, output, session) {
   
   DataLoaded <- reactive({nrow(rv$data) > 0})
   BasicDataReady <- reactive({checkModelReadiness(colValidation$AllModels)})
-  TTModelReady <- reactive({checkModelReadiness(colValidation$ThermalTime)})
-  HTModelReady <- reactive({checkModelReadiness(colValidation$HydroTime)})
-  HTTModelReady <- reactive({checkModelReadiness(colValidation$HydroThermalTime)})
-  HPModelReady <- reactive({checkModelReadiness(colValidation$HydroPriming)})
-  HTPModelReady <- reactive({checkModelReadiness(colValidation$HydroThermalPriming)})
-  AgingModelReady <- reactive({checkModelReadiness(colValidation$Aging)})
-  PromoterModelReady <- reactive({checkModelReadiness(colValidation$Promoter)})
-  InhibitorModelReady <- reactive({checkModelReadiness(colValidation$Inhibitor)})
-  
-  # lapply(modelNames, function(m) {
-  #   rv$modelReady[[m]] <- reactive({checkModelReadiness(colValidation[[m]])})
-  # })
-  
+
   observe({
     lapply(modelNames, function(m) {
       rv$modelReady[[m]] <- checkModelReadiness(colValidation[[m]])
     })
   })
-  
-  
-  
-  # Model readiness display ----
-  # output$modelStatus <- renderUI({
-  #   
-  #   status <- function(x) {
-  #     if (x) {
-  #       span(strong("Ready"), style = "color:blue")
-  #     } else {
-  #       span(strong("Not ready"), "- required columns missing", style = "color:red")
-  #     }
-  #   }
-  #   
-  #   list(
-  #     p(
-  #       "Basic plots and models:", status(BasicDataReady()), br(),
-  #       "Hydro Priming model:", status(HPModelReady()), br(),
-  #       "Hydro Thermal Priming model:", status(HTPModelReady()), br(),
-  #       "Hydro Time model:", status(HTModelReady()), br(),
-  #       "Thermal Time model:", status(TTModelReady()), br(),
-  #       "Hydro Thermal Time model:", status(HTTModelReady()), br(),
-  #       "Aging model:", status(HTTModelReady()), br(),
-  #       "Promoter model:", status(HTTModelReady()), br(),
-  #       "Inhibitor model:", status(HTTModelReady())
-  #     )
-  #   )
-  #   
-  # })
-  
-  # Menus ----
-  
 
   
   
@@ -586,39 +545,188 @@ server <- function(input, output, session) {
     })
   })
   
+  lapply(modelNames, function(m) {
+    output[[paste0(m, "UI")]] <- renderUI({
+      p("Under construction.")
+    })
+  })
+  
   
   # ThermalTime ----
-  output$ttMenu <- renderMenu({
-    if (TTModelReady()) {label = "OK"; color = "green"} else {label = "X"; color = "red"}
-    menuItem("ThermalTime", tabName = "ttTab", badgeLabel = label, badgeColor = color)
+
+  ## model ----
+  TTSubOModelResults <- reactive({
+    req(DataLoaded())
+    req(rv$modelReady$ThermalTime)
+    req(input$TTSubOMaxCumFrac)
+    
+    temp <- rv$data[[input$GermTemp]]
+    time <- rv$data[[input$CumTime]]
+    germ <- rv$data[[input$CumFraction]]
+    
+    max.cum.frac <- input$TTSubOMaxCumFrac
+    
+    # Calculate Thermaltime Suboptimal Model Parameters- nls plus algorithm port used to add constraints on the parameters
+    model <- stats::nls(
+      formula = germ ~ max.cum.frac * stats::pnorm(
+        log(time, base = 10),
+        mean = thetaT50 - log(temp - Tb, base = 10),
+        sd = sigma,
+        log = FALSE),
+      start = list(
+        Tb = 6,
+        thetaT50 = 3,
+        sigma = 0.09),
+      lower = list(
+        Tb = 0,
+        thetaT50 = 0.5,
+        sigma = 0.0001),
+      upper = list(
+        Tb = 15,
+        thetaT50 = 50,
+        sigma = 0.5),
+      algorithm = "port")
+    
+    # get some estimation of goodness of fit
+    Corr <- stats::cor(germ, stats::predict(model)) ^ 2
+    
+    # passing fitted Hydrotime Model Parameters
+    Tb <- summary(model)$coefficients[[1]]
+    ThetaT50 <- summary(model)$coefficients[[2]]
+    Sigma <- summary(model)$coefficients[[3]]
+    
+    results <- list(
+      Type = "ThermalTime Suboptimal",
+      Model = model,
+      Plot = NULL,
+      MaxCumFrac = max.cum.frac,
+      Tb = Tb,
+      ThetaT50 = ThetaT50,
+      Sigma = Sigma,
+      Correlation = Corr
+    )
+    
+    results
   })
   
-  output$ttUI <- renderUI({
-    p("Under construction.")
+  
+  ## ui ----
+  output$ThermalTimeUI <- renderUI({
+    validate(need(rv$modelReady$ThermalTime, "Please load required data for ThermalTime analysis."))
+    list(
+      p(em("The thermal time model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values.")),
+      br(),
+      box(
+        title = "Max cumulative fraction",
+        sliderInput(
+          inputId = "TTSubOMaxCumFrac",
+          label = NULL,
+          min = 0,
+          max = 1,
+          value = 1,
+          step = 0.05)
+      ),
+      box(
+        title = "Model results",
+        tableOutput("TTResults")
+      ),
+      box(
+        width = 12,
+        plotOutput("TTPlot")
+      )
+      
+    )
   })
+  
+  
+  ## model results table ----
+  output$TTResults <- renderTable({
+    req(TTSubOModelResults())
+    TTSubOModelResults() %>%
+      enframe() %>%
+      slice(5:8) %>% # just get the coefficients
+      unnest(value) %>%
+      rename(
+        Parameter = name,
+        Value = value
+      )
+  }, digits = 4)
+  
+  
+  ## plot ----
+  output$TTPlot <- renderPlot({
+    req(DataLoaded())
+    
+    # generate the plot
+    plt <- rv$data %>%
+      ggplot(aes(
+        x = .data[[input$CumTime]],
+        y = .data[[input$CumFraction]],
+        color = as.factor(.data[[input$GermTemp]]))) +
+      annotate("rect", xmin = 0, xmax = Inf, ymin = input$TTSubOMaxCumFrac, ymax = 1, fill = "grey", alpha = 0.1) +
+      geom_hline(yintercept = input$TTSubOMaxCumFrac, color = "darkgrey", linetype = "dashed") +
+      geom_point(shape = 19, size = 2) +
+      scale_y_continuous(labels = scales::percent, expand = c(0, 0), limits = c(0, 1.02)) +
+      scale_x_continuous(expand = c(0, 0)) +
+      expand_limits(x = 0, y = 0) +
+      labs(
+        title = "Thermal Time Sub-optimal Model",
+        x = "Time",
+        y = "Cumulative fraction germinated (%)",
+        color = "Temperature") +
+      guides(color = guide_legend(reverse = T, order = 1)) +
+      theme_classic()
+    
+    # try model so it will still plot on model error
+    try({
+      req(TTSubOModelResults())
+      model <- TTSubOModelResults()
+      
+      maxCumFrac <- model$MaxCumFrac
+      tb <- model$Tb
+      thetaT50 <- model$ThetaT50
+      sigma <- model$Sigma
+      corr <- model$Correlation
+      
+      par1 <- paste("T[b] ==", round(tb, 1))
+      par2 <- paste("ThetaT(50) ==", round(thetaT50, 3))
+      par3 <- paste("sigma ==", round(sigma, 3))
+      par4 <- paste("R^2 ==", round(corr, 2))
+      
+      # Plot all predicted treatments by the thermal time model
+      df <- rv$data %>% distinct(.data[[input$GermTemp]], .keep_all = FALSE)
+      modelLines <- mapply(function(temp) {
+        stat_function(
+          fun = function(x) {
+            stats::pnorm(log(x, base = 10), thetaT50 - log(temp - tb, base = 10),  sigma, log = FALSE)
+          },
+          aes(color = as.factor(temp))
+        )
+      },
+        df[[input$GermTemp]]
+      )
+      
+      plt <- plt +
+        modelLines +
+        annotate("text", x = -Inf, y = 0.95, label = paste("Model Parameters"), color = "grey0", hjust = -0.1) +
+        annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = -0.2, parse = TRUE) +
+        annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = -0.1, parse = TRUE) +
+        annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = -0.2, parse = TRUE) +
+        annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = -0.2, parse = TRUE)
+    })
+    
+    plt
+  })
+
   
   
   
   # HydroTime model ----
-  output$htMenu <- renderMenu({
-    if (HTModelReady()) {label = "OK"; color = "green"} else {label = "X"; color = "red"}
-    menuItem("HydroTime", tabName = "htTab", badgeLabel = label, badgeColor = color)
-  })
-  
-  output$htUI <- renderUI({
-    p("Under construction.")
-  })
+
   
   
   # HydroThermalTime ----
-  output$httMenu <- renderMenu({
-    if (HTTModelReady()) {label = "OK"; color = "green"} else {label = "X"; color = "red"}
-    menuItem("HydroThermalTime", tabName = "httTab", badgeLabel = label, badgeColor = color)
-  })
-  
-  output$httUI <- renderUI({
-    p("Under construction.")
-  })
+
   
   
   # HydroPriming model ----
