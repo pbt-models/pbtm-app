@@ -1,13 +1,13 @@
-﻿Column,Role,InputId,Description,Type,Min,Max,Usage,AllModels,HydroPriming,HydroThermalPriming,HydroTime,ThermalTime,HydroThermalTime,Aging,Promoter,Inhibitor
-TrtID,Factor,TrtID,Treatment ID,,,,All models,T,T,T,T,T,T,T,T,T
-TrtDesc,Factor,TrtDesc,Treatment description,,,,All models,F,F,F,F,F,F,F,F,F
-TrtAgingTime,Factor,TrtAgingTime,Aging time,numeric,0,,Aging,F,F,F,F,F,F,T,F,F
-TrtPrimingWP,Factor,TrtPrimingWP,Priming water potential,numeric,,0,Hydro and hydrothermal priming,F,T,T,F,F,F,F,F,F
-TrtPrimingTemp,Factor,TrtPrimingTemp,Priming temperature,numeric,0,100,Hydrothermal priming,F,F,T,F,F,F,F,F,F
-TrtPrimingDuration,Factor,TrtPrimingDuration,Priming duration,numeric,0,,Hydro and hydrothermal priming,F,T,T,T,F,T,F,F,F
-GermWP,Factor,GermWP,Germination water potential,numeric,,0,Hydrotime and hydrothermal,F,F,F,T,F,T,F,F,F
-GermTemp,Factor,GermTemp,Germination temperature,numeric,0,100,Thermal and hydrothermal time,F,F,F,F,T,T,F,F,F
-GermPromoterDosage,Factor,GermPromoterDosage,Germination promoter dosage,numeric,0,,Promoter model,F,F,F,F,F,F,F,T,T
-GermInhibitorDosage,Factor,GermInhibitorDosage,Germination inhibitor dosage,numeric,0,,Inhibitor model,F,F,F,F,F,F,F,T,T
-CumTime,Response,CumTime,Cumulative time,numeric,0,,All models,T,T,T,T,T,T,T,T,T
-CumFraction,Response,CumFraction,Cumulative germination fraction,numeric,0,1,All models,T,T,T,T,T,T,T,T,T
+﻿Column,InputId,Role,Description,LongDescription,Type,TypeDescription,Min,Max,Usage,AllModels,ThermalTime,HydroTime,HydroThermalTime,HydroPriming,HydroThermalPriming,Aging,Promoter,Inhibitor
+TrtID,TrtID,Factor,Treatment ID,Unique treatment number,,Text/Number,,,All models,T,T,T,T,T,T,T,T,T
+TrtDesc,TrtDesc,Factor,Treatment description,Description of the lot and treatment,,Text,,,All models,F,F,F,F,F,F,F,F,F
+AgingTime,TrtAgingTime,Factor,Aging time,Aging time,numeric,Positive number,0,,Aging,F,F,F,F,F,F,T,F,F
+PrimingWP,TrtPrimingWP,Factor,Priming water potential,Measured water potential used during priming,numeric,Negative number,,0,Hydro and hydrothermal priming,F,F,F,F,T,T,F,F,F
+PrimingTemp,TrtPrimingTemp,Factor,Priming temperature,Measured temperature during priming (Celcius),numeric,Number (0-100),0,100,Hydrothermal priming,F,F,F,F,F,T,F,F,F
+PrimingDuration,TrtPrimingDuration,Factor,Priming duration,Priming duration (hours or days),numeric,Positive number,0,,Hydro and hydrothermal priming,F,F,T,T,T,T,F,F,F
+GermWP,GermWP,Factor,Germination water potential,Measured germination water potential,numeric,Negative number,,0,Hydrotime and hydrothermal,F,F,T,T,F,F,F,F,F
+GermTemp,GermTemp,Factor,Germination temperature,Measured germination temperature (Celcius),numeric,Number (0-100),0,100,Thermal and hydrothermal time,F,T,F,T,F,F,F,F,F
+GermPromoterDosage,GermPromoterDosage,Factor,Germination promoter dosage,Measured concentration of the germination promoter,numeric,Positive number,0,,Promoter model,F,F,F,F,F,F,F,T,T
+GermInhibitorDosage,GermInhibitorDosage,Factor,Germination inhibitor dosage,Measured concentration of the germination inhibitor,numeric,Positive number,0,,Inhibitor model,F,F,F,F,F,F,F,T,T
+CumTime,CumTime,Response,Cumulative time,Cumulative elapsed time (hours),numeric,Positive number,0,,All models,T,T,T,T,T,T,T,T,T
+CumFraction,CumFraction,Response,Cumulative germination fraction,Cumulative germinated fraction,numeric,Number (0-1),0,1,All models,T,T,T,T,T,T,T,T,T
