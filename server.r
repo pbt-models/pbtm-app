@@ -95,20 +95,6 @@ server <- function(input, output, session) {
       )
   })
   
-  
-  
-  # Current data DT ----
-  
-  output$currentDataTable <- renderDataTable({rv$data})
-  
-  output$currentDataDisplay <- renderUI({
-    if (nrow(rv$data) == 0) {
-      return("No data loaded.")
-    } else {
-      dataTableOutput("currentDataTable")
-    }
-  })
-  
 
   # Column matching boxes ----
   
@@ -203,33 +189,37 @@ server <- function(input, output, session) {
       }
       
       # display the validation
-      fluidRow(
-        style = "margin-top: 5px; padding-top: 1em;",
-        column(6, msg),
-        column(6, ui)
-      )
+      p(ui, br(), msg)
     })
   })
   
-  output$colSelectUI <- renderUI({
+  # Current data DT ----
+  
+  output$currentDataTable <- renderDataTable({rv$data})
+  
+  output$currentDataDisplay <- renderUI({
     validate(
-      need(nrow(rv$data) > 0, "Load a dataset first.")
+      need(DataLoaded(), "Load a dataset first.")
     )
-    ui <- list()
-    style <- "border-bottom: 1px solid #cccccc; margin-bottom: 1em;"
-    
-    for (i in 1:nCols) {
-      if (i == nCols) { style <- "" }
-      row <- list(
-        fluidRow(
-          style = style,
-          column(6, uiOutput(paste0("colSelect", i))),
-          column(6, uiOutput(paste0("colValidate", i)))
-        )
+    list(
+      div(
+        style = "overflow: auto;",
+        dataTableOutput("currentDataTable")
+      ),
+      hr(),
+      h3("Match column names to expected roles:"),
+      p(em("If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range.")),
+      div(
+        style = "display: flex; flex-wrap: wrap;",
+        lapply(1:nCols, function(i) {
+          wellPanel(
+            style = "flex: 1; vertical-align: top; min-width: 15em; margin: 5px;",
+            uiOutput(paste0("colSelect", i)),
+            uiOutput(paste0("colValidate", i))
+          )
+        })
       )
-      ui <- append(ui, row)
-    }
-    wellPanel(ui)
+    )
   })
 
   
@@ -242,6 +232,7 @@ server <- function(input, output, session) {
     !(F %in% compare)
   }
   
+  DataLoaded <- reactive({nrow(rv$data) > 0})
   BasicDataReady <- reactive({checkModelReadiness(columnValidation$AllModels)})
   HPModelReady <- reactive({checkModelReadiness(columnValidation$HydroPriming)})
   HTPModelReady <- reactive({checkModelReadiness(columnValidation$HydroThermalPriming)})
@@ -255,34 +246,54 @@ server <- function(input, output, session) {
   
   
   # Model readiness display ----
-  output$modelStatus <- renderUI({
-    
-    status <- function(x) {
-      if (x) {
-        span(strong("Ready"), style = "color:blue")
-      } else {
-        span(strong("Not ready"), "- required columns missing", style = "color:red")
-      }
+  # output$modelStatus <- renderUI({
+  #   
+  #   status <- function(x) {
+  #     if (x) {
+  #       span(strong("Ready"), style = "color:blue")
+  #     } else {
+  #       span(strong("Not ready"), "- required columns missing", style = "color:red")
+  #     }
+  #   }
+  #   
+  #   list(
+  #     p(
+  #       "Basic plots and models:", status(BasicDataReady()), br(),
+  #       "Hydro Priming model:", status(HPModelReady()), br(),
+  #       "Hydro Thermal Priming model:", status(HTPModelReady()), br(),
+  #       "Hydro Time model:", status(HTModelReady()), br(),
+  #       "Thermal Time model:", status(TTModelReady()), br(),
+  #       "Hydro Thermal Time model:", status(HTTModelReady()), br(),
+  #       "Aging model:", status(HTTModelReady()), br(),
+  #       "Promoter model:", status(HTTModelReady()), br(),
+  #       "Inhibitor model:", status(HTTModelReady())
+  #     )
+  #   )
+  #   
+  # })
+  
+  # Menus ----
+  
+  output$loadMenu <- renderMenu({
+    if (DataLoaded()) {
+      label = "OK"; color = "green"
+    } else {
+      label = "!"; color = "yellow"
     }
-    
-    list(
-      p(
-        "Basic plots and models:", status(BasicDataReady()), br(),
-        "Hydro Priming model:", status(HPModelReady()), br(),
-        "Hydro Thermal Priming model:", status(HTPModelReady()), br(),
-        "Hydro Time model:", status(HTModelReady()), br(),
-        "Thermal Time model:", status(TTModelReady()), br(),
-        "Hydro Thermal Time model:", status(HTTModelReady()), br(),
-        "Aging model:", status(HTTModelReady()), br(),
-        "Promoter model:", status(HTTModelReady()), br(),
-        "Inhibitor model:", status(HTTModelReady())
-      )
-    )
-    
+    menuItem("Upload data", tabName = "load", badgeLabel = label, badgeColor = color)
   })
   
   
   # Germination Plot and Speed ----
+  
+  output$germMenu <- renderMenu({
+    if (BasicDataReady()) {
+      label = "OK"; color = "green"
+    } else {
+      label = "X"; color = "red"
+    }
+    menuItem("Germination analysis", tabName = "germ", badgeLabel = label, badgeColor = color)
+  })
   
   output$germUI <- renderUI({
     validate(
@@ -351,8 +362,10 @@ server <- function(input, output, session) {
   })
   
   output$germPlot <- renderPlot({
-    req(nrow(rv$data) > 0)
-    req(BasicDataReady())
+    validate(
+      need(DataLoaded(), "No data loaded."),
+      need(BasicDataReady(), "Necessary data columns not present.")
+    )
     
     trts <- 0
     
@@ -478,6 +491,7 @@ server <- function(input, output, session) {
   # TODO: I should have a second reactive dataset that includes only renamed columns from the primary dataset. That would simplify the references to that data.
   
   output$germSpeedTable <- renderDataTable({
+    req(DataLoaded())
     req(input$germSpeedRes)
     req(input$germSpeedType)
     

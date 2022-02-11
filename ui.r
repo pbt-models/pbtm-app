@@ -4,23 +4,27 @@ library(shiny)
 library(shinydashboard)
 library(shinythemes)
 library(shinyjs)
-# library(shinyWidgets)
 library(shinyBS)
 library(DT)
-# library(plotly)
 
+
+
+# Header ------------------------------------------------------------------
 
 header <- dashboardHeader(
   title = "PBTM Dashboard"
 )
 
+
+
+# Sidebar -----------------------------------------------------------------
+
 sidebar <- dashboardSidebar(
   sidebarMenu(
     menuItem("Introduction", tabName = "intro"),
     menuItem("Data format", tabName = "format"),
-    menuItem("Upload data", tabName = "load"),
-    menuItem("Set data columns", tabName = "cols"),
-    menuItem("Germination analysis", tabName = "germ"),
+    menuItemOutput("loadMenu"),
+    menuItemOutput("germMenu"),
     menuItem("PBT models",
       startExpanded = T,
       lapply(modelNames, function(m) {
@@ -29,6 +33,10 @@ sidebar <- dashboardSidebar(
     )
   )
 )
+
+
+
+# Body --------------------------------------------------------------------
 
 bodyparts <- list()
 
@@ -59,23 +67,17 @@ bodyparts$load <- list(
   p(em("Upload your own data here or select one of our sample datasets to get started.")),
   hr(),
   p(strong("Sample datasets:")),
-  fluidRow(
-    column(12,
-      actionButton("loadSampleGermData", "Load germination sample data"),
-      actionButton("loadSamplePrimingData", "Load priming sample data"),
-    )
+  p(
+    actionButton("loadSampleGermData", "Load germination sample data"),
+    actionButton("loadSamplePrimingData", "Load priming sample data")
   ),
   br(),
-  fluidRow(
-    column(12, fileInput("userData", "Upload your own data:", accept = c(".csv"))),
-  ),
+  p(fileInput("userData", "Upload your own data:", accept = c(".csv"))),
+  p(strong("Start over:")),
   actionButton("clearData", "Clear loaded data"),
   hr(),
   h3("Current dataset:"),
-  div(style = "overflow: auto;", uiOutput("currentDataDisplay")),
-  h3("Match column names to expected roles:"),
-  p(em("If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range.")),
-  uiOutput("colSelectUI")
+  uiOutput("currentDataDisplay")
 )
 
 bodyparts$germ <- list(
@@ -89,11 +91,14 @@ body <- dashboardBody(
     tabItem("intro", bodyparts$intro),
     tabItem("format", bodyparts$format),
     tabItem("load", bodyparts$load),
-    # tabItem("cols", bodyparts$cols),
     tabItem("germ", bodyparts$germ)
     # add analysis items here
   )
 )
+
+
+
+# Footer ------------------------------------------------------------------
 
 footer <- list(
   div(
@@ -110,6 +115,10 @@ footer <- list(
     )
   )
 )
+
+
+
+# Generate UI -------------------------------------------------------------
 
 ui <- list(
   dashboardPage(header, sidebar, body),
