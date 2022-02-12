@@ -5,7 +5,7 @@ GermTemp,GermTemp,Factor,Germination temperature,Measured germination temperatur
 GermWP,GermWP,Factor,Germination water potential,Measured germination water potential,numeric,Negative number,,0,Hydrotime and hydrothermal,F,F,T,T,F,F,F,F,F
 PrimingTemp,TrtPrimingTemp,Factor,Priming temperature,Measured temperature during priming (Celcius),numeric,Number (0-100),0,100,Hydrothermal priming,F,F,F,F,F,T,F,F,F
 PrimingWP,TrtPrimingWP,Factor,Priming water potential,Measured water potential used during priming,numeric,Negative number,,0,Hydro and hydrothermal priming,F,F,F,F,T,T,F,F,F
-PrimingDuration,TrtPrimingDuration,Factor,Priming duration,Priming duration (hours or days),numeric,Positive number,0,,Hydro and hydrothermal priming,F,F,T,T,T,T,F,F,F
+PrimingDuration,TrtPrimingDuration,Factor,Priming duration,Priming duration (hours or days),numeric,Positive number,0,,Hydro and hydrothermal priming,F,F,F,F,T,T,F,F,F
 AgingTime,TrtAgingTime,Factor,Aging time,Aging time,numeric,Positive number,0,,Aging,F,F,F,F,F,F,T,F,F
 GermPromoterDosage,GermPromoterDosage,Factor,Germination promoter dosage,Measured concentration of the germination promoter,numeric,Positive number,0,,Promoter model,F,F,F,F,F,F,F,T,T
 GermInhibitorDosage,GermInhibitorDosage,Factor,Germination inhibitor dosage,Measured concentration of the germination inhibitor,numeric,Positive number,0,,Inhibitor model,F,F,F,F,F,F,F,T,T

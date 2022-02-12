@@ -146,7 +146,7 @@ server <- function(input, output, session) {
       # check if no column selected
       if (input[[inputId]] == "NA") {
         msg <- list(span("No column specified.", style = "color:orange"))
-        rv$colStatus[[paste0("col", i)]] <- F
+        rv$colStatus[i] <- F
       } else {
         
         col <- rv$data[[input[[inputId]]]]
@@ -188,10 +188,10 @@ server <- function(input, output, session) {
         # set status TRUE if no messages
         if (is.null(msg)) {
           msg <- list(span(strong("OK"), style = "color:blue"))
-          rv$colStatus[[paste0("col", i)]] <- T
+          rv$colStatus[i] <- T
         } else {
           msg[1] <- NULL # remove the first br()
-          rv$colStatus[[paste0("col", i)]] <- F
+          rv$colStatus[i] <- F
         }
       }
       
@@ -206,18 +206,35 @@ server <- function(input, output, session) {
   # returns false if colStatus is false for that column
   checkModelReadiness <- function(col) {
     compare <- sapply(1:nCols, function(i) {
-      test <- (col[i] == T & rv$colStatus[[paste0("col", i)]] == T) | (col[i] == F)
+      test <- (col[i] == T & rv$colStatus[i] == T) | (col[i] == F)
       if (length(test) == 0) {F} else {test}
     })
     !(F %in% compare)
   }
   
+  # reactive readiness checks
   DataLoaded <- reactive({nrow(rv$data) > 0})
   BasicDataReady <- reactive({checkModelReadiness(colValidation$AllModels)})
 
+  # set reactive values for each model's readiness
   observe({
     lapply(modelNames, function(m) {
       rv$modelReady[[m]] <- checkModelReadiness(colValidation[[m]])
+    })
+  })
+  
+  #### Model menu items ####
+  lapply(modelNames, function(m) {
+    output[[paste0(m, "Menu")]] <- renderMenu({
+      if (rv$modelReady[[m]]) {label = "OK"; color = "green"} else {label = "X"; color = "red"}
+      menuItem(m, tabName = paste0(m, "Tab"), badgeLabel = label, badgeColor = color)
+    })
+  })
+  
+  #### Model UI placeholders ####
+  lapply(modelNames, function(m) {
+    output[[paste0(m, "UI")]] <- renderUI({
+      p("Under construction.")
     })
   })
 
@@ -225,7 +242,7 @@ server <- function(input, output, session) {
   
   # Germination tab ----
   
-  #### output$germMenu ####
+  #### germMenu ####
   output$germMenu <- renderMenu({
     if (BasicDataReady()) {
       label = "OK"; color = "green"
@@ -235,7 +252,7 @@ server <- function(input, output, session) {
     menuItem("Germination analysis", tabName = "germTab", badgeLabel = label, badgeColor = color)
   })
   
-  #### output$germUI ####
+  #### germUI ####
   output$germUI <- renderUI({
     validate(
       need(BasicDataReady(), "Please load a dataset and set required column types for germination analysis.")
@@ -264,9 +281,9 @@ server <- function(input, output, session) {
           width = 12,
           sidebarLayout(
             sidebarPanel(
-              uiOutput("germSpeedTrts"),
-              uiOutput("germSpeedFracs"),
-              uiOutput("germSpeedType")
+              uiOutput("germSpeedTrtsUI"),
+              uiOutput("germSpeedFracsUI"),
+              uiOutput("germSpeedTypeUI")
             ),
             mainPanel(
               div(
@@ -283,13 +300,13 @@ server <- function(input, output, session) {
   #### germTrtChoices ####
   germTrtChoices <- reactive({
     cols <- sapply(1:nCols, function(i) {
-      if (rv$colStatus[[paste0("col", i)]] == T && colValidation$Role[i] == "Factor") colValidation$Column[i]
+      if (rv$colStatus[i] == T && colValidation$Role[i] == "Factor") colValidation$Column[i]
     })
     cols <- compact(cols)
     setNames(as.list(c(NA, cols)), c("Not specified", cols))
   })
   
-  #### output$germPlotTrt1 ####
+  #### germPlotTrt1 ####
   output$germPlotTrt1 <- renderUI({
     list(
       selectInput(
@@ -300,7 +317,7 @@ server <- function(input, output, session) {
     )
   })
   
-  #### output$germPlotTrt2 ####
+  #### germPlotTrt2 ####
   output$germPlotTrt2 <- renderUI({
     req(input$germPlotTrt1)
     req(input$germPlotTrt1 != "NA")
@@ -313,7 +330,7 @@ server <- function(input, output, session) {
     )
   })
   
-  #### output$germPlot ####
+  #### germPlot ####
   output$germPlot <- renderPlot({
     validate(
       need(DataLoaded(), "No data loaded."),
@@ -388,19 +405,16 @@ server <- function(input, output, session) {
     plt + geom_hline(yintercept = lines, color = "grey", size = 0.25, alpha = 0.5, linetype = "dashed")
   })
   
-  
-  ## germination speed ----
-  
   #### germSpeedTrtChoices ####
   germSpeedTrtChoices <- reactive({
     cols <- sapply(1:nCols, function(i) {
-      if (rv$colStatus[[paste0("col", i)]] == T && colValidation$Role[i] == "Factor") colValidation$Column[i]
+      if (rv$colStatus[i] == T && colValidation$Role[i] == "Factor") colValidation$Column[i]
     })
     cols <- compact(cols)
   })
   
-  #### output$germSpeedTrts ####
-  output$germSpeedTrts <- renderUI({
+  #### germSpeedTrts ####
+  output$germSpeedTrtsUI <- renderUI({
     checkboxGroupInput(
       inputId = "germSpeedTrtSelect",
       label = "Select all treatment factors:",
@@ -409,8 +423,8 @@ server <- function(input, output, session) {
     )
   })
   
-  #### output$germSpeedFracs ####
-  output$germSpeedFracs <- renderUI({
+  #### germSpeedFracsUI ####
+  output$germSpeedFracsUI <- renderUI({
     list(
       textInput(
         inputId = "addGermSpeedFracs",
@@ -443,8 +457,8 @@ server <- function(input, output, session) {
     rv$germSpeedFracs = defaultGermSpeedFracs
   })
   
-  #### output$germSpeedType ####
-  output$germSpeedType <- renderUI({
+  #### germSpeedTypeUI ####
+  output$germSpeedTypeUI <- renderUI({
     radioButtons(
       inputId = "germSpeedType",
       label = "Report values as:",
@@ -453,7 +467,7 @@ server <- function(input, output, session) {
     )
   })
   
-  #### output$germSpeedTable ####
+  #### germSpeedTable ####
   output$germSpeedTable <- renderDataTable({
     req(DataLoaded())
     req(input$germSpeedType)
@@ -537,25 +551,37 @@ server <- function(input, output, session) {
   )
   
   
-  # Render menus ----
-  
-  lapply(modelNames, function(m) {
-    output[[paste0(m, "Menu")]] <- renderMenu({
-      if (rv$modelReady[[m]]) {label = "OK"; color = "green"} else {label = "X"; color = "red"}
-      menuItem(m, tabName = paste0(m, "Tab"), badgeLabel = label, badgeColor = color)
-    })
-  })
-  
-  lapply(modelNames, function(m) {
-    output[[paste0(m, "UI")]] <- renderUI({
-      p("Under construction.")
-    })
-  })
-  
-  
+
   # ThermalTime ----
 
-  ## model ----
+  #### ThermalTimeUI ####
+  output$ThermalTimeUI <- renderUI({
+    validate(need(rv$modelReady$ThermalTime, "Please load required data for ThermalTime analysis."))
+    list(
+      p(em("The thermal time model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values.")),
+      br(),
+      box(
+        title = "Max cumulative fraction",
+        sliderInput(
+          inputId = "TTSubOMaxCumFrac",
+          label = NULL,
+          min = 0,
+          max = 1,
+          value = 1,
+          step = 0.05)
+      ),
+      box(
+        title = "Model results",
+        tableOutput("TTResultsTable")
+      ),
+      box(
+        width = 12,
+        plotOutput("TTPlot")
+      )
+    )
+  })
+  
+  #### TTSubOModelResults ####
   TTSubOModelResults <- reactive({
     req(DataLoaded())
     req(rv$modelReady$ThermalTime)
@@ -597,10 +623,6 @@ server <- function(input, output, session) {
     Sigma <- summary(model)$coefficients[[3]]
     
     results <- list(
-      Type = "ThermalTime Suboptimal",
-      Model = model,
-      Plot = NULL,
-      MaxCumFrac = max.cum.frac,
       Tb = Tb,
       ThetaT50 = ThetaT50,
       Sigma = Sigma,
@@ -610,42 +632,11 @@ server <- function(input, output, session) {
     results
   })
   
-  
-  ## ui ----
-  output$ThermalTimeUI <- renderUI({
-    validate(need(rv$modelReady$ThermalTime, "Please load required data for ThermalTime analysis."))
-    list(
-      p(em("The thermal time model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values.")),
-      br(),
-      box(
-        title = "Max cumulative fraction",
-        sliderInput(
-          inputId = "TTSubOMaxCumFrac",
-          label = NULL,
-          min = 0,
-          max = 1,
-          value = 1,
-          step = 0.05)
-      ),
-      box(
-        title = "Model results",
-        tableOutput("TTResults")
-      ),
-      box(
-        width = 12,
-        plotOutput("TTPlot")
-      )
-      
-    )
-  })
-  
-  
-  ## model results table ----
-  output$TTResults <- renderTable({
+  #### TTResultsTable ####
+  output$TTResultsTable <- renderTable({
     req(TTSubOModelResults())
     TTSubOModelResults() %>%
       enframe() %>%
-      slice(5:8) %>% # just get the coefficients
       unnest(value) %>%
       rename(
         Parameter = name,
@@ -654,7 +645,7 @@ server <- function(input, output, session) {
   }, digits = 4)
   
   
-  ## plot ----
+  #### TTPlot ####
   output$TTPlot <- renderPlot({
     req(DataLoaded())
     
@@ -678,7 +669,7 @@ server <- function(input, output, session) {
       guides(color = guide_legend(reverse = T, order = 1)) +
       theme_classic()
     
-    # try model so it will still plot on model error
+    # use try so it will still plot on model error
     try({
       req(TTSubOModelResults())
       model <- TTSubOModelResults()
@@ -721,9 +712,161 @@ server <- function(input, output, session) {
 
   
   
-  
   # HydroTime model ----
 
+  #### HydroTimeUI ####
+  output$HydroTimeUI <- renderUI({
+    validate(need(rv$modelReady$HydroTime, "Please load required data for HydroTime analysis."))
+    list(
+      p(em("The hydro time model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values.")),
+      br(),
+      box(
+        title = "Max cumulative fraction",
+        sliderInput(
+          inputId = "HTMaxCumFrac",
+          label = NULL,
+          min = 0,
+          max = 1,
+          value = 1,
+          step = 0.05)
+      ),
+      box(
+        title = "Model results",
+        tableOutput("HTResultsTable")
+      ),
+      box(
+        width = 12,
+        plotOutput("HTPlot")
+      )
+    )
+  })
+  
+  #### HTModelResults ####
+  HTModelResults <- reactive({
+    req(DataLoaded())
+    req(rv$modelReady$HydroTime)
+    req(input$HTMaxCumFrac)
+    
+    wp <- rv$data[[input$GermWP]]
+    time <- rv$data[[input$CumTime]]
+    germ <- rv$data[[input$CumFraction]]
+    max.cum.frac <- input$HTMaxCumFrac
+    
+    # Calculate Hydrotime Model Parameters- nls plus algorithm port used to add constraints on the parameters
+    model <- stats::nls(
+      formula = germ ~ max.cum.frac * stats::pnorm(
+        wp - (HT / time),
+        Psib50,
+        Sigma,
+        log = FALSE),
+      start = list(
+        HT = 60,
+        Psib50 = -0.8,
+        Sigma = 0.2),
+      lower = list(
+        HT = 1,
+        Psib50 = -5,
+        Sigma = 0.0001),
+      upper = list(
+        HT = 1000,
+        Psib50 = -0.000000001,
+        Sigma = 2),
+      algorithm = "port")
+    
+    #get some estimation of goodness of fit
+    corr <- stats::cor(germ, stats::predict(model)) ^ 2
+    
+    # Passing fitted Hydrotime Model Parameters
+    HT <- summary(model)$coefficients[[1]]
+    Psib50 <- summary(model)$coefficients[[2]]
+    Sigma <- summary(model)$coefficients[[3]]
+    
+    results <- list(
+      HT = HT,
+      Psib50 = Psib50,
+      Sigma = Sigma,
+      Correlation = corr)
+    
+    results
+  })
+  
+  #### HTResultsTable ####
+  output$HTResultsTable <- renderTable({
+    req(HTModelResults())
+    HTModelResults() %>%
+      enframe() %>%
+      unnest(value) %>%
+      rename(
+        Parameter = name,
+        Value = value
+      )
+  }, digits = 4)
+  
+  #### HTPlot ####
+  output$HTPlot <- renderPlot({
+    req(DataLoaded())
+    
+    # generate the plot
+    plt <- rv$data %>%
+      ggplot(aes(
+        x = .data[[input$CumTime]],
+        y = .data[[input$CumFraction]],
+        color = as.factor(.data[[input$GermWP]]))) +
+      annotate("rect", xmin = 0, xmax = Inf, ymin = input$HTMaxCumFrac, ymax = 1, fill = "grey", alpha = 0.1) +
+      geom_hline(yintercept = input$HTMaxCumFrac, color = "darkgrey", linetype = "dashed") +
+      geom_point(shape = 19, size = 2) +
+      scale_y_continuous(labels = scales::percent, expand = c(0, 0), limits = c(0, 1.02)) +
+      scale_x_continuous(expand = c(0, 0)) +
+      expand_limits(x = 0, y = 0) +
+      labs(
+        title = "Hydro Time Model",
+        x = "Time",
+        y = "Cumulative fraction germinated (%)",
+        color = "Water potential") +
+      guides(color = guide_legend(reverse = T, order = 1)) +
+      theme_classic()
+    
+    # use try so it will still plot on model error
+    try({
+      req(HTModelResults())
+      model <- HTModelResults()
+      
+      maxCumFrac <- model$MaxCumFrac
+      ht <- model$HT
+      psib50 <- model$Psib50
+      sigma <- model$Sigma
+      corr <- model$Correlation
+      
+      par1 <- paste("HT ==", round(ht, 2))
+      par2 <- paste("Psi[b](50)==", round(psib50, 3))
+      par3 <- paste("sigma == ", round(sigma, 3))
+      par4 <- paste("R^2 == ", round(corr, 2))
+      
+      # Plot all predicted treatments by the thermal time model
+      df <- rv$data %>% distinct(.data[[input$GermWP]], .keep_all = FALSE)
+      modelLines <- mapply(function(wp) {
+        stat_function(
+          fun = function(x) {
+            stats::pnorm(wp - (ht / x), psib50, sigma, log = FALSE)
+          },
+          aes(color = as.factor(wp))
+        )
+      },
+        df[[input$GermWP]]
+      )
+      
+      plt <- plt +
+        modelLines +
+        annotate("text", x = -Inf, y = 0.95, label = paste("Model Parameters"), color = "grey0", hjust = -0.1) +
+        annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = -0.2, parse = TRUE) +
+        annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = -0.1, parse = TRUE) +
+        annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = -0.2, parse = TRUE) +
+        annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = -0.2, parse = TRUE)
+    })
+    
+    plt
+  })
+  
   
   
   # HydroThermalTime ----
