@@ -1,12 +1,13 @@
 # ---- Server ---- #
 
-library(tidyverse, quietly = T)
-library(shiny, quietly = T)
-library(shinyjs, quietly = T)
-library(DT, quietly = T)
-library(Cairo, quietly = T)
-# library(plotly)
-
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(shiny)
+  library(shinyjs)
+  library(DT)
+  library(Cairo)
+  # library(plotly)
+})
 
 server <- function(input, output, session) {
   

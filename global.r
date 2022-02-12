@@ -1,6 +1,8 @@
 # ---- global ---- #
 
-library(tidyverse)
+suppressPackageStartupMessages({
+  library(tidyverse)
+})
 
 # Load data
 colValidation <- read_csv("data/column-validation.csv", col_types = cols())
