@@ -10,33 +10,22 @@ library(Cairo)
 
 server <- function(input, output, session) {
   
-  # options(shiny.usecairo = TRUE)
-  
   # Data definitions ----
+  
+  defaultGermSpeedFracs <- c(10, 16, 50, 84, 90)
   
   rv <- reactiveValues(
     data = tibble(),
     colStatus = NULL,
-    modelReady = list()
+    modelReady = list(),
+    germSpeedFracs = defaultGermSpeedFracs
   )
   
   
-  # Action Buttons ----
   
-
-
-  observeEvent(input$confirmDataView, {
-    updateCollapse(session, "data", open = "cols", close = "view")
-  })
-  observeEvent(c(input$confirmColView, input$confirmColView2), {
-    updateCollapse(session, "data", close = "cols")
-  })
+  # Intro tab ----
   
-  
-  
-  # Format tab ----
-  
-  ## download buttons ----
+  #### Download buttons ####
   output$downloadTemplate <- downloadHandler(
     filename = "pbtm-data-template.csv",
     content = function(file) {write_csv(sampleTemplate, file)})
@@ -50,7 +39,7 @@ server <- function(input, output, session) {
     content = function(file) {write_csv(samplePrimingData, file)})
   
   
-  ## data format description table ----
+  #### output$columnDescriptions ####
   output$columnDescriptions <- renderTable({
     colValidation %>%
       select(
@@ -62,12 +51,10 @@ server <- function(input, output, session) {
   })
   
   
-  
-  
-  
+
   # Load tab ----
   
-  ## menu badge handler ----
+  #### loadMenu ####
   output$loadMenu <- renderMenu({
     if (DataLoaded()) {
       label = "OK"; color = "green"
@@ -77,35 +64,24 @@ server <- function(input, output, session) {
     menuItem("Upload data", tabName = "load", badgeLabel = label, badgeColor = color)
   })
   
-  ## action buttons ----
-  observeEvent(input$loadSampleGermData, {
-    rv$data <- sampleGermData
-    # updateCollapse(session, "data", open = "view", close = "load")
-  })
-  
-  observeEvent(input$loadSamplePrimingData, {
-    rv$data <- samplePrimingData
-    # updateCollapse(session, "data", open = "view", close = "load")
-  })
-  
+  #### dataset load buttons ####
+  observeEvent(input$loadSampleGermData, {rv$data <- sampleGermData})
+  observeEvent(input$loadSamplePrimingData, {rv$data <- samplePrimingData})
   observeEvent(input$userData, {
-    rv$data <- read_csv(input$userData$datapath, col_types = cols()) %>%
-      distinct() # remove any duplicate rows
-    # updateCollapse(session, "data", open = "view", close = "load")
+    try({
+      df <- read_csv(input$userData$datapath, col_types = cols()) %>% distinct()
+      if (nrow(df) > 0) {rv$data <- df}
+    })
   })
-  
   observeEvent(input$clearData, {
     rv$data <- tibble()
     reset("userData")
   })
   
-  
-  ## current data display ----
-  
-  # the table
+  #### currentDataTable ####
   output$currentDataTable <- renderDataTable({rv$data})
   
-  # the ui, which shows the table and the matching boxes only when data loaded
+  #### currentDataDisplay ####
   output$currentDataDisplay <- renderUI({
     validate(need(DataLoaded(), "Please load a dataset."))
     
@@ -128,17 +104,18 @@ server <- function(input, output, session) {
   })
   
   
-  ## column matching ----
-  
+  #### columnNames ####
   columnNames <- reactive({
     req(rv$data)
     names(rv$data)
   })
   
+  #### columnChoices ####
   columnChoices <- reactive({
     setNames(as.list(c(NA, columnNames())), c("Not specified", columnNames()))
   })
   
+  #### colSelect ####
   lapply(1:nCols, function(i) {
     output[[paste0("colSelect", i)]] <- renderUI({
       selectInput(
@@ -151,8 +128,7 @@ server <- function(input, output, session) {
   })
   
   
-  ## column validation messages ----
-  
+  #### colValidate ####
   lapply(1:nCols, function(i) {
     
     outCol <- paste0("colValidate", i)
@@ -247,8 +223,9 @@ server <- function(input, output, session) {
 
   
   
-  # Germination Plot and Speed ----
+  # Germination tab ----
   
+  #### output$germMenu ####
   output$germMenu <- renderMenu({
     if (BasicDataReady()) {
       label = "OK"; color = "green"
@@ -258,42 +235,52 @@ server <- function(input, output, session) {
     menuItem("Germination analysis", tabName = "germTab", badgeLabel = label, badgeColor = color)
   })
   
+  #### output$germUI ####
   output$germUI <- renderUI({
     validate(
       need(BasicDataReady(), "Please load a dataset and set required column types for germination analysis.")
     )
     list(
-      h4("Cumulative germination plot:"),
-      sidebarLayout(
-        sidebarPanel(
-          uiOutput("germPlotTrt1"),
-          uiOutput("germPlotTrt2")
+      fluidRow(
+        box(
+          title = "Cumulative germination plot",
+          status = "primary",
+          solidHeader = T,
+          width = 12,
+          sidebarLayout(
+            sidebarPanel(
+              uiOutput("germPlotTrt1"),
+              uiOutput("germPlotTrt2")
+            ),
+            mainPanel(
+              plotOutput("germPlot")
+            )
+          )
         ),
-        mainPanel(
-          plotOutput("germPlot")
-        )
-      ),
-      br(),
-      h4("Germination time analysis: (work in progress)"),
-      sidebarLayout(
-        sidebarPanel(
-          uiOutput("germSpeedTrts"),
-          uiOutput("germSpeedFracs"),
-          uiOutput("germSpeedType")
-        ),
-        mainPanel(
-          div(
-            dataTableOutput("germSpeedTable"),
-            style = "overflow-x: auto"
+        box(
+          title = "Germination time analysis",
+          status = "primary",
+          solidHeader = T,
+          width = 12,
+          sidebarLayout(
+            sidebarPanel(
+              uiOutput("germSpeedTrts"),
+              uiOutput("germSpeedFracs"),
+              uiOutput("germSpeedType")
+            ),
+            mainPanel(
+              div(
+                style = "overflow-x: auto",
+                dataTableOutput("germSpeedTable")
+              )
+            )
           )
         )
       )
     )
   })
   
-
-  ## germination plot ----
-  
+  #### germTrtChoices ####
   germTrtChoices <- reactive({
     cols <- sapply(1:nCols, function(i) {
       if (rv$colStatus[[paste0("col", i)]] == T && colValidation$Role[i] == "Factor") colValidation$Column[i]
@@ -302,6 +289,7 @@ server <- function(input, output, session) {
     setNames(as.list(c(NA, cols)), c("Not specified", cols))
   })
   
+  #### output$germPlotTrt1 ####
   output$germPlotTrt1 <- renderUI({
     list(
       selectInput(
@@ -312,6 +300,7 @@ server <- function(input, output, session) {
     )
   })
   
+  #### output$germPlotTrt2 ####
   output$germPlotTrt2 <- renderUI({
     req(input$germPlotTrt1)
     req(input$germPlotTrt1 != "NA")
@@ -324,6 +313,7 @@ server <- function(input, output, session) {
     )
   })
   
+  #### output$germPlot ####
   output$germPlot <- renderPlot({
     validate(
       need(DataLoaded(), "No data loaded."),
@@ -354,38 +344,30 @@ server <- function(input, output, session) {
       mutate(FracDiff = CumFrac - lag(CumFrac, default = 0))
     
     if (trts == 1) {
-      
       df <- df %>%
         group_by(Trt1, CumTime) %>%
         summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
         mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
-      
       plt <- df %>%
         ggplot(aes(x = CumTime, y = CumFrac, color = Trt1)) +
         geom_line() +
         geom_point(shape = 19, size = 2) +
         labs(color = input$germPlotTrt1)
-      
     } else if (trts == 2) {
-      
       df <- df %>%
         group_by(Trt1, Trt2, CumTime) %>%
         summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
         mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
-      
       plt <- df %>%
         ggplot(aes(x = CumTime, y = CumFrac, color = Trt1, shape = Trt2)) +
         geom_line() +
         geom_point(size = 2) +
         labs(color = input$germPlotTrt1, shape = input$germPlotTrt2)
-      
     } else {
-      
       df <- df %>%
         group_by(CumTime) %>%
         summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
         mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
-      
       plt <- df %>%
         ggplot(aes(x = CumTime, y = CumFrac)) +
         geom_line() +
@@ -402,19 +384,14 @@ server <- function(input, output, session) {
       ) +
       theme_classic()
     
-    # if (req(input$germSpeedFracs)) {
-    #   plt <- plt + geom_hline(yintercept = input$germSpeedFracs / 100)
-    # }
-    
-    lines = seq(0, 1, by = input$germSpeedRes / 100)
-    plt <- plt + geom_hline(yintercept = lines, color = "grey", size = 0.25, alpha = 0.5, linetype = "dashed")
-    
-    plt
+    lines = rv$germSpeedFracs / 100
+    plt + geom_hline(yintercept = lines, color = "grey", size = 0.25, alpha = 0.5, linetype = "dashed")
   })
   
   
   ## germination speed ----
   
+  #### germSpeedTrtChoices ####
   germSpeedTrtChoices <- reactive({
     cols <- sapply(1:nCols, function(i) {
       if (rv$colStatus[[paste0("col", i)]] == T && colValidation$Role[i] == "Factor") colValidation$Column[i]
@@ -422,6 +399,7 @@ server <- function(input, output, session) {
     cols <- compact(cols)
   })
   
+  #### output$germSpeedTrts ####
   output$germSpeedTrts <- renderUI({
     checkboxGroupInput(
       inputId = "germSpeedTrtSelect",
@@ -431,17 +409,41 @@ server <- function(input, output, session) {
     )
   })
   
+  #### output$germSpeedFracs ####
   output$germSpeedFracs <- renderUI({
-    sliderInput(
-      inputId = "germSpeedRes",
-      label = "Germination fraction step",
-      min = 10,
-      max = 50,
-      step = 5,
-      value = 25
+    list(
+      textInput(
+        inputId = "addGermSpeedFracs",
+        label = "Set cumulative percent (separate with commas):",
+        value = ""
+      ),
+      div(
+        actionButton("setGermSpeedFracs", "Apply"),
+        actionButton("resetGermSpeedFracs", "Reset"),
+        style = "margin-top:15px"
+      )
     )
   })
   
+  # handle apply button
+  observeEvent(input$setGermSpeedFracs, {
+    try({
+      fracs <- suppressWarnings(sort(parse_number(unlist(strsplit(input$addGermSpeedFracs, ",")))))
+      fracs <- unique(as.integer(fracs))
+      fracs <- fracs[fracs > 0]
+      fracs <- fracs[fracs <= 100]
+      if (length(fracs) > 0) {rv$germSpeedFracs <- fracs}
+    })
+    updateTextInput(inputId = "addGermSpeedFracs", value = "")
+  })
+  
+  # handle reset button
+  observeEvent(input$resetGermSpeedFracs, {
+    updateTextInput(inputId = "addGermSpeedFracs", value = "")
+    rv$germSpeedFracs = defaultGermSpeedFracs
+  })
+  
+  #### output$germSpeedType ####
   output$germSpeedType <- renderUI({
     radioButtons(
       inputId = "germSpeedType",
@@ -451,10 +453,9 @@ server <- function(input, output, session) {
     )
   })
   
-  
+  #### output$germSpeedTable ####
   output$germSpeedTable <- renderDataTable({
     req(DataLoaded())
-    req(input$germSpeedRes)
     req(input$germSpeedType)
     
     # construct working dataset
@@ -486,7 +487,7 @@ server <- function(input, output, session) {
       arrange(CumTime) %>%
       summarise(
         {
-          df <- approx(CumFrac, CumTime, xout = seq(0, 1, by = input$germSpeedRes / 100), ties = "ordered", rule = 2)
+          df <- approx(CumFrac, CumTime, xout = rv$germSpeedFracs / 100, ties = "ordered", rule = 2)
           names(df) <- c("Frac", "Time")
           df <- as_tibble(df)
           drop_na(df)
