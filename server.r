@@ -1,10 +1,10 @@
 # ---- Server ---- #
 
-library(tidyverse)
-library(shiny)
-library(shinyjs)
-library(DT)
-library(Cairo)
+library(tidyverse, quietly = T)
+library(shiny, quietly = T)
+library(shinyjs, quietly = T)
+library(DT, quietly = T)
+library(Cairo, quietly = T)
 # library(plotly)
 
 
@@ -432,9 +432,9 @@ server <- function(input, output, session) {
         value = ""
       ),
       div(
+        style = "margin-top: 1em; margin-bottom: 1em;",
         actionButton("setGermSpeedFracs", "Apply"),
-        actionButton("resetGermSpeedFracs", "Reset"),
-        style = "margin-top:15px"
+        actionButton("resetGermSpeedFracs", "Reset")
       )
     )
   })
@@ -462,7 +462,7 @@ server <- function(input, output, session) {
     radioButtons(
       inputId = "germSpeedType",
       label = "Report values as:",
-      choiceNames = c("Time (to % germinated)", "Rate (% / time)"),
+      choiceNames = c("Time (to % germinated)", "Rate (1 / time)"),
       choiceValues = c("Time", "Rate")
     )
   })
@@ -568,7 +568,7 @@ server <- function(input, output, session) {
           min = 0,
           max = 1,
           value = 1,
-          step = 0.05)
+          step = 0.01)
       ),
       box(
         title = "Model results",
@@ -680,17 +680,17 @@ server <- function(input, output, session) {
       sigma <- model$Sigma
       corr <- model$Correlation
       
-      par1 <- paste("T[b] ==", round(tb, 1))
-      par2 <- paste("ThetaT(50) ==", round(thetaT50, 3))
-      par3 <- paste("sigma ==", round(sigma, 3))
-      par4 <- paste("R^2 ==", round(corr, 2))
+      par1 <- paste("~~T[b]==", round(tb, 1))
+      par2 <- paste("~~ThetaT(50)==", round(thetaT50, 3))
+      par3 <- paste("~~sigma==", round(sigma, 3))
+      par4 <- paste("~~R^2==", round(corr, 2))
       
       # Plot all predicted treatments by the thermal time model
-      df <- rv$data %>% distinct(.data[[input$GermTemp]], .keep_all = FALSE)
+      df <- rv$data %>% distinct(.data[[input$GermTemp]], .keep_all = F)
       modelLines <- mapply(function(temp) {
         stat_function(
           fun = function(x) {
-            stats::pnorm(log(x, base = 10), thetaT50 - log(temp - tb, base = 10),  sigma, log = FALSE)
+            stats::pnorm(log(x, base = 10), thetaT50 - log(temp - tb, base = 10),  sigma, log = F)
           },
           aes(color = as.factor(temp))
         )
@@ -700,11 +700,11 @@ server <- function(input, output, session) {
       
       plt <- plt +
         modelLines +
-        annotate("text", x = -Inf, y = 0.95, label = paste("Model Parameters"), color = "grey0", hjust = -0.1) +
-        annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = -0.2, parse = TRUE) +
-        annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = -0.1, parse = TRUE) +
-        annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = -0.2, parse = TRUE) +
-        annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = -0.2, parse = TRUE)
+        annotate("text", x = -Inf, y = 0.95, label = " Model parameters:", color = "grey0", hjust = 0) +
+        annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T)
     })
     
     plt
@@ -728,7 +728,7 @@ server <- function(input, output, session) {
           min = 0,
           max = 1,
           value = 1,
-          step = 0.05)
+          step = 0.01)
       ),
       box(
         title = "Model results",
@@ -837,10 +837,10 @@ server <- function(input, output, session) {
       sigma <- model$Sigma
       corr <- model$Correlation
       
-      par1 <- paste("HT ==", round(ht, 2))
-      par2 <- paste("Psi[b](50)==", round(psib50, 3))
-      par3 <- paste("sigma == ", round(sigma, 3))
-      par4 <- paste("R^2 == ", round(corr, 2))
+      par1 <- paste("~~HT==", round(ht, 2))
+      par2 <- paste("~~Psi[b](50)==", round(psib50, 3))
+      par3 <- paste("~~sigma== ", round(sigma, 3))
+      par4 <- paste("~~R^2== ", round(corr, 2))
       
       # Plot all predicted treatments by the thermal time model
       df <- rv$data %>% distinct(.data[[input$GermWP]], .keep_all = FALSE)
@@ -857,11 +857,11 @@ server <- function(input, output, session) {
       
       plt <- plt +
         modelLines +
-        annotate("text", x = -Inf, y = 0.95, label = paste("Model Parameters"), color = "grey0", hjust = -0.1) +
-        annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = -0.2, parse = TRUE) +
-        annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = -0.1, parse = TRUE) +
-        annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = -0.2, parse = TRUE) +
-        annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = -0.2, parse = TRUE)
+        annotate("text", x = -Inf, y = 0.95, label = " Model parameters", color = "grey0", hjust = 0) +
+        annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T)
     })
     
     plt
@@ -871,6 +871,205 @@ server <- function(input, output, session) {
   
   # HydroThermalTime ----
 
+  #### HydroThermalTimeUI ####
+  output$HydroThermalTimeUI <- renderUI({
+    validate(need(rv$modelReady$HydroThermalTime, "Please load required data for HydroThermalTime analysis."))
+    list(
+      p(em("The hydro thermal time model assumes a data set with germination temperature and germination water potential as treatment conditions. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values.")),
+      br(),
+      fluidRow(
+        box(
+          title = "Model parameters",
+          sliderInput(
+            inputId = "HTTMaxCumFrac",
+            label = "Mac cumulative fraction",
+            min = 0,
+            max = 1,
+            value = 1,
+            step = 0.01
+          ),
+          numericInput(
+            inputId = "HTTBaseTemp",
+            label = HTML("Base temperature<br>(leave blank to compute)"),
+            value = NULL
+          )
+        ),
+        box(
+          title = "Model results",
+          tableOutput("HTTResultsTable")
+        ),
+        box(
+          width = 12,
+          plotOutput("HTTPlot")
+        )
+      )
+    )
+  })
+  
+  #### HTTModelResults ####
+  HTTModelResults <- reactive({
+    req(DataLoaded())
+    req(rv$modelReady$HydroThermalTime)
+    req(input$HTTMaxCumFrac)
+    
+    wp <- rv$data[[input$GermWP]]
+    temp <- rv$data[[input$GermTemp]]
+    time <- rv$data[[input$CumTime]]
+    germ <- rv$data[[input$CumFraction]]
+    max.cum.frac <- input$HTTMaxCumFrac
+    base.temp <- input$HTTBaseTemp
+    
+    # model conditions
+    start <- list(
+      HT = 800,
+      psib50 = -1,
+      sigma = 0.4)
+    lower <- list(
+      HT = 1,
+      psib50 = -5,
+      sigma = 0.0001)
+    upper <- list(
+      HT = 5000,
+      psib50 = 0,
+      sigma = 10)
+    
+    if (is.na(base.temp)) {
+      start$Tb <- 1
+      lower$Tb <- 0
+      upper$Tb <- 15
+    } else {
+      Tb <- base.temp
+    }
+    
+    # Calculate Hydrotime Model Parameters and Tb - nls plus algorithm port used to add constraints on the parameters
+    model <- stats::nls(
+      germ ~ max.cum.frac * stats::pnorm(
+        wp - (HT / ((temp - Tb) * time)),
+        psib50,
+        sigma,
+        log = FALSE),
+      start = start,
+      lower = lower,
+      upper = upper,
+      algorithm = "port")
+    
+    HT <- summary(model)$coefficients[[1]]
+    Psib50 <- summary(model)$coefficients[[2]]
+    Sigma <- summary(model)$coefficients[[3]]
+    
+    # get model coefficients
+    if (is.na(base.temp)) {
+      Tb <- summary(model)$coefficients[[4]]
+    } else {
+      Tb <- base.temp
+    }
+    
+    # estimate goodness of fit
+    corr <- stats::cor(germ, stats::predict(model)) ^ 2
+    
+    results <- list(
+      HT = HT,
+      Tb = Tb,
+      Psib50 = Psib50,
+      Sigma = Sigma,
+      Correlation = corr)
+    
+    results
+  })
+  
+  #### HTTResultsTable ####
+  output$HTTResultsTable <- renderTable({
+    req(HTTModelResults())
+    HTTModelResults() %>%
+      enframe() %>%
+      unnest(value) %>%
+      rename(
+        Parameter = name,
+        Value = value
+      )
+  }, digits = 4)
+  
+  #### HTTPlot ####
+  output$HTTPlot <- renderPlot({
+    req(DataLoaded())
+    
+    # generate the plot
+    plt <- rv$data %>%
+      ggplot(aes(
+        x = .data[[input$CumTime]],
+        y = .data[[input$CumFraction]],
+        color = as.factor(.data[[input$GermWP]]),
+        linetype = as.factor(.data[[input$GermTemp]]))) +
+      annotate("rect", xmin = 0, xmax = Inf, ymin = input$HTTMaxCumFrac, ymax = 1, fill = "grey", alpha = 0.1) +
+      geom_hline(yintercept = input$HTTMaxCumFrac, color = "darkgrey", linetype = "dashed") +
+      geom_point(aes(shape = as.factor(.data[[input$GermTemp]])), size = 2) +
+      scale_y_continuous(labels = scales::percent, expand = c(0, 0), limits = c(0, 1.02)) +
+      scale_x_continuous(expand = c(0, 0)) +
+      expand_limits(x = 0, y = 0) +
+      labs(
+        title = "HydroThermalTime Model",
+        x = "Time",
+        y = "Cumulative fraction germinated (%)",
+        color = "Water Potential",
+        shape = "Temperature",
+        linetype = "Temperature") +
+      guides(color = guide_legend(reverse = T, order = 1)) +
+      theme_classic()
+    
+    # use try so it will still plot on model error
+    try({
+      req(HTTModelResults())
+      model <- HTTModelResults()
+      
+      maxCumFrac <- input$HTTMaxCumFrac
+      ht <- model$HT
+      psib50 <- model$Psib50
+      tb <- model$Tb
+      sigma <- model$Sigma
+      corr <- model$Correlation
+      
+      # model params
+      par1 <- paste("~~HT==", round(ht, 2))
+      par2 <- paste("~~T[b]==", round(tb, 2))
+      par3 <- paste("~~psi[b](50)==", round(psib50,3))
+      par4 <- paste("~~sigma == ", round(sigma, 3))
+      par5 <- paste("~~R^2 == ", round(corr, 2))
+      
+      # function to plot all predicted treatments by the hydro thermal time model
+      df <- rv$data %>%
+        distinct(.data[[input$GermWP]], .data[[input$GermTemp]], .keep_all = F) %>%
+        arrange(.data[[input$GermWP]], .data[[input$GermTemp]])
+      
+      modelLines <- mapply(function(wp, temp) {
+        stat_function(
+          fun = function(x) {
+            maxCumFrac * stats::pnorm(
+              wp - (ht / ((temp - tb) * x)),
+              psib50,
+              sigma,
+              log = FALSE
+            )
+          },
+          aes(color = as.factor(wp), linetype = as.factor(temp))
+        )
+      },
+        df[[input$GermWP]],
+        df[[input$GermTemp]]
+      )
+      
+      plt <- plt +
+        modelLines +
+        annotate("text", x = -Inf, y = 0.95, label = " Model Parameters:", color = "grey0", hjust = 0) +
+        annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.7, label = par5, color = "grey0", hjust = 0, parse = T)
+    })
+    
+    plt
+  })
+  
   
   
   # HydroPriming model ----
