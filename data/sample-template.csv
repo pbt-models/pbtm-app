@@ -1,1 +1,1 @@
-TrtID,TrtDesc,TrtAgingTime,TrtPrimingWP,TrtPrimingTemp,TrtPrimingDuration,GermWP,GermTemp,GermPromoterDosage,GermInhibitorDosage,CumTime,CumPercent,CumFraction
+TrtID,TrtDesc,GermTemp,GermWP,PrimingTemp,PrimingWP,PrimingDuration,AgingTime,GermPromoterDosage,GermInhibitorDosage,CumTime,CumFraction
