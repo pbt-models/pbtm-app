@@ -588,55 +588,64 @@ server <- function(input, output, session) {
     req(rv$modelReady$ThermalTime)
     req(input$TTSubOMaxCumFrac)
     
-    temp <- rv$data[[input$GermTemp]]
-    time <- rv$data[[input$CumTime]]
-    germ <- rv$data[[input$CumFraction]]
-    
-    max.cum.frac <- input$TTSubOMaxCumFrac
-    
-    # Calculate Thermaltime Suboptimal Model Parameters- nls plus algorithm port used to add constraints on the parameters
-    model <- stats::nls(
-      formula = germ ~ max.cum.frac * stats::pnorm(
-        log(time, base = 10),
-        mean = thetaT50 - log(temp - Tb, base = 10),
-        sd = sigma,
-        log = FALSE),
-      start = list(
-        Tb = 6,
-        thetaT50 = 3,
-        sigma = 0.09),
-      lower = list(
-        Tb = 0,
-        thetaT50 = 0.5,
-        sigma = 0.0001),
-      upper = list(
-        Tb = 15,
-        thetaT50 = 50,
-        sigma = 0.5),
-      algorithm = "port")
-    
-    # get some estimation of goodness of fit
-    Corr <- stats::cor(germ, stats::predict(model)) ^ 2
-    
-    # passing fitted Hydrotime Model Parameters
-    Tb <- summary(model)$coefficients[[1]]
-    ThetaT50 <- summary(model)$coefficients[[2]]
-    Sigma <- summary(model)$coefficients[[3]]
-    
-    results <- list(
-      Tb = Tb,
-      ThetaT50 = ThetaT50,
-      Sigma = Sigma,
-      Correlation = Corr
+    tryCatch({
+      # local vars
+      temp <- rv$data[[input$GermTemp]]
+      time <- rv$data[[input$CumTime]]
+      germ <- rv$data[[input$CumFraction]]
+      max.cum.frac <- input$TTSubOMaxCumFrac
+      
+      # run model
+      model <- stats::nls(
+        formula = germ ~ max.cum.frac * stats::pnorm(
+          log(time, base = 10),
+          mean = thetaT50 - log(temp - Tb, base = 10),
+          sd = sigma,
+          log = FALSE),
+        start = list(
+          Tb = 6,
+          thetaT50 = 3,
+          sigma = 0.09),
+        lower = list(
+          Tb = 0,
+          thetaT50 = 0.5,
+          sigma = 0.0001),
+        upper = list(
+          Tb = 15,
+          thetaT50 = 50,
+          sigma = 0.5),
+        algorithm = "port")
+      
+      # grab coefs
+      Corr <- stats::cor(germ, stats::predict(model)) ^ 2
+      Tb <- summary(model)$coefficients[[1]]
+      ThetaT50 <- summary(model)$coefficients[[2]]
+      Sigma <- summary(model)$coefficients[[3]]
+      
+      # return results
+      list(
+        Tb = Tb,
+        ThetaT50 = ThetaT50,
+        Sigma = Sigma,
+        Correlation = Corr
+      )
+    },
+      error = function(cond) {
+        paste("Unable to compute model, try adjusting parameters. ", str_to_sentence(cond[1]))
+      }
     )
-    
-    results
   })
   
   #### TTResultsTable ####
   output$TTResultsTable <- renderTable({
     req(TTSubOModelResults())
-    TTSubOModelResults() %>%
+    results <- TTSubOModelResults()
+    
+    # print error message if model fails
+    validate(need(is.list(results), results))
+    
+    # convert results list to data frame
+    results %>%
       enframe() %>%
       unnest(value) %>%
       rename(
@@ -672,7 +681,7 @@ server <- function(input, output, session) {
     
     # use try so it will still plot on model error
     try({
-      req(TTSubOModelResults())
+      req(is.list(TTSubOModelResults()))
       model <- TTSubOModelResults()
       
       maxCumFrac <- model$MaxCumFrac
@@ -748,53 +757,63 @@ server <- function(input, output, session) {
     req(rv$modelReady$HydroTime)
     req(input$HTMaxCumFrac)
     
-    wp <- rv$data[[input$GermWP]]
-    time <- rv$data[[input$CumTime]]
-    germ <- rv$data[[input$CumFraction]]
-    max.cum.frac <- input$HTMaxCumFrac
-    
-    # Calculate Hydrotime Model Parameters- nls plus algorithm port used to add constraints on the parameters
-    model <- stats::nls(
-      formula = germ ~ max.cum.frac * stats::pnorm(
-        wp - (HT / time),
-        Psib50,
-        Sigma,
-        log = FALSE),
-      start = list(
-        HT = 60,
-        Psib50 = -0.8,
-        Sigma = 0.2),
-      lower = list(
-        HT = 1,
-        Psib50 = -5,
-        Sigma = 0.0001),
-      upper = list(
-        HT = 1000,
-        Psib50 = -0.000000001,
-        Sigma = 2),
-      algorithm = "port")
-    
-    #get some estimation of goodness of fit
-    corr <- stats::cor(germ, stats::predict(model)) ^ 2
-    
-    # Passing fitted Hydrotime Model Parameters
-    HT <- summary(model)$coefficients[[1]]
-    Psib50 <- summary(model)$coefficients[[2]]
-    Sigma <- summary(model)$coefficients[[3]]
-    
-    results <- list(
-      HT = HT,
-      Psib50 = Psib50,
-      Sigma = Sigma,
-      Correlation = corr)
-    
-    results
+    tryCatch({
+      # required data
+      wp <- rv$data[[input$GermWP]]
+      time <- rv$data[[input$CumTime]]
+      germ <- rv$data[[input$CumFraction]]
+      max.cum.frac <- input$HTMaxCumFrac
+      
+      # run model
+      model <- stats::nls(
+        formula = germ ~ max.cum.frac * stats::pnorm(
+          wp - (HT / time),
+          Psib50,
+          Sigma,
+          log = FALSE),
+        start = list(
+          HT = 60,
+          Psib50 = -0.8,
+          Sigma = 0.2),
+        lower = list(
+          HT = 1,
+          Psib50 = -5,
+          Sigma = 0.0001),
+        upper = list(
+          HT = 1000,
+          Psib50 = -0.000000001,
+          Sigma = 2),
+        algorithm = "port")
+      
+      # grab coefs
+      corr <- stats::cor(germ, stats::predict(model)) ^ 2
+      HT <- summary(model)$coefficients[[1]]
+      Psib50 <- summary(model)$coefficients[[2]]
+      Sigma <- summary(model)$coefficients[[3]]
+      
+      # return results
+      list(
+        HT = HT,
+        Psib50 = Psib50,
+        Sigma = Sigma,
+        Correlation = corr)
+    },
+      error = function(cond) {
+        paste("Unable to compute model, try adjusting parameters. ", str_to_sentence(cond[1]))
+      }
+    )
   })
   
   #### HTResultsTable ####
   output$HTResultsTable <- renderTable({
     req(HTModelResults())
-    HTModelResults() %>%
+    results <- HTModelResults()
+    
+    # print error message if model fails
+    validate(need(is.list(results), results))
+    
+    # convert list to simple data frame
+    results %>%
       enframe() %>%
       unnest(value) %>%
       rename(
@@ -829,7 +848,7 @@ server <- function(input, output, session) {
     
     # use try so it will still plot on model error
     try({
-      req(HTModelResults())
+      req(is.list(HTModelResults()))
       model <- HTModelResults()
       
       maxCumFrac <- model$MaxCumFrac
@@ -913,75 +932,83 @@ server <- function(input, output, session) {
     req(rv$modelReady$HydroThermalTime)
     req(input$HTTMaxCumFrac)
     
-    wp <- rv$data[[input$GermWP]]
-    temp <- rv$data[[input$GermTemp]]
-    time <- rv$data[[input$CumTime]]
-    germ <- rv$data[[input$CumFraction]]
-    max.cum.frac <- input$HTTMaxCumFrac
-    base.temp <- input$HTTBaseTemp
-    
-    # model conditions
-    start <- list(
-      HT = 800,
-      psib50 = -1,
-      sigma = 0.4)
-    lower <- list(
-      HT = 1,
-      psib50 = -5,
-      sigma = 0.0001)
-    upper <- list(
-      HT = 5000,
-      psib50 = 0,
-      sigma = 10)
-    
-    if (is.na(base.temp)) {
-      start$Tb <- 1
-      lower$Tb <- 0
-      upper$Tb <- 15
-    } else {
-      Tb <- base.temp
-    }
-    
-    # Calculate Hydrotime Model Parameters and Tb - nls plus algorithm port used to add constraints on the parameters
-    model <- stats::nls(
-      germ ~ max.cum.frac * stats::pnorm(
-        wp - (HT / ((temp - Tb) * time)),
-        psib50,
-        sigma,
-        log = FALSE),
-      start = start,
-      lower = lower,
-      upper = upper,
-      algorithm = "port")
-    
-    HT <- summary(model)$coefficients[[1]]
-    Psib50 <- summary(model)$coefficients[[2]]
-    Sigma <- summary(model)$coefficients[[3]]
-    
-    # get model coefficients
-    if (is.na(base.temp)) {
-      Tb <- summary(model)$coefficients[[4]]
-    } else {
-      Tb <- base.temp
-    }
-    
-    # estimate goodness of fit
-    corr <- stats::cor(germ, stats::predict(model)) ^ 2
-    
-    results <- list(
-      HT = HT,
-      Tb = Tb,
-      Psib50 = Psib50,
-      Sigma = Sigma,
-      Correlation = corr)
-    
-    results
+    tryCatch({
+      wp <- rv$data[[input$GermWP]]
+      temp <- rv$data[[input$GermTemp]]
+      time <- rv$data[[input$CumTime]]
+      germ <- rv$data[[input$CumFraction]]
+      max.cum.frac <- input$HTTMaxCumFrac
+      base.temp <- input$HTTBaseTemp
+      
+      # model conditions
+      start <- list(
+        HT = 800,
+        psib50 = -1,
+        sigma = 0.4)
+      lower <- list(
+        HT = 1,
+        psib50 = -5,
+        sigma = 0.0001)
+      upper <- list(
+        HT = 5000,
+        psib50 = 0,
+        sigma = 10)
+      
+      if (is.na(base.temp)) {
+        start$Tb <- 1
+        lower$Tb <- 0
+        upper$Tb <- 15
+      } else {
+        Tb <- base.temp
+      }
+      
+      # run model
+      model <- stats::nls(
+        germ ~ max.cum.frac * stats::pnorm(
+          wp - (HT / ((temp - Tb) * time)),
+          psib50,
+          sigma,
+          log = FALSE),
+        start = start,
+        lower = lower,
+        upper = upper,
+        algorithm = "port")
+      
+      # get coefs
+      corr <- stats::cor(germ, stats::predict(model)) ^ 2
+      HT <- summary(model)$coefficients[[1]]
+      Psib50 <- summary(model)$coefficients[[2]]
+      Sigma <- summary(model)$coefficients[[3]]
+      if (is.na(base.temp)) {
+        Tb <- summary(model)$coefficients[[4]]
+      } else {
+        Tb <- base.temp
+      }
+      
+      # return results
+      list(
+        HT = HT,
+        Tb = Tb,
+        Psib50 = Psib50,
+        Sigma = Sigma,
+        Correlation = corr)
+    },
+      error = function(cond) {
+        paste("Unable to compute model, try adjusting parameters. ", str_to_sentence(cond[1]))
+      }
+    )
   })
   
   #### HTTResultsTable ####
   output$HTTResultsTable <- renderTable({
     req(HTTModelResults())
-    HTTModelResults() %>%
+    results <- HTTModelResults()
+    
+    # print error message if model fails
+    validate(need(is.list(results), results))
+    
+    # convert results list to data frame
+    results %>%
       enframe() %>%
       unnest(value) %>%
       rename(
@@ -1019,7 +1046,7 @@ server <- function(input, output, session) {
     
     # use try so it will still plot on model error
     try({
-      req(HTTModelResults())
+      req(is.list(HTTModelResults()))
       model <- HTTModelResults()
       
       maxCumFrac <- input$HTTMaxCumFrac
