@@ -52,7 +52,7 @@ intro <- list(
   ),
   br(),
   h4("Expected column names and descriptions:"),
-  tableOutput("columnDescriptions")
+  div(style = "overflow: auto;", tableOutput("columnDescriptions"))
 )
 
 load <- list(
