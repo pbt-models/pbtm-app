@@ -502,10 +502,10 @@ server <- function(input, output, session) {
       arrange(CumTime) %>%
       summarise(
         {
-          df <- approx(CumFrac, CumTime, xout = rv$germSpeedFracs / 100, ties = "ordered", rule = 2)
-          names(df) <- c("Frac", "Time")
-          df <- as_tibble(df)
-          drop_na(df)
+          approx(CumFrac, CumTime, xout = rv$germSpeedFracs / 100, ties = "ordered", rule = 2) %>%
+            setNames(c("Frac", "Time")) %>%
+            as_tibble() %>%
+            drop_na()
         },
         .groups = "drop"
       )

@@ -36,11 +36,8 @@ sidebar <- dashboardSidebar(
 
 # Body --------------------------------------------------------------------
 
-headerStyle <- "margin-top: 0px; border-bottom: 1px solid rgba(0, 0, 0, 0.25);"
-bodyparts <- list()
-
-bodyparts$intro <- list(
-  h2("Population-based threshold models for seed germination analysis", style = headerStyle),
+intro <- list(
+  h2("Population-based threshold models for seed germination analysis", class = "tab-title"),
   h3("Introduction to the models"),
   p("This app in an interactive easy-to-use implementation of the functions found in the PBTM R package (currently under development).  The models use a nonlinear least squares function (Bates and Watts, 1988; Bates and Chambers, 1992) for each model by comparing the raw data and respective treatments directly with the curves predicted by the selected model and minimizing the error."),
   br(),
@@ -58,8 +55,8 @@ bodyparts$intro <- list(
   tableOutput("columnDescriptions")
 )
 
-bodyparts$load <- list(
-  h3("Upload data", style = headerStyle),
+load <- list(
+  h3("Upload data", class = "tab-title"),
   p(em("Upload your own data here or select one of our sample datasets to get started.")),
   hr(),
   p(strong("Sample datasets:")),
@@ -75,39 +72,28 @@ bodyparts$load <- list(
   uiOutput("currentDataDisplay")
 )
 
-body <- dashboardBody(
-  useShinyjs(),
-  tabItems(
-    tabItem("intro", bodyparts$intro),
-    tabItem("load", bodyparts$load),
+tabs <- append(
+  list(
+    tabItem("intro", intro),
+    tabItem("load", load),
     tabItem("germTab", list(
-      h3("Germination models", style = headerStyle),
-      uiOutput("germUI"))),
-    tabItem("ThermalTimeTab", list(
-      h3("ThermalTime model", style = headerStyle),
-      uiOutput("ThermalTimeUI"))),
-    tabItem("HydroTimeTab", list(
-      h3("HydroTime model", style = headerStyle),
-      uiOutput("HydroTimeUI"))),
-    tabItem("HydroThermalTimeTab", list(
-      h3("HydroThermalTime model", style = headerStyle),
-      uiOutput("HydroThermalTimeUI"))),
-    tabItem("HydroPrimingTab", list(
-      h3("HydroPriming model", style = headerStyle),
-      uiOutput("HydroPrimingUI"))),
-    tabItem("HydroThermalPrimingTab", list(
-      h3("HydroThermalPriming model", style = headerStyle),
-      uiOutput("HydroThermalPrimingUI"))),
-    tabItem("AgingTab", list(
-      h3("Aging model", style = headerStyle),
-      uiOutput("AgingUI"))),
-    tabItem("PromoterTab", list(
-      h3("Promoter model", style = headerStyle),
-      uiOutput("PromoterUI"))),
-    tabItem("InhibitorTab", list(
-      h3("Inhibitor model", style = headerStyle),
-      uiOutput("InhibitorUI")))
-  )
+      h3("Germination models", class = "tab-title"),
+      uiOutput("germUI")))
+  ),
+  lapply(modelNames, function(m) {
+    tabItem(paste0(m, "Tab"), list(
+      h3(m, class = "tab-title"),
+      uiOutput(paste0(m, "UI"))
+    ))
+  })
+)
+
+body <- dashboardBody(
+  tags$head(includeHTML(("google-analytics.html"))),
+  tags$head(includeHTML(("favicons.html"))),
+  includeCSS("style.css"),
+  useShinyjs(),
+  do.call(tabItems, tabs)
 )
 
 
@@ -117,19 +103,14 @@ body <- dashboardBody(
 footer <- list(
   div(
     align = "center",
-    style = "font-size:small; color:grey; border-top:2px darkgrey; margin-top: 2em;",
+    class = "wrapper",
+    style = "font-size: small; color: grey; background-color: white;",
+    br(), br(),
     p("App developed by", a("Ben Bradford", href = "https://github.com/bzbradford")),
-    p(
-      "Based on the", a("PBTM R package", href = "https://github.com/pedrobello/pbtm"),
-      "developed by", a("Pedro Bello", href = "https://github.com/pedrobello"),
-      "and", a("Ben Bradford", href = "https://github.com/bzbradford")
-    ),
-    p(
-      "Seed germination models developed by", a("Kent Bradford", href = "https://www.plantsciences.ucdavis.edu/people/kent-bradford"),
-      "and", a("Pedro Bello", href = "https://www.plantsciences.ucdavis.edu/people/pedro-bello")
-    ),
-    p(a("Source code", href = "https://github.com/bzbradford/pbtm-app")
-    )
+    p("Based on the", a("PBTM R package", href = "https://github.com/pedrobello/pbtm"), "developed by", a("Pedro Bello", href = "https://github.com/pedrobello"), "and", a("Ben Bradford", href = "https://github.com/bzbradford")),
+    p("Seed germination models developed by", a("Kent Bradford", href = "https://www.plantsciences.ucdavis.edu/people/kent-bradford"), "and", a("Pedro Bello", href = "https://www.plantsciences.ucdavis.edu/people/pedro-bello")),
+    p(a("Source code", href = "https://github.com/bzbradford/pbtm-app")),
+    br()
   )
 )
 
