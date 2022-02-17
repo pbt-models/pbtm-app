@@ -4,6 +4,7 @@ suppressPackageStartupMessages({
   library(tidyverse)
   library(shiny)
   library(shinyjs)
+  library(shinyBS)
   library(DT)
   library(Cairo)
   # library(plotly)
@@ -21,6 +22,24 @@ server <- function(input, output, session) {
     modelReady = list(),
     germSpeedFracs = defaultGermSpeedFracs
   )
+  
+  cleanData <- reactive({
+    req(DataLoaded())
+    data <- list()
+    for (i in 1:nCols) {
+      id <- colValidation$InputId[i]
+      req(input[[id]])
+      userCol <- input[[id]]
+      if (!is.na(userCol)) {
+        data[[id]] <- rv$data[[userCol]]
+      }
+    }
+    as_tibble(data)
+  })
+  
+  cleanDataReady <- reactive({
+    is_tibble(cleanData())
+  })
   
   
   
@@ -83,7 +102,7 @@ server <- function(input, output, session) {
   output$currentDataTable <- renderDataTable({rv$data})
   
   #### currentDataDisplay ####
-  output$currentDataDisplay <- renderUI({
+  output$currentDataUI <- renderUI({
     validate(need(DataLoaded(), "Please load a dataset."))
     
     list(
@@ -197,7 +216,8 @@ server <- function(input, output, session) {
       }
       
       # display the validation
-      p(ui, br(), msg)
+      # p(ui, br(), msg)
+      p(msg, br(), ui)
     })
   })
   
@@ -301,7 +321,9 @@ server <- function(input, output, session) {
   #### germTrtChoices ####
   germTrtChoices <- reactive({
     cols <- sapply(1:nCols, function(i) {
-      if (rv$colStatus[i] == T && colValidation$Role[i] == "Factor") colValidation$Column[i]
+      if (rv$colStatus[i] == T && colValidation$Role[i] == "Factor") {
+        colValidation$Column[i]
+      }
     })
     cols <- compact(cols)
     setNames(as.list(c(NA, cols)), c("Not specified", cols))
@@ -337,37 +359,33 @@ server <- function(input, output, session) {
       need(DataLoaded(), "No data loaded."),
       need(BasicDataReady(), "Necessary data columns not present.")
     )
+    req(cleanDataReady())
     
     trts <- 0
-    
-    df <- tibble(
-      TrtID = as.factor(rv$data[[input$TrtID]]),
-      CumTime = rv$data[[input$CumTime]],
-      CumFrac = rv$data[[input$CumFraction]]
-    )
+    df <- cleanData()
     
     if (req(input$germPlotTrt1) != "NA") {
-      df <- mutate(df, Trt1 = as.factor(rv$data[[input$germPlotTrt1]]))
+      df <- mutate(df, Trt1 = as.factor(df[[input$germPlotTrt1]]))
       trts <- 1
 
       if (req(input$germPlotTrt2) != "NA") {
-        df <- mutate(df, Trt2 = as.factor(rv$data[[input$germPlotTrt2]]))
+        df <- mutate(df, Trt2 = as.factor(df[[input$germPlotTrt2]]))
         trts <- 2
       }
     }
     
     df <- df %>%
       group_by(TrtID) %>%
-      arrange(TrtID, CumTime, CumFrac) %>%
-      mutate(FracDiff = CumFrac - lag(CumFrac, default = 0))
+      arrange(TrtID, CumTime, CumFraction) %>%
+      mutate(FracDiff = CumFraction - lag(CumFraction, default = 0))
     
     if (trts == 1) {
       df <- df %>%
         group_by(Trt1, CumTime) %>%
         summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+        mutate(CumFraction = cumsum(FracDiff) / sum(FracDiff))
       plt <- df %>%
-        ggplot(aes(x = CumTime, y = CumFrac, color = Trt1)) +
+        ggplot(aes(x = CumTime, y = CumFraction, color = Trt1)) +
         geom_line() +
         geom_point(shape = 19, size = 2) +
         labs(color = input$germPlotTrt1)
@@ -375,9 +393,9 @@ server <- function(input, output, session) {
       df <- df %>%
         group_by(Trt1, Trt2, CumTime) %>%
         summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+        mutate(CumFraction = cumsum(FracDiff) / sum(FracDiff))
       plt <- df %>%
-        ggplot(aes(x = CumTime, y = CumFrac, color = Trt1, shape = Trt2)) +
+        ggplot(aes(x = CumTime, y = CumFraction, color = Trt1, shape = Trt2)) +
         geom_line() +
         geom_point(size = 2) +
         labs(color = input$germPlotTrt1, shape = input$germPlotTrt2)
@@ -385,9 +403,9 @@ server <- function(input, output, session) {
       df <- df %>%
         group_by(CumTime) %>%
         summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+        mutate(CumFraction = cumsum(FracDiff) / sum(FracDiff))
       plt <- df %>%
-        ggplot(aes(x = CumTime, y = CumFrac)) +
+        ggplot(aes(x = CumTime, y = CumFraction)) +
         geom_line() +
         geom_point(size = 2)
     } 
@@ -471,22 +489,17 @@ server <- function(input, output, session) {
   #### germSpeedTable ####
   output$germSpeedTable <- renderDataTable({
     req(DataLoaded())
+    req(cleanDataReady())
     req(input$germSpeedType)
     
-    # construct working dataset
-    df <- tibble(TrtID = rv$data[[input$TrtID]])
+    df <- cleanData()
     trts <- input$germSpeedTrtSelect
-    for (trt in trts) { df[[trt]] <- rv$data[[input[[trt]]]] }
-    df <- df %>% mutate(
-      CumTime = rv$data[[input$CumTime]],
-      CumFrac = rv$data[[input$CumFraction]]
-    )
     
     # regenerate cumulative fractions depending on grouping trts
     df <- df %>%
       group_by(TrtID) %>%
-      arrange(TrtID, CumTime, CumFrac) %>%
-      mutate(FracDiff = CumFrac - lag(CumFrac, default = 0))
+      arrange(TrtID, CumTime, CumFraction) %>%
+      mutate(FracDiff = CumFraction - lag(CumFraction, default = 0))
     
     # group by the selected treatments
     df <- group_by_at(df, trts)
@@ -495,14 +508,14 @@ server <- function(input, output, session) {
     df <- df %>%
       group_by(CumTime, .add = T) %>%
       summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-      mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+      mutate(CumFraction = cumsum(FracDiff) / sum(FracDiff))
     
     # interpolate the curves to get the estimated value at given fraction
     df <- df %>%
       arrange(CumTime) %>%
       summarise(
         {
-          approx(CumFrac, CumTime, xout = rv$germSpeedFracs / 100, ties = "ordered", rule = 2) %>%
+          approx(CumFraction, CumTime, xout = rv$germSpeedFracs / 100, ties = "ordered", rule = 2) %>%
             setNames(c("Frac", "Time")) %>%
             as_tibble() %>%
             drop_na()
@@ -545,7 +558,7 @@ server <- function(input, output, session) {
       buttons = list(
         list(
           extend = "copy",
-          text = 'Copy table to clipboard'
+          text = "Copy table to clipboard"
         )
       )
     )
@@ -621,13 +634,15 @@ server <- function(input, output, session) {
   
   #### TTSubOModelResults ####
   TTSubOModelResults <- reactive({
-    req(DataLoaded())
+    req(cleanDataReady())
     req(rv$modelReady$ThermalTime)
     
+    df <- cleanData()
+    
     # get data
-    GermTemp <- rv$data[[input$GermTemp]]
-    CumTime <- rv$data[[input$CumTime]]
-    CumFrac <- rv$data[[input$CumFraction]]
+    GermTemp <- df$GermTemp
+    CumTime <- df$CumTime
+    CumFrac <- df$CumFraction
     
     # get params
     maxCumFrac <- input$TT.maxCumFrac
@@ -719,17 +734,18 @@ server <- function(input, output, session) {
   
   #### TTPlot ####
   output$TTPlot <- renderPlot({
-    req(DataLoaded())
+    req(cleanDataReady())
     req(input$TT.maxCumFrac)
     
     maxCumFrac <- input$TT.maxCumFrac
+    df <- cleanData()
     
     # generate the plot
-    plt <- rv$data %>%
+    plt <- df %>%
       ggplot(aes(
-        x = .data[[input$CumTime]],
-        y = .data[[input$CumFraction]],
-        color = as.factor(.data[[input$GermTemp]]))) +
+        x = CumTime,
+        y = CumFraction,
+        color = as.factor(GermTemp))) +
       annotate("rect", xmin = 0, xmax = Inf, ymin = maxCumFrac, ymax = 1, fill = "grey", alpha = 0.1) +
       geom_hline(yintercept = maxCumFrac, color = "darkgrey", linetype = "dashed") +
       geom_point(shape = 19, size = 2) +
@@ -763,7 +779,7 @@ server <- function(input, output, session) {
       par4 <- paste("~~R^2==", signif(Corr, 2))
       
       # Plot all predicted treatments by the thermal time model
-      df <- rv$data %>% distinct(.data[[input$GermTemp]], .keep_all = F)
+      df2 <- df %>% distinct(GermTemp)
       modelLines <- mapply(function(temp) {
         stat_function(
           fun = function(x) {
@@ -772,7 +788,7 @@ server <- function(input, output, session) {
           aes(color = as.factor(temp))
         )
       },
-        df[[input$GermTemp]]
+        df2$GermTemp
       )
       
       plt <- plt +
@@ -849,6 +865,7 @@ server <- function(input, output, session) {
       fluidRow(
         box(
           width = 12,
+          status = "primary",
           plotOutput("HTPlot")
         )
       )
@@ -857,13 +874,15 @@ server <- function(input, output, session) {
   
   #### HTModelResults ####
   HTModelResults <- reactive({
-    req(DataLoaded())
+    req(cleanDataReady())
     req(rv$modelReady$HydroTime)
     
+    df <- cleanData()
+    
     # get data
-    GermWP <- rv$data[[input$GermWP]]
-    CumTime <- rv$data[[input$CumTime]]
-    CumFrac <- rv$data[[input$CumFraction]]
+    GermWP <- df$GermWP
+    CumTime <- df$CumTime
+    CumFrac <- df$CumFraction
     
     # get params
     maxCumFrac <- input$HT.maxCumFrac
@@ -954,17 +973,18 @@ server <- function(input, output, session) {
   
   #### HTPlot ####
   output$HTPlot <- renderPlot({
-    req(DataLoaded())
+    req(cleanDataReady())
     req(input$HT.maxCumFrac)
     
     maxCumFrac <- input$HT.maxCumFrac
+    df <- cleanData()
     
     # generate the plot
-    plt <- rv$data %>%
+    plt <- df %>%
       ggplot(aes(
-        x = .data[[input$CumTime]],
-        y = .data[[input$CumFraction]],
-        color = as.factor(.data[[input$GermWP]]))) +
+        x = CumTime,
+        y = CumFraction,
+        color = as.factor(GermWP))) +
       annotate("rect", xmin = 0, xmax = Inf, ymin = maxCumFrac, ymax = 1, fill = "grey", alpha = 0.1) +
       geom_hline(yintercept = maxCumFrac, color = "darkgrey", linetype = "dashed") +
       geom_point(shape = 19, size = 2) +
@@ -995,7 +1015,7 @@ server <- function(input, output, session) {
       par4 <- paste("~~R^2== ", round(Corr, 2))
       
       # Plot all predicted treatments by the thermal time model
-      df <- rv$data %>% distinct(.data[[input$GermWP]], .keep_all = FALSE)
+      df2 <- df %>% distinct(GermWP)
       modelLines <- mapply(function(wp) {
         stat_function(
           fun = function(x) {
@@ -1009,7 +1029,7 @@ server <- function(input, output, session) {
           aes(color = as.factor(wp))
         )
       },
-        df[[input$GermWP]]
+        df2$GermWP
       )
       
       plt <- plt +
@@ -1100,14 +1120,15 @@ server <- function(input, output, session) {
   
   #### HTTModelResults ####
   HTTModelResults <- reactive({
-    req(DataLoaded())
+    req(cleanDataReady())
     req(rv$modelReady$HydroThermalTime)
 
     # get data
-    GermWP <- rv$data[[input$GermWP]]
-    GermTemp <- rv$data[[input$GermTemp]]
-    CumTime <- rv$data[[input$CumTime]]
-    CumFrac <- rv$data[[input$CumFraction]]
+    df <- cleanData()
+    GermWP <- df$GermWP
+    GermTemp <- df$GermTemp
+    CumTime <- df$CumTime
+    CumFrac <- df$CumFraction
     
     # get params
     maxCumFrac <- input$HTT.maxCumFrac
@@ -1198,21 +1219,18 @@ server <- function(input, output, session) {
   
   #### HTTPlot ####
   output$HTTPlot <- renderPlot({
-    req(DataLoaded())
+    req(cleanDataReady())
     req(input$HTT.maxCumFrac)
     
     maxCumFrac <- input$HTT.maxCumFrac
+    df <- cleanData()
     
     # generate the plot
-    plt <- rv$data %>%
-      ggplot(aes(
-        x = .data[[input$CumTime]],
-        y = .data[[input$CumFraction]],
-        color = as.factor(.data[[input$GermWP]]),
-        linetype = as.factor(.data[[input$GermTemp]]))) +
+    plt <- df %>%
+      ggplot(aes(x = CumTime, y = CumFraction, color = as.factor(GermWP), linetype = as.factor(GermTemp))) +
       annotate("rect", xmin = 0, xmax = Inf, ymin = maxCumFrac, ymax = 1, fill = "grey", alpha = 0.1) +
       geom_hline(yintercept = maxCumFrac, color = "darkgrey", linetype = "dashed") +
-      geom_point(aes(shape = as.factor(.data[[input$GermTemp]])), size = 2) +
+      geom_point(aes(shape = as.factor(GermTemp)), size = 2) +
       scale_y_continuous(labels = scales::percent, expand = c(0, 0), limits = c(0, 1.02)) +
       scale_x_continuous(expand = c(0, 0)) +
       expand_limits(x = 0, y = 0) +
@@ -1245,9 +1263,9 @@ server <- function(input, output, session) {
       par5 <- paste("~~R^2 == ", signif(Corr, 3))
       
       # function to plot all predicted treatments by the hydro thermal time model
-      df <- rv$data %>%
-        distinct(.data[[input$GermWP]], .data[[input$GermTemp]], .keep_all = F) %>%
-        arrange(.data[[input$GermWP]], .data[[input$GermTemp]])
+      df2 <- df %>%
+        distinct(GermWP, GermTemp) %>%
+        arrange(GermWP, GermTemp)
       
       modelLines <- mapply(function(wp, temp) {
         stat_function(
@@ -1262,8 +1280,8 @@ server <- function(input, output, session) {
           aes(color = as.factor(wp), linetype = as.factor(temp))
         )
       },
-        df[[input$GermWP]],
-        df[[input$GermTemp]]
+        df2$GermWP,
+        df2$GermTemp
       )
       
       plt <- plt +
