@@ -890,18 +890,40 @@ server <- function(input, output, session) {
   
   
   # HydroThermalTime ----
+  
+  #### Model params ####
+  HTT.start <- list(
+    HT = 800,
+    Tb = 1,
+    Psib50 = -1,
+    Sigma = 0.4
+  )
+  
+  HTT.min <- list(
+    HT = 1,
+    Tb = 0,
+    Psib50 = -5,
+    Sigma = 0.0001
+  )
+  
+  HTT.max <- list(
+    HT = 5000,
+    Tb = 15,
+    Psib50 = 0,
+    Sigma = 10
+  )
 
   #### HydroThermalTimeUI ####
   output$HydroThermalTimeUI <- renderUI({
     validate(need(rv$modelReady$HydroThermalTime, "Please load required data for HydroThermalTime analysis."))
     list(
-      p(em("The hydro thermal time model assumes a data set with germination temperature and germination water potential as treatment conditions. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values.")),
+      p(em("The hydro thermal time model assumes a data set with germination temperature and germination water potential as treatment conditions. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Input any of the following model coefficients, or leave blank to compute the best fit. Note: the model may fail to converge under certain max cumulative fraction values.")),
       br(),
       fluidRow(
         box(
           title = "Model parameters",
           sliderInput(
-            inputId = "HTTMaxCumFrac",
+            inputId = "HTT.maxCumFrac",
             label = "Mac cumulative fraction",
             min = 0,
             max = 1,
@@ -909,10 +931,33 @@ server <- function(input, output, session) {
             step = 0.01
           ),
           numericInput(
-            inputId = "HTTBaseTemp",
-            label = HTML("Base temperature<br>(leave blank to compute)"),
-            value = NULL
-          )
+            inputId = "HTT.HT",
+            label = paste0("HT (range: ", HTT.min$HT, " - ", HTT.max$HT, ")"),
+            value = NULL,
+            min = HTT.min$HT,
+            max = HTT.max$HT
+          ),
+          numericInput(
+            inputId = "HTT.Tb",
+            label = paste0("Tb (range: ", HTT.min$Tb, " - ", HTT.max$Tb, ")"),
+            value = NULL,
+            min = HTT.min$Tb,
+            max = HTT.max$Tb
+          ),
+          numericInput(
+            inputId = "HTT.Psib50",
+            label = paste0("Psib50 (range: ", HTT.min$Psib50, " - ", HTT.max$Psib50, ")"),
+            value = NULL,
+            min = HTT.min$Psib50,
+            max = HTT.max$Psib50
+          ),
+          numericInput(
+            inputId = "HTT.Sigma",
+            label = paste0("Sigma (range: ", HTT.min$Sigma, " - ", HTT.max$Sigma, ")"),
+            value = NULL,
+            min = HTT.min$Sigma,
+            max = HTT.max$Sigma
+          ),
         ),
         box(
           title = "Model results",
@@ -930,67 +975,74 @@ server <- function(input, output, session) {
   HTTModelResults <- reactive({
     req(DataLoaded())
     req(rv$modelReady$HydroThermalTime)
-    req(input$HTTMaxCumFrac)
+
+    # get data
+    wp <- rv$data[[input$GermWP]]
+    temp <- rv$data[[input$GermTemp]]
+    time <- rv$data[[input$CumTime]]
+    germ <- rv$data[[input$CumFraction]]
+    
+    # get params
+    maxCumFrac <- input$HTT.maxCumFrac
+    coefNames <- names(HTT.start)
+    userCoefs <- list()
+    start <- HTT.start
+    lower <- HTT.min
+    upper <- HTT.max
+    
+    for (c in coefNames) {
+      userVal <- input[[paste0("HTT.", c)]]
+      if (!is.na(userVal)) {
+        if (between(userVal, HTT.min[[c]], HTT.max[[c]])) {
+          start[[c]] <- lower[[c]] <- upper[[c]] <- NULL
+          userCoefs[[c]] <- userVal
+          assign(c, userVal)
+        } else {
+          updateTextInput(inputId = paste0("HTT.", c), value = "")
+        }
+      }
+    }
     
     tryCatch({
-      wp <- rv$data[[input$GermWP]]
-      temp <- rv$data[[input$GermTemp]]
-      time <- rv$data[[input$CumTime]]
-      germ <- rv$data[[input$CumFraction]]
-      max.cum.frac <- input$HTTMaxCumFrac
-      base.temp <- input$HTTBaseTemp
-      
-      # model conditions
-      start <- list(
-        HT = 800,
-        psib50 = -1,
-        sigma = 0.4)
-      lower <- list(
-        HT = 1,
-        psib50 = -5,
-        sigma = 0.0001)
-      upper <- list(
-        HT = 5000,
-        psib50 = 0,
-        sigma = 10)
-      
-      if (is.na(base.temp)) {
-        start$Tb <- 1
-        lower$Tb <- 0
-        upper$Tb <- 15
-      } else {
-        Tb <- base.temp
-      }
-      
       # run model
       model <- stats::nls(
-        germ ~ max.cum.frac * stats::pnorm(
+        germ ~ maxCumFrac * stats::pnorm(
           wp - (HT / ((temp - Tb) * time)),
-          psib50,
-          sigma,
+          Psib50,
+          Sigma,
           log = FALSE),
         start = start,
         lower = lower,
         upper = upper,
         algorithm = "port")
       
-      # get coefs
+      # get correlation
       corr <- stats::cor(germ, stats::predict(model)) ^ 2
-      HT <- summary(model)$coefficients[[1]]
-      Psib50 <- summary(model)$coefficients[[2]]
-      Sigma <- summary(model)$coefficients[[3]]
-      if (is.na(base.temp)) {
-        Tb <- summary(model)$coefficients[[4]]
+      
+      # at least one coef undefined
+      if (length(userCoefs) < length(coefNames)) {
+        coefs <- summary(model)$coefficients %>%
+          as_tibble(rownames = "Parameter") %>%
+          pull(Estimate, Parameter) %>%
+          as.list()
+        
+        # merge model coefs and user coefs
+        for (c in coefNames) {
+          if (is.null(coefs[[c]])) {
+            coefs[[c]] <- userCoefs[[c]]
+          }
+        }
       } else {
-        Tb <- base.temp
+        coefs <- userCoefs
       }
+      print(coefs)
       
       # return results
       list(
-        HT = HT,
-        Tb = Tb,
-        Psib50 = Psib50,
-        Sigma = Sigma,
+        HT = coefs$HT,
+        Tb = coefs$Tb,
+        Psib50 = coefs$Psib50,
+        Sigma = coefs$Sigma,
         Correlation = corr)
     },
       error = function(cond) {
@@ -1020,6 +1072,9 @@ server <- function(input, output, session) {
   #### HTTPlot ####
   output$HTTPlot <- renderPlot({
     req(DataLoaded())
+    req(input$HTT.maxCumFrac)
+    
+    maxCumFrac <- input$HTT.maxCumFrac
     
     # generate the plot
     plt <- rv$data %>%
@@ -1028,8 +1083,8 @@ server <- function(input, output, session) {
         y = .data[[input$CumFraction]],
         color = as.factor(.data[[input$GermWP]]),
         linetype = as.factor(.data[[input$GermTemp]]))) +
-      annotate("rect", xmin = 0, xmax = Inf, ymin = input$HTTMaxCumFrac, ymax = 1, fill = "grey", alpha = 0.1) +
-      geom_hline(yintercept = input$HTTMaxCumFrac, color = "darkgrey", linetype = "dashed") +
+      annotate("rect", xmin = 0, xmax = Inf, ymin = maxCumFrac, ymax = 1, fill = "grey", alpha = 0.1) +
+      geom_hline(yintercept = maxCumFrac, color = "darkgrey", linetype = "dashed") +
       geom_point(aes(shape = as.factor(.data[[input$GermTemp]])), size = 2) +
       scale_y_continuous(labels = scales::percent, expand = c(0, 0), limits = c(0, 1.02)) +
       scale_x_continuous(expand = c(0, 0)) +
@@ -1049,7 +1104,6 @@ server <- function(input, output, session) {
       req(is.list(HTTModelResults()))
       model <- HTTModelResults()
       
-      maxCumFrac <- input$HTTMaxCumFrac
       ht <- model$HT
       psib50 <- model$Psib50
       tb <- model$Tb
