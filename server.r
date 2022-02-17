@@ -554,30 +554,67 @@ server <- function(input, output, session) {
   
 
   # ThermalTime ----
+  
+  #### Model params ####
+  
+  TT.start <- list(
+    Tb = 6,
+    ThetaT50 = 3,
+    Sigma = 0.09)
+  
+  TT.min <- list(
+    Tb = 0,
+    ThetaT50 = 0.5,
+    Sigma = 0)
+  
+  TT.max <- list(
+    Tb = 15,
+    ThetaT50 = 50,
+    Sigma = 0.5)
 
   #### ThermalTimeUI ####
   output$ThermalTimeUI <- renderUI({
     validate(need(rv$modelReady$ThermalTime, "Please load required data for ThermalTime analysis."))
     list(
-      p(em("The thermal time model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values.")),
+      p(em("The thermal time model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Input any of the following model coefficients, or leave blank to compute the best fit. If the model fails, try changing or unsetting parameters.")),
       br(),
-      box(
-        title = "Max cumulative fraction",
-        sliderInput(
-          inputId = "TTSubOMaxCumFrac",
-          label = NULL,
-          min = 0,
-          max = 1,
-          value = 1,
-          step = 0.01)
+      fluidRow(
+        box(
+          title = "Max cumulative fraction",
+          status = "primary",
+          sliderInput(
+            inputId = "TT.maxCumFrac",
+            label = NULL,
+            min = 0,
+            max = 1,
+            value = 1,
+            step = 0.01),
+          lapply(names(TT.start), function(c) {
+            min <- TT.min[[c]]
+            max <- TT.max[[c]]
+            step <- signif((max - min) / 100, 2)
+            numericInput(
+              inputId = paste0("TT.", c),
+              label = paste0(c, " (range: ", min, " - ", max, ")"),
+              value = NULL,
+              min = min,
+              max = max,
+              step = step
+            )
+          })
+        ),
+        box(
+          title = "Model results",
+          status = "primary",
+          tableOutput("TTResultsTable")
+        )
       ),
-      box(
-        title = "Model results",
-        tableOutput("TTResultsTable")
-      ),
-      box(
-        width = 12,
-        plotOutput("TTPlot")
+      fluidRow(
+        box(
+          width = 12,
+          status = "primary",
+          plotOutput("TTPlot")
+        )
       )
     )
   })
@@ -586,52 +623,77 @@ server <- function(input, output, session) {
   TTSubOModelResults <- reactive({
     req(DataLoaded())
     req(rv$modelReady$ThermalTime)
-    req(input$TTSubOMaxCumFrac)
+    
+    # get data
+    GermTemp <- rv$data[[input$GermTemp]]
+    CumTime <- rv$data[[input$CumTime]]
+    CumFrac <- rv$data[[input$CumFraction]]
+    
+    # get params
+    maxCumFrac <- input$TT.maxCumFrac
+    coefNames <- names(TT.start)
+    userCoefs <- list()
+    start <- TT.start
+    lower <- TT.min
+    upper <- TT.max
+    
+    for (c in coefNames) {
+      userVal <- input[[paste0("TT.", c)]]
+      if (!is.na(userVal)) {
+        if (between(userVal, TT.min[[c]], TT.max[[c]])) {
+          start[[c]] <- lower[[c]] <- upper[[c]] <- NULL
+          userCoefs[[c]] <- userVal
+          assign(c, userVal)
+        } else {
+          updateTextInput(inputId = paste0("TT.", c), value = "")
+        }
+      }
+    }
     
     tryCatch({
-      # local vars
-      temp <- rv$data[[input$GermTemp]]
-      time <- rv$data[[input$CumTime]]
-      germ <- rv$data[[input$CumFraction]]
-      max.cum.frac <- input$TTSubOMaxCumFrac
-      
       # run model
       model <- stats::nls(
-        formula = germ ~ max.cum.frac * stats::pnorm(
-          log(time, base = 10),
-          mean = thetaT50 - log(temp - Tb, base = 10),
-          sd = sigma,
+        CumFrac ~ maxCumFrac * stats::pnorm(
+          log10(CumTime),
+          mean = ThetaT50 - log10(GermTemp - Tb),
+          sd = Sigma,
           log = FALSE),
-        start = list(
-          Tb = 6,
-          thetaT50 = 3,
-          sigma = 0.09),
-        lower = list(
-          Tb = 0,
-          thetaT50 = 0.5,
-          sigma = 0.0001),
-        upper = list(
-          Tb = 15,
-          thetaT50 = 50,
-          sigma = 0.5),
+        start = start,
+        lower = lower,
+        upper = upper,
         algorithm = "port")
       
-      # grab coefs
-      Corr <- stats::cor(germ, stats::predict(model)) ^ 2
-      Tb <- summary(model)$coefficients[[1]]
-      ThetaT50 <- summary(model)$coefficients[[2]]
-      Sigma <- summary(model)$coefficients[[3]]
+      # get correlation
+      corr <- stats::cor(CumFrac, stats::predict(model)) ^ 2
+      
+      # at least one coef generated by the model
+      if (length(userCoefs) < length(coefNames)) {
+        coefs <- summary(model)$coefficients %>%
+          as_tibble(rownames = "Parameter") %>%
+          pull(Estimate, Parameter) %>%
+          as.list()
+        
+        # merge model coefs and user coefs
+        for (c in coefNames) {
+          if (is.null(coefs[[c]])) {
+            coefs[[c]] <- userCoefs[[c]]
+          }
+        }
+      } else {
+        # user specified all coefs
+        coefs <- userCoefs
+      }
       
       # return results
       list(
-        Tb = Tb,
-        ThetaT50 = ThetaT50,
-        Sigma = Sigma,
-        Correlation = Corr
+        Tb = coefs$Tb,
+        ThetaT50 = coefs$ThetaT50,
+        Sigma = coefs$Sigma,
+        Correlation = corr
       )
     },
-      error = function(cond) {
-        paste("Unable to compute model, try adjusting parameters. ", str_to_sentence(cond[1]))
+      error = function(e) {
+        paste("Unable to compute model, try adjusting parameters. ", str_to_sentence(e[1]))
       }
     )
   })
@@ -658,6 +720,9 @@ server <- function(input, output, session) {
   #### TTPlot ####
   output$TTPlot <- renderPlot({
     req(DataLoaded())
+    req(input$TT.maxCumFrac)
+    
+    maxCumFrac <- input$TT.maxCumFrac
     
     # generate the plot
     plt <- rv$data %>%
@@ -665,11 +730,11 @@ server <- function(input, output, session) {
         x = .data[[input$CumTime]],
         y = .data[[input$CumFraction]],
         color = as.factor(.data[[input$GermTemp]]))) +
-      annotate("rect", xmin = 0, xmax = Inf, ymin = input$TTSubOMaxCumFrac, ymax = 1, fill = "grey", alpha = 0.1) +
-      geom_hline(yintercept = input$TTSubOMaxCumFrac, color = "darkgrey", linetype = "dashed") +
+      annotate("rect", xmin = 0, xmax = Inf, ymin = maxCumFrac, ymax = 1, fill = "grey", alpha = 0.1) +
+      geom_hline(yintercept = maxCumFrac, color = "darkgrey", linetype = "dashed") +
       geom_point(shape = 19, size = 2) +
       scale_y_continuous(labels = scales::percent, expand = c(0, 0), limits = c(0, 1.02)) +
-      scale_x_continuous(expand = c(0, 0)) +
+      scale_x_continuous(expand = c(0, 0), breaks = scales::pretty_breaks()) +
       expand_limits(x = 0, y = 0) +
       labs(
         title = "Thermal Time Sub-optimal Model",
@@ -677,30 +742,32 @@ server <- function(input, output, session) {
         y = "Cumulative fraction germinated (%)",
         color = "Temperature") +
       guides(color = guide_legend(reverse = T, order = 1)) +
-      theme_classic()
+      theme_classic() +
+      theme(
+        panel.grid.major = element_line(linetype = "dotted")
+      )
     
     # use try so it will still plot on model error
     try({
       req(is.list(TTSubOModelResults()))
       model <- TTSubOModelResults()
       
-      maxCumFrac <- model$MaxCumFrac
-      tb <- model$Tb
-      thetaT50 <- model$ThetaT50
-      sigma <- model$Sigma
-      corr <- model$Correlation
+      Tb <- model$Tb
+      ThetaT50 <- model$ThetaT50
+      Sigma <- model$Sigma
+      Corr <- model$Correlation
       
-      par1 <- paste("~~T[b]==", round(tb, 1))
-      par2 <- paste("~~ThetaT(50)==", round(thetaT50, 3))
-      par3 <- paste("~~sigma==", round(sigma, 3))
-      par4 <- paste("~~R^2==", round(corr, 2))
+      par1 <- paste("~~T[b]==", signif(Tb, 3))
+      par2 <- paste("~~Theta[T](50)==", signif(ThetaT50, 3))
+      par3 <- paste("~~sigma==", signif(Sigma, 3))
+      par4 <- paste("~~R^2==", signif(Corr, 2))
       
       # Plot all predicted treatments by the thermal time model
       df <- rv$data %>% distinct(.data[[input$GermTemp]], .keep_all = F)
       modelLines <- mapply(function(temp) {
         stat_function(
           fun = function(x) {
-            stats::pnorm(log(x, base = 10), thetaT50 - log(temp - tb, base = 10),  sigma, log = F)
+            maxCumFrac * stats::pnorm(log10(x), ThetaT50 - log10(temp - Tb), Sigma, log = F)
           },
           aes(color = as.factor(temp))
         )
@@ -723,30 +790,67 @@ server <- function(input, output, session) {
   
   
   # HydroTime model ----
+  
+  #### Model params ####
+  
+  HT.start <- list(
+    HT = 60,
+    Psib50 = -0.8,
+    Sigma = 0.2)
+  
+  HT.min <- list(
+    HT = 0,
+    Psib50 = -5,
+    Sigma = 0)
+  
+  HT.max <- list(
+    HT = 1000,
+    Psib50 = 0,
+    Sigma = 2)
 
   #### HydroTimeUI ####
   output$HydroTimeUI <- renderUI({
     validate(need(rv$modelReady$HydroTime, "Please load required data for HydroTime analysis."))
     list(
-      p(em("The hydro time model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values.")),
+      p(em("The hydro time model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Input any of the following model coefficients, or leave blank to compute the best fit. If the model fails, try changing or unsetting parameters.")),
       br(),
-      box(
-        title = "Max cumulative fraction",
-        sliderInput(
-          inputId = "HTMaxCumFrac",
-          label = NULL,
-          min = 0,
-          max = 1,
-          value = 1,
-          step = 0.01)
+      fluidRow(
+        box(
+          title = "Max cumulative fraction",
+          status = "primary",
+          sliderInput(
+            inputId = "HT.maxCumFrac",
+            label = NULL,
+            min = 0,
+            max = 1,
+            value = 1,
+            step = 0.01
+          ),
+          lapply(names(HT.start), function(c) {
+            min <- HT.min[[c]]
+            max <- HT.max[[c]]
+            step <- signif((max - min) / 100, 2)
+            numericInput(
+              inputId = paste0("HT.", c),
+              label = paste0(c, " (range: ", min, " - ", max, ")"),
+              value = NULL,
+              min = min,
+              max = max,
+              step = step
+            )
+          })
+        ),
+        box(
+          title = "Model results",
+          status = "primary",
+          tableOutput("HTResultsTable")
+        )
       ),
-      box(
-        title = "Model results",
-        tableOutput("HTResultsTable")
-      ),
-      box(
-        width = 12,
-        plotOutput("HTPlot")
+      fluidRow(
+        box(
+          width = 12,
+          plotOutput("HTPlot")
+        )
       )
     )
   })
@@ -755,51 +859,77 @@ server <- function(input, output, session) {
   HTModelResults <- reactive({
     req(DataLoaded())
     req(rv$modelReady$HydroTime)
-    req(input$HTMaxCumFrac)
     
+    # get data
+    GermWP <- rv$data[[input$GermWP]]
+    CumTime <- rv$data[[input$CumTime]]
+    CumFrac <- rv$data[[input$CumFraction]]
+    
+    # get params
+    maxCumFrac <- input$HT.maxCumFrac
+    coefNames <- names(HT.start)
+    userCoefs <- list()
+    start <- HT.start
+    lower <- HT.min
+    upper <- HT.max
+    
+    # handle user defined or fitted model params
+    for (c in coefNames) {
+      userVal <- input[[paste0("HT.", c)]]
+      if (!is.na(userVal)) {
+        if (between(userVal, HT.min[[c]], HT.max[[c]])) {
+          start[[c]] <- lower[[c]] <- upper[[c]] <- NULL
+          userCoefs[[c]] <- userVal
+          assign(c, userVal)
+        } else {
+          updateTextInput(inputId = paste0("HT.", c), value = "")
+        }
+      }
+    }
+    
+    # run model
     tryCatch({
-      # required data
-      wp <- rv$data[[input$GermWP]]
-      time <- rv$data[[input$CumTime]]
-      germ <- rv$data[[input$CumFraction]]
-      max.cum.frac <- input$HTMaxCumFrac
-      
-      # run model
       model <- stats::nls(
-        formula = germ ~ max.cum.frac * stats::pnorm(
-          wp - (HT / time),
-          Psib50,
-          Sigma,
-          log = FALSE),
-        start = list(
-          HT = 60,
-          Psib50 = -0.8,
-          Sigma = 0.2),
-        lower = list(
-          HT = 1,
-          Psib50 = -5,
-          Sigma = 0.0001),
-        upper = list(
-          HT = 1000,
-          Psib50 = -0.000000001,
-          Sigma = 2),
+        CumFrac ~ maxCumFrac * stats::pnorm(
+          GermWP - (HT / CumTime),
+          mean = Psib50,
+          sd = Sigma,
+          log = F),
+        start = start,
+        lower = lower,
+        upper = upper,
         algorithm = "port")
       
-      # grab coefs
-      corr <- stats::cor(germ, stats::predict(model)) ^ 2
-      HT <- summary(model)$coefficients[[1]]
-      Psib50 <- summary(model)$coefficients[[2]]
-      Sigma <- summary(model)$coefficients[[3]]
+      # get correlation
+      Corr <- stats::cor(CumFrac, stats::predict(model)) ^ 2
+      
+      # at least one coef generated by the model
+      if (length(userCoefs) < length(coefNames)) {
+        coefs <- summary(model)$coefficients %>%
+          as_tibble(rownames = "Parameter") %>%
+          pull(Estimate, Parameter) %>%
+          as.list()
+        
+        # merge model coefs and user coefs
+        for (c in coefNames) {
+          if (is.null(coefs[[c]])) {
+            coefs[[c]] <- userCoefs[[c]]
+          }
+        }
+      } else {
+        # user specified all coefs
+        coefs <- userCoefs
+      }
       
       # return results
       list(
-        HT = HT,
-        Psib50 = Psib50,
-        Sigma = Sigma,
-        Correlation = corr)
+        HT = coefs$HT,
+        Psib50 = coefs$Psib50,
+        Sigma = coefs$Sigma,
+        Correlation = Corr)
     },
-      error = function(cond) {
-        paste("Unable to compute model, try adjusting parameters. ", str_to_sentence(cond[1]))
+      error = function(e) {
+        paste("Unable to compute model, try adjusting parameters. ", str_to_sentence(e[1]))
       }
     )
   })
@@ -825,6 +955,9 @@ server <- function(input, output, session) {
   #### HTPlot ####
   output$HTPlot <- renderPlot({
     req(DataLoaded())
+    req(input$HT.maxCumFrac)
+    
+    maxCumFrac <- input$HT.maxCumFrac
     
     # generate the plot
     plt <- rv$data %>%
@@ -832,8 +965,8 @@ server <- function(input, output, session) {
         x = .data[[input$CumTime]],
         y = .data[[input$CumFraction]],
         color = as.factor(.data[[input$GermWP]]))) +
-      annotate("rect", xmin = 0, xmax = Inf, ymin = input$HTMaxCumFrac, ymax = 1, fill = "grey", alpha = 0.1) +
-      geom_hline(yintercept = input$HTMaxCumFrac, color = "darkgrey", linetype = "dashed") +
+      annotate("rect", xmin = 0, xmax = Inf, ymin = maxCumFrac, ymax = 1, fill = "grey", alpha = 0.1) +
+      geom_hline(yintercept = maxCumFrac, color = "darkgrey", linetype = "dashed") +
       geom_point(shape = 19, size = 2) +
       scale_y_continuous(labels = scales::percent, expand = c(0, 0), limits = c(0, 1.02)) +
       scale_x_continuous(expand = c(0, 0)) +
@@ -851,23 +984,27 @@ server <- function(input, output, session) {
       req(is.list(HTModelResults()))
       model <- HTModelResults()
       
-      maxCumFrac <- model$MaxCumFrac
-      ht <- model$HT
-      psib50 <- model$Psib50
-      sigma <- model$Sigma
-      corr <- model$Correlation
+      Ht <- model$HT
+      Psib50 <- model$Psib50
+      Sigma <- model$Sigma
+      Corr <- model$Correlation
       
-      par1 <- paste("~~HT==", round(ht, 2))
-      par2 <- paste("~~Psi[b](50)==", round(psib50, 3))
-      par3 <- paste("~~sigma== ", round(sigma, 3))
-      par4 <- paste("~~R^2== ", round(corr, 2))
+      par1 <- paste("~~HT==", round(Ht, 2))
+      par2 <- paste("~~Psi[b](50)==", round(Psib50, 3))
+      par3 <- paste("~~sigma== ", round(Sigma, 3))
+      par4 <- paste("~~R^2== ", round(Corr, 2))
       
       # Plot all predicted treatments by the thermal time model
       df <- rv$data %>% distinct(.data[[input$GermWP]], .keep_all = FALSE)
       modelLines <- mapply(function(wp) {
         stat_function(
           fun = function(x) {
-            stats::pnorm(wp - (ht / x), psib50, sigma, log = FALSE)
+            maxCumFrac * stats::pnorm(
+              wp - (Ht / x),
+              mean = Psib50,
+              sd = Sigma,
+              log = F
+            )
           },
           aes(color = as.factor(wp))
         )
@@ -967,10 +1104,10 @@ server <- function(input, output, session) {
     req(rv$modelReady$HydroThermalTime)
 
     # get data
-    wp <- rv$data[[input$GermWP]]
-    temp <- rv$data[[input$GermTemp]]
-    time <- rv$data[[input$CumTime]]
-    germ <- rv$data[[input$CumFraction]]
+    GermWP <- rv$data[[input$GermWP]]
+    GermTemp <- rv$data[[input$GermTemp]]
+    CumTime <- rv$data[[input$CumTime]]
+    CumFrac <- rv$data[[input$CumFraction]]
     
     # get params
     maxCumFrac <- input$HTT.maxCumFrac
@@ -996,18 +1133,18 @@ server <- function(input, output, session) {
     tryCatch({
       # run model
       model <- stats::nls(
-        germ ~ maxCumFrac * stats::pnorm(
-          wp - (HT / ((temp - Tb) * time)),
-          Psib50,
-          Sigma,
-          log = FALSE),
+        CumFrac ~ maxCumFrac * stats::pnorm(
+          GermWP - (HT / ((GermTemp - Tb) * CumTime)),
+          mean = Psib50,
+          sd = Sigma,
+          log = F),
         start = start,
         lower = lower,
         upper = upper,
         algorithm = "port")
       
       # get correlation
-      corr <- stats::cor(germ, stats::predict(model)) ^ 2
+      Corr <- stats::cor(CumFrac, stats::predict(model)) ^ 2
       
       # at least one coef generated by the model
       if (length(userCoefs) < length(coefNames)) {
@@ -1033,7 +1170,7 @@ server <- function(input, output, session) {
         Tb = coefs$Tb,
         Psib50 = coefs$Psib50,
         Sigma = coefs$Sigma,
-        Correlation = corr)
+        Correlation = Corr)
     },
       error = function(e) {
         paste("Unable to compute model, try adjusting parameters. ", str_to_sentence(e[1]))
@@ -1094,18 +1231,18 @@ server <- function(input, output, session) {
       req(is.list(HTTModelResults()))
       model <- HTTModelResults()
       
-      ht <- model$HT
-      psib50 <- model$Psib50
-      tb <- model$Tb
-      sigma <- model$Sigma
-      corr <- model$Correlation
+      Ht <- model$HT
+      Psib50 <- model$Psib50
+      Tb <- model$Tb
+      Sigma <- model$Sigma
+      Corr <- model$Correlation
       
       # model params
-      par1 <- paste("~~HT==", round(ht, 2))
-      par2 <- paste("~~T[b]==", round(tb, 2))
-      par3 <- paste("~~psi[b](50)==", round(psib50,3))
-      par4 <- paste("~~sigma == ", round(sigma, 3))
-      par5 <- paste("~~R^2 == ", round(corr, 2))
+      par1 <- paste("~~HT==", signif(Ht, 3))
+      par2 <- paste("~~T[b]==", signif(Tb, 3))
+      par3 <- paste("~~Psi[b](50)==", signif(Psib50,3))
+      par4 <- paste("~~sigma == ", signif(Sigma, 3))
+      par5 <- paste("~~R^2 == ", signif(Corr, 3))
       
       # function to plot all predicted treatments by the hydro thermal time model
       df <- rv$data %>%
@@ -1116,10 +1253,10 @@ server <- function(input, output, session) {
         stat_function(
           fun = function(x) {
             maxCumFrac * stats::pnorm(
-              wp - (ht / ((temp - tb) * x)),
-              psib50,
-              sigma,
-              log = FALSE
+              wp - (Ht / ((temp - Tb) * x)),
+              mean = Psib50,
+              sd = Sigma,
+              log = F
             )
           },
           aes(color = as.factor(wp), linetype = as.factor(temp))
