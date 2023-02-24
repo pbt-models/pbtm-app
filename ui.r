@@ -69,7 +69,7 @@ load <- list(
   p(strong("Start over:")),
   actionButton("clearData", "Clear loaded data"),
   hr(),
-  uiOutput("currentDataDisplay")
+  uiOutput("currentDataUI")
 )
 
 tabs <- append(
