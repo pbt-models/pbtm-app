@@ -1,0 +1,13 @@
+name: pbtm-app
+title: pbtm-app
+username:
+account: bzbradford
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 4398700
+bundleId: 5583585
+url: https://bzbradford.shinyapps.io/pbtm-app/
+when: 1644979298.88573
+lastSyncTime: 1644979298.88573
+asMultiple: FALSE
+asStatic: FALSE

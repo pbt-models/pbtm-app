@@ -1,5 +1,8 @@
+# ---- app ---- #
 
-library(shiny)
+suppressPackageStartupMessages({
+  library(shiny)
+})
 
 source("global.r")
 source("ui.r")

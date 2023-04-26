@@ -1,150 +1,148 @@
 # ---- Server ---- #
 
-#library(dplyr)
-library(tidyverse)
-library(shiny)
-library(shinyjs)
-library(DT)
-#library(pbtmodels)
-
-# remove.packages("pbtm")
-
-#Install required package for GitHub repository
-# install.packages("plyr") # for some reason needed to install pbtm... (CHECK)
-# install.packages("dplyr")
-# remove.packages("ggplot2")
-# install.packages("ggplot2", force = TRUE, dependencies = TRUE)
-# devtools::install_github("pedrobello/pbtm", force = TRUE, dependencies = TRUE)
-# devtools::install_github("pedrobello/pbtmodels", dependencies = TRUE)
-# devtools::install_github("pedrobello/pbtmodels")
-# install.packages("tidyverse", force = TRUE, dependencies = TRUE)
-
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(shiny)
+  library(shinyjs)
+  library(DT)
+  library(Cairo)
+  # library(plotly)
+})
 
 server <- function(input, output, session) {
   
-  # On load ----
-  
-  # this forces the bscollapse panels to load their content by starting open then closing
-  updateCollapse(session, "data", close = c("view", "cols"))
-  
-  
-  
   # Data definitions ----
   
-  # - number of columns (rows) in the column validation file= 12
-  nCols <- nrow(columnValidation)
+  defaultGermSpeedFracs <- c(10, 16, 50, 84, 90)
   
-  # Create object to store reactive values - full table
   rv <- reactiveValues(
     data = tibble(),
-    colStatus = NULL
+    colStatus = NULL,
+    modelReady = list(),
+    germSpeedFracs = defaultGermSpeedFracs
   )
   
   
   
+  # Intro tab ----
   
-  # Action Buttons ----
-  
-  observeEvent(input$loadSampleGermData, { # when clicked
-    rv$data <- sampleGermData # load sample germ data inside rv$data
-    updateCollapse(session, "data", open = "view", close = "load")
-  })
-  observeEvent(input$loadSamplePrimingData, {
-    rv$data <- samplePrimingData # load sample priming data
-    updateCollapse(session, "data", open = "view", close = "load")
-  })
-  observeEvent(input$userData, {
-    rv$data <- read_csv(input$userData$datapath, col_types = cols()) %>%
-      distinct() # remove any duplicate rows # load data uploaded from user 
-    updateCollapse(session, "data", open = "view", close = "load")
-  })
-  observeEvent(input$clearData, {
-    rv$data <- tibble() # clear data
-    reset("userData")
-  })
-  observeEvent(input$confirmDataView, {
-    updateCollapse(session, "data", open = "cols", close = "view")
-  })
-  observeEvent(c(input$confirmColView, input$confirmColView2), {
-    updateCollapse(session, "data", close = "cols")
-  })
-  
-  
-  
-  
-  
-  # Download button handlers ----
-  
+  #### Download buttons ####
   output$downloadTemplate <- downloadHandler(
     filename = "pbtm-data-template.csv",
-    content = function(file) {write_csv(sampleTemplate, file)}
-  )
+    content = function(file) {write_csv(sampleTemplate, file)})
+  
   output$downloadSampleGermData <- downloadHandler(
     filename = "pbtm-sample-germination-data.csv",
-    content = function(file) {write_csv(sampleGermData, file)}
-  )
+    content = function(file) {write_csv(sampleGermData, file)})
+  
   output$downloadSamplePrimingData <- downloadHandler(
     filename = "pbtm-sample-priming-data.csv",
-    content = function(file) {write_csv(samplePrimingData, file)}
-  )
+    content = function(file) {write_csv(samplePrimingData, file)})
+  
+  output$downloadSampleAgingData <- downloadHandler(
+    filename = "pbtm-sample-aging-data.csv",
+    content = function(file) {write_csv(sampleAgingData, file)})
+  
+  #### output$columnDescriptions ####
+  output$columnDescriptions <- renderTable({
+    colValidation %>%
+      select(
+        `Default column name` = Column,
+        Description = LongDescription,
+        `Data type` = TypeDescription,
+        Usage
+      )
+  })
   
   
+
+  # Load tab ----
   
-  # Column description table ----
+  #### loadMenu ####
+  output$loadMenu <- renderMenu({
+    if (DataLoaded()) {
+      label = "OK"; color = "green"
+    } else {
+      label = "!"; color = "yellow"
+    }
+    menuItem("Upload data", tabName = "load", badgeLabel = label, badgeColor = color)
+  })
   
-  output$columnDescriptions <- renderTable({columnDescriptions})
+  #### dataset load buttons ####
+  observeEvent(input$loadSampleGermData, {rv$data <- sampleGermData})
+  observeEvent(input$loadSamplePrimingData, {rv$data <- samplePrimingData})
+  observeEvent(input$loadSampleAgingData, {rv$data <- sampleAgingData})
+  observeEvent(input$userData, {
+    try({
+      df <- read_csv(input$userData$datapath, col_types = cols()) %>% distinct()
+      if (nrow(df) > 0) {rv$data <- df}
+    })
+  })
+  observeEvent(input$clearData, {
+    rv$data <- tibble()
+    reset("userData")
+  })
   
-  
-  
-  # Current data DT ----
-  
+  #### currentDataTable ####
   output$currentDataTable <- renderDataTable({rv$data})
   
-  output$currentDataDisplay <- renderUI({ # show current data or data lacking message
-    if (nrow(rv$data) == 0) { # check number of rows in the data list
-      return("No data loaded.")
-    } else {
-      dataTableOutput("currentDataTable")
-    }
+  #### currentDataDisplay ####
+  output$currentDataDisplay <- renderUI({
+    validate(need(DataLoaded(), "Please load a dataset."))
+    
+    list(
+      h3("Current dataset:"),
+      div(style = "overflow: auto;", dataTableOutput("currentDataTable")),
+      hr(),
+      h3("Match column names to expected roles:"),
+      p(em("If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range.")),
+      div(style = "display: flex; flex-wrap: wrap;",
+        lapply(1:nCols, function(i) {
+          wellPanel(
+            style = "flex: 1; vertical-align: top; min-width: 15em; margin: 5px;",
+            uiOutput(paste0("colSelect", i)),
+            uiOutput(paste0("colValidate", i))
+          )
+        })
+      )
+    )
   })
   
   
-  # Column matching boxes ----
-  
-  columnNames <- reactive({ # Reactive function to check and load column names from current data
-    req(rv$data) # check if rv$data is present/correct, no missing inputs or preconditions
-    names(rv$data) # get names of columns 
+  #### columnNames ####
+  columnNames <- reactive({
+    req(rv$data)
+    names(rv$data)
   })
   
-  columnChoices <- reactive({ # Reactive function to load combo choices based on current data 
-    setNames(as.list(c(NA, columnNames())), c("Not specified", columnNames())) # create list (objects and actual names) for combo choices based on the reactive rv$data columnnames  
+  #### columnChoices ####
+  columnChoices <- reactive({
+    setNames(as.list(c(NA, columnNames())), c("Not specified", columnNames()))
   })
   
+  #### colSelect ####
   lapply(1:nCols, function(i) {
-    output[[paste0("colSelect", i)]] <- renderUI({ # give the output names colSelect1 - 12 with renderUI
-      selectInput( # function creates combobox
-        inputId = columnValidation$InputId[i], # InputIds coming from the columnvalidation csv - df
-        label = columnValidation$Description[i], # description coming from the columnvalidation csv - df (top of combobox)
-        choices = columnChoices(), # populate combo choices using columnchoices function above based on user data input
-        selected = columnValidation$Column[i] #show the selected column name from the columnvalidation csv in case it exists in the choices otherwise = not specified 
+    output[[paste0("colSelect", i)]] <- renderUI({
+      selectInput(
+        inputId = colValidation$InputId[i],
+        label = colValidation$Description[i],
+        choices = columnChoices(),
+        selected = colValidation$Column[i]
       )
     })
   })
   
   
-  
-  # Column validation messages ----
-  
+  #### colValidate ####
   lapply(1:nCols, function(i) {
     
-    outCol <- paste0("colValidate", i) # give names to outCol = colValidate1 - colValidate12
-    inputId <- columnValidation$InputId[i] # give inputIds from column validation df to inputId vector [1] to [12] = TrtId, TrtDesc and so on...
-    expectedType <- columnValidation$Type[i] # give types from column validation df to expectedType vector [1] to [12] = null or numeric - max and min below  
-    minValue <- columnValidation$Min[i]
-    maxValue <- columnValidation$Max[i]
+    outCol <- paste0("colValidate", i)
+    inputId <- colValidation$InputId[i]
+    expectedType <- colValidation$Type[i]
+    minValue <- colValidation$Min[i]
+    maxValue <- colValidation$Max[i]
     ui <- NULL
     msg <- NULL
-    add <- NULL
     
     output[[outCol]] <- renderUI({
       
@@ -153,282 +151,183 @@ server <- function(input, output, session) {
       # check if no column selected
       if (input[[inputId]] == "NA") {
         msg <- list(span("No column specified.", style = "color:orange"))
-        rv$colStatus[[paste0("col", i)]] <- F
-        return(msg)
-      }
-      
-      # sel <- input[[inputId]] # Temp
-      
-      col <- rv$data[[input[[inputId]]]]
-      
-      if (anyNA(col)) { # check for presence of any NA values in the whole data column
-        msg <- list(br(), span("Warning: Missing value in data", style = "color:red"))
-      }
-      
-      colType <- class(col)
-      ui <- list(paste("Type =", colType))
-      
-      # column type mismatch
-      if (!is.na(expectedType) & colType != expectedType) {
-        newmsg <- list(br(), span("Error: Incorrect column type, expected", expectedType, style = "color:red"))
-        msg <- append(msg, newmsg)
-        
-      } else if (colType == "numeric") {
-        
-        # min check
-        if(!is.na(minValue) & min(col, na.rm = TRUE) < minValue) {
-          newmsg <- list(br(), span("Error: Min value less than", minValue, style = "color:red"))
-          msg <- append(msg, newmsg)
-          add <- list(
-            br(),
-            paste0("Min = ", round(min(col, na.rm = TRUE), 2))
-          )
-        }
-        
-        # max check
-        if(!is.na(maxValue) & max(col, na.rm = TRUE) > maxValue) {
-          newmsg <- list(br(), span("Error: Max value greater than ", maxValue, style = "color:red"))
-          msg <- append(msg, newmsg)
-          add1 <- paste0("Max = ", round(max(col, na.rm = TRUE), 2))
-          add <- append(add, list(
-            br(),
-            "Max = ", round(max(col, na.rm = TRUE), 2))
-          )
-        }
-        
-        ui <- append(ui, add) }
-      
-      if (is.null(msg)) { # in case no message was filed (no error found), output OK and give T value to colStatus[col1] - [12]
-        msg <- list(span(strong("OK"), style = "color:blue"))
-        rv$colStatus[[paste0("col", i)]] <- T
-        
+        rv$colStatus[i] <- F
       } else {
-        rv$colStatus[[paste0("col", i)]] <- F # False if msg has content (error found)
+        
+        col <- rv$data[[input[[inputId]]]]
+        
+        if (anyNA(col)) {
+          msg <- list(br(), span("Warning: Missing value in data", style = "color:red"))
+        }
+        
+        colType <- class(col)
+        ui <- list(paste("Type:", colType))
+        
+        if (colType == "numeric") {
+          add <- list(br(), paste0("Range: ", round(min(col), 2), " => ", round(max(col), 2)))
+          ui <- append(ui, add)
+          
+          # column type mismatch
+          if (!is.na(expectedType) & colType != expectedType) {
+            newmsg <- list(br(), span("Error: Incorrect column type, expected", expectedType, style = "color:red"))
+            msg <- append(msg, newmsg)
+          }
+          
+          # min check
+          if (!is.na(minValue) & min(col) < minValue) {
+            newmsg <- list(br(), span("Error: Min value less than", minValue, style = "color:red"))
+            msg <- append(msg, newmsg)
+          }
+          
+          # max check
+          if (!is.na(maxValue) & max(col) > maxValue) {
+            newmsg <- list(br(), span("Error: Max value greater than ", maxValue, style = "color:red"))
+            msg <- append(msg, newmsg)
+          }
+          
+        } else if (!is.na(expectedType) & colType != expectedType) {
+          newmsg <- list(br(), span("Error: Incorrect column type, expected", expectedType, style = "color:red"))
+          msg <- append(msg, newmsg)
+        }
+        
+        # set status TRUE if no messages
+        if (is.null(msg)) {
+          msg <- list(span(strong("OK"), style = "color:blue"))
+          rv$colStatus[i] <- T
+        } else {
+          msg[1] <- NULL # remove the first br()
+          rv$colStatus[i] <- F
+        }
       }
       
-      list(p(ui), p(msg)) #temp , p(sel)
-      
+      # display the validation
+      p(ui, br(), msg)
     })
   })
   
-  # lapply(1:nrow(columnDefaults), function(i) {
-  #   observe({
-  #     rv$colMatch[[i]] <- input[[paste0("colSelect", i)]]
-  #     print(rv$colMatch[[i]])
-  #   })
-  # })
-  
-  
-  # cleanData <- reactive({
-  #   dfIn <- rv$data
-  #   dfOut <- sampleTemplate
-  #   lapply(1:nrow(columnDefaults), function(i) {
-  #     inCol <- paste0("colSelect", i)
-  #     req(input[[inCol]])
-  #     if (input[[inCol]] != "NA") {
-  #       dfOut[[columnDefaults$defaultColumn[i]]] <- dfIn[[]]
-  #     } else {
-  #       dfOut <- select(dfOut, -columnDefaults$defaultColumn[i])
-  #     }
-  #   })
-  # })
-  # 
-  # observe({print(cleanData())})
-  
-  
-  
+
   # Model readiness ----
-  checkModelReadiness <- function(col) { # get the full column for each model (col) from the columnn-validation csv df
-    compare <- sapply(1:nCols, function(i) { # for each rows in that column  
-      test <- (col[i] == T & rv$colStatus[[paste0("col", i)]] == T) | (col[i] == F) # check if the row has a T (model needs that parameter) and the parameter is correct (rv$colStatus[colnumber] = T) or row has a F 
-      if (length(test) == 0) {F} else {test} 
+  
+  # returns false if colStatus is false for that column
+  checkModelReadiness <- function(col) {
+    compare <- sapply(1:nCols, function(i) {
+      test <- (col[i] == T & rv$colStatus[i] == T) | (col[i] == F)
+      if (length(test) == 0) {F} else {test}
     })
     !(F %in% compare)
   }
   
-  BasicDataReady <- reactive({checkModelReadiness(columnValidation$AllModels)})
-  HPModelReady <- reactive({checkModelReadiness(columnValidation$HydroPriming)})
-  HTPModelReady <- reactive({checkModelReadiness(columnValidation$HydroThermalPriming)})
-  HTModelReady <- reactive({checkModelReadiness(columnValidation$HydroTime)})
-  TTModelReady <- reactive({checkModelReadiness(columnValidation$ThermalTime)})
-  HTTModelReady <- reactive({checkModelReadiness(columnValidation$HydroThermalTime)})
-  AgingModelReady <- reactive({checkModelReadiness(columnValidation$Aging)})
-  PromoterModelReady <- reactive({checkModelReadiness(columnValidation$Promoter)})
-  InhibitorModelReady <- reactive({checkModelReadiness(columnValidation$Inhibitor)})
+  # reactive readiness checks
+  DataLoaded <- reactive({nrow(rv$data) > 0})
+  BasicDataReady <- reactive({checkModelReadiness(colValidation$AllModels)})
+
+  # set reactive values for each model's readiness
+  observe({
+    lapply(modelNames, function(m) {
+      rv$modelReady[[m]] <- checkModelReadiness(colValidation[[m]])
+    })
+  })
+  
+  #### Model menu items ####
+  lapply(modelNames, function(m) {
+    output[[paste0(m, "Menu")]] <- renderMenu({
+      if (rv$modelReady[[m]]) {label = "OK"; color = "green"} else {label = "X"; color = "red"}
+      menuItem(m, tabName = paste0(m, "Tab"), badgeLabel = label, badgeColor = color)
+    })
+  })
+  
+  #### Model UI placeholders ####
+  lapply(modelNames, function(m) {
+    output[[paste0(m, "UI")]] <- renderUI({
+      p("Under construction.")
+    })
+  })
+
   
   
-  # Update visible tabs based in the model readiness
-  observeEvent(TTModelReady(), {
-    if (TTModelReady ()) {
-      showTab(inputId = "tabs", target = "Thermal time")
+  # Germination tab ----
+  
+  #### germMenu ####
+  output$germMenu <- renderMenu({
+    if (BasicDataReady()) {
+      label = "OK"; color = "green"
     } else {
-      hideTab(inputId = "tabs", target = "Thermal time")
+      label = "X"; color = "red"
     }
+    menuItem("Germination analysis", tabName = "germTab", badgeLabel = label, badgeColor = color)
   })
   
-  observeEvent(HTModelReady(), {
-    if (HTModelReady ()) {
-      showTab(inputId = "tabs", target = "Hydrotime")
-    } else {
-      hideTab(inputId = "tabs", target = "Hydrotime")
-    }
-  })
-  
-  observeEvent(HTTModelReady(), {
-    if (HTTModelReady ()) {
-      showTab(inputId = "tabs", target = "Hydrothermal time")
-    } else {
-      hideTab(inputId = "tabs", target = "Hydrothermal time")
-    }
-  })
-  
-  observeEvent(AgingModelReady(), {
-    if (AgingModelReady ()) {
-      showTab(inputId = "tabs", target = "Aging")
-    } else {
-      hideTab(inputId = "tabs", target = "Aging")
-    }
-  })
-  
-  observeEvent(PromoterModelReady(), {
-    if (PromoterModelReady ()) {
-      showTab(inputId = "tabs", target = "Promoter")
-    } else {
-      hideTab(inputId = "tabs", target = "Promoter")
-    }
-  })
-  
-  observeEvent(InhibitorModelReady(), {
-    if (InhibitorModelReady ()) {
-      showTab(inputId = "tabs", target = "Inhibitor")
-    } else {
-      hideTab(inputId = "tabs", target = "Inhibitor")
-    }
-  })
-  
-  observeEvent(HPModelReady(), {
-    if (HPModelReady ()) {
-      showTab(inputId = "tabs", target = "Hydropriming")
-    } else {
-      hideTab(inputId = "tabs", target = "Hydropriming")
-    }
-  })
-  
-  observeEvent(HTPModelReady(), {
-    if (HTPModelReady ()) {
-      showTab(inputId = "tabs", target = "Hydrothermal priming")
-    } else {
-      hideTab(inputId = "tabs", target = "Hydrothermal priming")
-    }
-  })
-  
-  
-  
-  # Model readiness display ----
-  output$modelStatus <- renderUI({
-    
-    status <- function(x) { # receive model validation status
-      if (x) {
-        span(strong("Ready"), style = "color:blue") # if T is ready
-      } else {
-        span(strong("Not ready"), "- required columns missing", style = "color:red") # if F not ready
-      }
-    }
-    
-    list(
-      p(
-        "Basic plots:", status(BasicDataReady()), br(),
-        "Thermal time model:", status(TTModelReady()), br(),
-        "Hydrotime model:", status(HTModelReady()), br(),
-        "Hydrothermal time model:", status(HTTModelReady()), br(),
-        "Aging model:", status(AgingModelReady()), br(),
-        "Promoter model:", status(PromoterModelReady()), br(),
-        "Inhibitor model:", status(InhibitorModelReady()), br(),
-        "Hydropriming model:", status(HPModelReady()), br(),
-        "Hydrothermal priming model:", status(HTPModelReady())
-      )
-    )
-    
-  })
-  
-  
-  
-  # Germination Plot and Speed ----
-  
+  #### germUI ####
   output$germUI <- renderUI({
-    validate(  #check if current data has basic requirements
+    validate(
       need(BasicDataReady(), "Please load a dataset and set required column types for germination analysis.")
     )
     list(
-      h4("Cumulative germination:"),
-      sidebarLayout(
-        sidebarPanel(
-          uiOutput("germPlotTrt1"),
-          uiOutput("germPlotTrt2")
-        ),
-        mainPanel(
-          plotOutput("germPlot")
-        )
-      ),
-      br(),
-      h4("Germination speed parameters:"),
-      sidebarLayout(
-        sidebarPanel(
-          uiOutput("germSpeedTrts"),
-          uiOutput("germSpeedFracs")
-          #    uiOutput("germSpeedType")
-        ),
-        mainPanel(
-          div(
-            dataTableOutput("germSpeedTable"),
-            style = "overflow-x: auto"
+      fluidRow(
+        box(
+          title = "Cumulative germination plot",
+          status = "primary",
+          solidHeader = T,
+          width = 12,
+          sidebarLayout(
+            sidebarPanel(
+              uiOutput("germPlotTrt1"),
+              uiOutput("germPlotTrt2")
+            ),
+            mainPanel(
+              plotOutput("germPlot")
+            )
           )
-        )
-      ),
-      br(),
-      h4("Germination rates over treatments:"),
-      sidebarLayout(
-        sidebarPanel(
-          uiOutput("yAxisTreat"),
-          uiOutput("xAxisTreat")
         ),
-        mainPanel(
-          div(
-            plotOutput("germRateTrtPlot")
+        box(
+          title = "Germination time analysis",
+          status = "primary",
+          solidHeader = T,
+          width = 12,
+          sidebarLayout(
+            sidebarPanel(
+              uiOutput("germSpeedTrtsUI"),
+              uiOutput("germSpeedFracsUI"),
+              uiOutput("germSpeedTypeUI")
+            ),
+            mainPanel(
+              div(
+                style = "overflow-x: auto",
+                dataTableOutput("germSpeedTable")
+              )
+            )
           )
         )
       )
     )
   })
   
-  ## Germination rate plots -----
-  
-  # Treatment SelectInputs ---    
-  
-  germTrtChoices <- reactive({ # create choices with validated column names and factors 
+  #### germTrtChoices ####
+  germTrtChoices <- reactive({
     cols <- sapply(1:nCols, function(i) {
-      if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor") columnValidation$Column[i] # TODO: need to fix this to display users column names instead otherwise error with custom column names. 
+      if (rv$colStatus[i] == T && colValidation$Role[i] == "Factor") colValidation$Column[i]
     })
-    cols <- compact(cols) #remove all null entries 
+    cols <- compact(cols)
     setNames(as.list(c(NA, cols)), c("Not specified", cols))
   })
   
+  #### germPlotTrt1 ####
   output$germPlotTrt1 <- renderUI({
-    # req(BasicDataReady()) #check if current data has basic requirements
     list(
-      selectInput( #create combo box with validated columns and factors
-        "germPlotTrt1", 
+      selectInput(
+        "germPlotTrt1",
         "Treatment 1 (color)",
         choices = germTrtChoices()
       )
     )
   })
   
+  #### germPlotTrt2 ####
   output$germPlotTrt2 <- renderUI({
-    req(input$germPlotTrt1) #check if combo treatment is filled
-    req(input$germPlotTrt1 != "NA") #check if combo treatment is not NA
+    req(input$germPlotTrt1)
+    req(input$germPlotTrt1 != "NA")
     list(
-      selectInput(  #create combo box with validated columns and factors
+      selectInput(
         "germPlotTrt2",
         "Treatment 2 (shape)",
         choices = germTrtChoices()
@@ -436,13 +335,12 @@ server <- function(input, output, session) {
     )
   })
   
-  # Germination rate plot ---
-  
-  # Reactive data ---
-  
-  germRateData <- reactive({
-    req(nrow(rv$data) > 0)
-    req(BasicDataReady())
+  #### germPlot ####
+  output$germPlot <- renderPlot({
+    validate(
+      need(DataLoaded(), "No data loaded."),
+      need(BasicDataReady(), "Necessary data columns not present.")
+    )
     
     trts <- 0
     
@@ -455,7 +353,7 @@ server <- function(input, output, session) {
     if (req(input$germPlotTrt1) != "NA") {
       df <- mutate(df, Trt1 = as.factor(rv$data[[input$germPlotTrt1]]))
       trts <- 1
-      
+
       if (req(input$germPlotTrt2) != "NA") {
         df <- mutate(df, Trt2 = as.factor(rv$data[[input$germPlotTrt2]]))
         trts <- 2
@@ -464,74 +362,43 @@ server <- function(input, output, session) {
     
     df <- df %>%
       group_by(TrtID) %>%
-      arrange(TrtID, CumTime, CumFrac) %>%
-      mutate(FracDiff = CumFrac - lag(CumFrac, default = 0))
-    
-    if (trts == 1) { # setup plot data if treatment 1 informed only
-      
+      arrange(TrtID, CumTime, CumFrac) # %>%
+      # mutate(FracDiff = CumFrac - lag(CumFrac, default = 0))
+      # Datasets provided should be used as they are without combining nor normalizing them
+    if (trts == 1) {
       df <- df %>%
-        group_by(Trt1, CumTime) %>%
-        summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
-      
-      
-    } else if (trts == 2) { # setup plot data if both treatments were informed
-      
-      df <- df %>%
-        group_by(Trt1, Trt2, CumTime) %>%
-        summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
-      
-    } else { # setup plot data if no treatments were informed on combos
-      
-      df <- df %>%
-        group_by(CumTime) %>%
-        summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-        mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
-      
-    } 
-  })
-  
-  
-  # Render Plot----
-  output$germPlot <- renderPlot({
-    req(nrow(rv$data) > 0)
-    req(BasicDataReady())
-    
-    trts <- 0
-    
-    df <- germRateData()
-    
-    if (req(input$germPlotTrt1) != "NA") {
-      trts <- 1
-      
-      if (req(input$germPlotTrt2) != "NA") {
-        trts <- 2
-      }
-    }
-    
-    if (trts == 1) { # setup plot data if treatment 1 informed only
-      
+        group_by(TrtID, Trt1, CumTime) #%>%
+        # summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+        # mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
       plt <- df %>%
-        ggplot(aes(x = CumTime, y = CumFrac, color = Trt1)) +
+        ggplot(aes(x = CumTime, y = CumFrac, fill = TrtID, color = Trt1)) +
         geom_line() +
         geom_point(shape = 19, size = 2) +
-        labs(color = input$germPlotTrt1)
+        labs(color = input$germPlotTrt1) +
+        guides(fill = FALSE)
       
-    } else if (trts == 2) { # setup plot data if both treatments were informed
-      
+    } else if (trts == 2) {
+      df <- df %>%
+        group_by(TrtID, Trt1, Trt2, CumTime) #%>%
+        # summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+        # mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
       plt <- df %>%
-        ggplot(aes(x = CumTime, y = CumFrac, color = Trt1, shape = Trt2)) +
+        ggplot(aes(x = CumTime, y = CumFrac, fill = TrtID, color = Trt1, shape = Trt2)) +
         geom_line() +
         geom_point(size = 2) +
-        labs(color = input$germPlotTrt1, shape = input$germPlotTrt2)
+        labs(color = input$germPlotTrt1, shape = input$germPlotTrt2) +
+        guides(fill = FALSE)
       
-    } else { # setup plot data if no treatments were informed on combos
-      
+    } else {
+      df <- df %>%
+        group_by(TrtID,CumTime) #%>%
+        # summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+        # mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
       plt <- df %>%
-        ggplot(aes(x = CumTime, y = CumFrac)) +
+        ggplot(aes(x = CumTime, y = CumFrac, fill = TrtID)) +
         geom_line() +
-        geom_point(size = 2)
+        geom_point(size = 2) +
+        guides(fill = FALSE)
     } 
     
     plt <- plt +
@@ -544,24 +411,20 @@ server <- function(input, output, session) {
       ) +
       theme_classic()
     
-    lines = seq(0, 1, by = input$germSpeedRes / 100)
-    plt <- plt + geom_hline(yintercept = lines, color = "grey", size = 0.25, alpha = 0.5, linetype = "dashed")
-    
-    plt
+    lines = rv$germSpeedFracs / 100
+    plt + geom_hline(yintercept = lines, color = "grey", size = 0.25, alpha = 0.5, linetype = "dashed")
   })
   
-  
-  ## Germination speed parameters ----
-  
+  #### germSpeedTrtChoices ####
   germSpeedTrtChoices <- reactive({
     cols <- sapply(1:nCols, function(i) {
-      if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor") columnValidation$Column[i]
+      if (rv$colStatus[i] == T && colValidation$Role[i] == "Factor") colValidation$Column[i]
     })
     cols <- compact(cols)
-    
   })
   
-  output$germSpeedTrts <- renderUI({
+  #### germSpeedTrts ####
+  output$germSpeedTrtsUI <- renderUI({
     checkboxGroupInput(
       inputId = "germSpeedTrtSelect",
       label = "Select all treatment factors:",
@@ -570,24 +433,54 @@ server <- function(input, output, session) {
     )
   })
   
-  output$germSpeedFracs <- renderUI({
-    sliderInput(
-      inputId = "germSpeedRes",
-      label = "Germination (%) basis",
-      min = 10,
-      max = 100,
-      step = 10,
-      value = 50
+  #### germSpeedFracsUI ####
+  output$germSpeedFracsUI <- renderUI({
+    list(
+      textInput(
+        inputId = "addGermSpeedFracs",
+        label = "Set cumulative percent (separate with commas):",
+        value = ""
+      ),
+      div(
+        style = "margin-top: 1em; margin-bottom: 1em;",
+        actionButton("setGermSpeedFracs", "Apply"),
+        actionButton("resetGermSpeedFracs", "Reset")
+      )
     )
   })
   
-  # TODO: I should have a second reactive dataset that includes only renamed columns from the primary dataset. That would simplify the references to that data.
+  # handle apply button
+  observeEvent(input$setGermSpeedFracs, {
+    try({
+      fracs <- suppressWarnings(sort(parse_number(unlist(strsplit(input$addGermSpeedFracs, ",")))))
+      fracs <- unique(as.integer(fracs))
+      fracs <- fracs[fracs > 0]
+      fracs <- fracs[fracs <= 100]
+      if (length(fracs) > 0) {rv$germSpeedFracs <- fracs}
+    })
+    updateTextInput(inputId = "addGermSpeedFracs", value = "")
+  })
   
-  # Prepare df for table and plot ---
+  # handle reset button
+  observeEvent(input$resetGermSpeedFracs, {
+    updateTextInput(inputId = "addGermSpeedFracs", value = "")
+    rv$germSpeedFracs = defaultGermSpeedFracs
+  })
   
-  GRData <- reactive({
-    req(input$germSpeedRes)
-    #req(input$germSpeedType)
+  #### germSpeedTypeUI ####
+  output$germSpeedTypeUI <- renderUI({
+    radioButtons(
+      inputId = "germSpeedType",
+      label = "Report values as:",
+      choiceNames = c("Time (to % germinated)", "Rate (1 / time)"),
+      choiceValues = c("Time", "Rate")
+    )
+  })
+  
+  #### germSpeedTable ####
+  output$germSpeedTable <- renderDataTable({
+    req(DataLoaded())
+    req(input$germSpeedType)
     
     # construct working dataset
     df <- tibble(TrtID = rv$data[[input$TrtID]])
@@ -601,260 +494,184 @@ server <- function(input, output, session) {
     # regenerate cumulative fractions depending on grouping trts
     df <- df %>%
       group_by(TrtID) %>%
-      arrange(TrtID, CumTime, CumFrac) %>%
-      mutate(FracDiff = CumFrac - lag(CumFrac, default = 0))
+      arrange(TrtID, CumTime, CumFrac) #%>%
+      #mutate(FracDiff = CumFrac - lag(CumFrac, default = 0))
     
-    # group by the selected treatments
-    df <- group_by_at(df, trts)
+    # group by the selected treatments AND TrtID to calculate speed individually
+    df <- group_by_at(df, vars(TrtID,trts))
     
-    # merge values that occur at the same timepoint 
-    ### TODO: Is this dropping values at the same timepoint? We actually need to drop the last value of similar fraction that occur at different time points (no increase in germination since earlier observation) that is the function of the cleandata function from the pbtm package 
-    df <- df %>%
-      group_by(CumTime, .add = T) %>%
-      summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-      mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+    # merge values that occur at the same timepoint
+    #df <- df %>%
+      #group_by(CumTime, .add = T) #%>%
+      #summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+      #mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
     
     # interpolate the curves to get the estimated value at given fraction
     df <- df %>%
       arrange(CumTime) %>%
       summarise(
         {
-          #df <- approx(CumFrac, CumTime, xout = seq(0, 1, by = input$germSpeedRes / 100), ties = "ordered", rule = 2) # rule 2 returns the closest data which can be misleading, better return NA with rule = 1
-          df <- approx(CumFrac, CumTime, xout =  (input$germSpeedRes / 100), ties = "ordered", rule = 1)
-          names(df) <- c("Frac", "Time") # saving x (Frac) and y (Time) 
-          df <- as_tibble(df)
-          drop_na(df)
+          approx(CumFrac, CumTime, xout = rv$germSpeedFracs / 100, ties = "ordered", rule = 2) %>%
+            setNames(c("Frac", "Time")) %>%
+            as_tibble() %>%
+            drop_na()
         },
         .groups = "drop"
       )
     
-    # Calculation of the time to desired germ % and respective rate.
-    #if (input$germSpeedType == "Rate") {
-    # show as rate
+    # group by the selected treatments for next step
+    df <- group_by_at(df, vars(trts, Frac))
+    
+    # Calculate average speed and standard deviations (Future) for all speed fractions
     df <- df %>%
-      mutate(
-        #Time = round(Frac / Time * 100, 2),
-        Tx = paste0("T", input$germSpeedRes),
-        GRx = paste0("GR", input$germSpeedRes),
-        Time = round(Time, 1),
-        Frac = round(1 / Time, 6)) %>%
-      pivot_wider(
-        names_from = c(Tx, GRx), 
-        values_from = c("Time", "Frac")
-      ) 
-    
-    names(df)[names(df) == paste0("Time_T", input$germSpeedRes, "_GR", input$germSpeedRes)] <- paste0("T", input$germSpeedRes)
-    names(df)[names(df) == paste0("Frac_T", input$germSpeedRes, "_GR", input$germSpeedRes)] <- paste0("GR", input$germSpeedRes)
-    
-    df
-    
-  })
-  
-  # Render germSpeedTable -----
-  
-  output$germSpeedTable <- renderDataTable({
-    req(input$germSpeedRes)
-    
-    df <- GRData()
-  },
-  rownames = F,
-  server = F,
-  extensions = c("Buttons", "Select"),
-  selection = "none",
-  options = list(
-    searching = F,
-    paging = F,
-    select = T,
-    dom = "Bfrtip",
-    buttons = list(
-      list(
-        extend = "copy",
-        text = 'Copy'
+      summarise(
+        Time = mean(Time), # Time_sd = sd(Time), ADD SD in the future
+        .groups = "drop"
       )
-    )
-  )
-  )
-  
-  ## Germination rate plot against treatment ----
-  
-  germTrtChoicesRate <- reactive({
-    input$germSpeedTrtSelect
-  })
-  
-  output$xAxisTreat <- renderUI({
-    req(GRData()>0) #check if combo treatment is filled
-    req(input$germSpeedTrtSelect) #check if combo treatment is filled
-    req(input$germSpeedTrtSelect != "NA") #check if combo treatment is not NA
-    radioButtons(
-      inputId = "germSpeedRateTrtSelectX",
-      label = "Select treatment for x axis:",
-      choices = germTrtChoicesRate()
-      
-    )
-  })
-  
-  output$yAxisTreat <- renderUI({
-    req(GRData()>0) #check if combo treatment is filled
-    req(input$germSpeedTrtSelect) #check if combo treatment is filled
-    req(input$germSpeedTrtSelect != "NA") #check if combo treatment is not NA
     
-    opt1 <- paste0("GR",  input$germSpeedRes)
-    opt2 <- paste0("T",  input$germSpeedRes)
-    
-    radioButtons(
-      inputId = "germSpeedRateTrtSelectY",
-      label = "Select germination parameter for y axis:",
-      choices = c(opt1, opt2),
-      selected = opt1
-      #choices = germSpeedTrtChoices()
-      
-    )
-  })
-  
-  
-  
-  # Plot selected GRx (from the section above) in the y-axis and the numeric factor in the x axis based in the radiobutton germSpeedRateTrtSelect
-  
-  # TODO: Show plot only if the numeric treatment is present in the table above.
-  
-  output$germRateTrtPlot <- renderPlot({
-    req(GRData()>0) #check if combo treatment is filled
-    req(input$germSpeedTrtSelect) #check if combo treatment is filled
-    req(input$germSpeedTrtSelect != "NA") #check if combo treatment is not NA
-    
-    df <- GRData()
-    
-    xTreat <- input$germSpeedRateTrtSelectX
-    yTreat <- input$germSpeedRateTrtSelectY
-    
-    pltRt <- df %>%
-      ggplot(aes(x = !!as.name(xTreat), y = !!as.name(yTreat))) +
-      geom_point(shape = 19, size = 2) +
-      scale_x_continuous(breaks = scales::pretty_breaks()) +
-      #scale_y_continuous(labels = scales::percent) +
-      # TODO: make nicer axis labels based on columns / treatments
-      theme_classic()
-    
-    
-    pltRt
-  })
-  
-  
-  
-  
-  
-  # Thermal time TAB -------------------
-  
-  
-  # Render Thermal time model UI
-  output$ThermaltimeUI <- renderUI({
-    list(
-      #h4("Thermal time model calculation"),
-      sidebarLayout(
-        sidebarPanel(
-          h4("Model data input", align = "center"),
-          uiOutput("germThermalPlotTrt1"),
-          uiOutput("thermalFactorsSelect"),
-          h5("Select factor levels for model:"),
-          uiOutput("tempFactorLevelSelect"),
-          uiOutput("WPFactorLevelSelect"),
-          uiOutput("TrtIDFactorLevelSelect"),
-          uiOutput("TrtDescFactorLevelSelect")
-          #uiOutput("germFracRange"),
-          #uiOutput("maxGermThermal")
-          
-        ),
-        mainPanel(
-          br(),
-          h4("Cumulative germination observed and predicted", align = "center"),
-          plotOutput("germPlotThermal"),
-          splitLayout(cellWidths = c("50%", "50%"), uiOutput("germFracRange", align = "center"), uiOutput("maxGermThermal", align = "center"))
-        ),
-      ), 
-      #br(),
-      #h4("Germination speed parameters:"),
-      sidebarLayout(
-        sidebarPanel(
-          h4("Model parameters", align = "center"),
-          uiOutput("Tb"),
-          uiOutput("ThetaT50"),
-          uiOutput("ThetaTsigma"),
-          actionButton("optimizeThermalTModel", "Optimize model"), align = "center",
-          
-        ),
-        mainPanel(
-          fluidRow(
-            splitLayout(cellWidths = c("50%", "50%"), plotOutput("distThetaThermal"), plotOutput("modelFitThermal")),
-            dataTableOutput("ThermalTParamTable"),
-            #style = "overflow-x: auto",
-            
-            actionLink("ShowStatsThermalT", "Show stats"), align = "right",
-            hidden(
-              div(id='text_div',
-                  verbatimTextOutput("text")
-              )
-            )
-
-          )
+    if (input$germSpeedType == "Rate") {
+      # show as rate
+      df <- df %>%
+        mutate(
+          Time = round(1 / Time, 6),
+          Frac = paste0("GR", Frac * 100)) %>%
+        pivot_wider(
+          names_from = "Frac",
+          values_from = "Time"
+        )
+    } else {
+      # show as cumulative fraction
+      df <- df %>%
+        mutate(
+          Frac = paste0("T", Frac * 100),
+          Time = round(Time, 1)) %>%
+        pivot_wider(
+          names_from = "Frac",
+          values_from = "Time"
+        )
+    }
+    df
+  },
+    rownames = F,
+    server = F,
+    extensions = c("Buttons", "Select"),
+    selection = "none",
+    options = list(
+      searching = F,
+      paging = F,
+      select = T,
+      dom = "Bfrtip",
+      buttons = list(
+        list(
+          extend = "copy",
+          text = 'Copy table to clipboard'
         )
       )
-      #br(),
     )
-  })
-  
-  # Treatment SelectInputs ---    
+  )
   
   
-  output$germThermalPlotTrt1 <- renderUI({
-    #req(TTModelReady()) #check if current data has basic requirements
-    #req(germTrtThermalChoices()>0) 
+
+  # ThermalTime --------------------
+
+  #### ThermalTimeUI ####
+  output$ThermalTimeUI <- renderUI({
+    validate(need(rv$modelReady$ThermalTime, "Please load required data for thermal time analysis."))
     list(
-      selectInput( #create combo box with validated columns and factors
-        "germThermalPlotTrt1", 
-        "Main treatment factor",
-        choices = columnValidation$Column[8],
-        selected = columnValidation$Column[8] #TODO: Adapt this for user column
+      p(em("The thermal time model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will display those treatments and include them in the model calculation which can result on unreliable or unexpected results. Please inform and remove additonal treatments when pertinent in the lower left corner of this section. Note: the model may fail to converge under certain max cumulative fraction values.")),
+      br(),
+      box(
+        title = "Model data input",
+        uiOutput("tempFactorLevelSelect"),
+        uiOutput("dataInputType")
+      ),
+      box(
+        title = "Model results",
+        tableOutput("TTResultsTable")
+      ),
+      box(
+        width = 12,
+        plotOutput("TTPlot")
+      ),
+      box(
+        title = "Data input filter",
+        uiOutput("thermalFactorsSelect"),
+        uiOutput("WPFactorLevelSelect"),
+        uiOutput("TrtIDFactorLevelSelect"),
+        uiOutput("TrtDescFactorLevelSelect")
+      ),
+      box(
+        title = "Maximum germination (%) observed",
+        sliderInput(
+          inputId = "TTSubOMaxCumFrac",
+          label = NULL,
+          min = 10,
+          max = 100,
+          value = 100,
+          step = 1)
+      ),
+      box(
+        title = "Included interval (%):",
+        sliderInput(
+          inputId = "germFracRange",
+          label = NULL,
+          min = 0,
+          max = 100,
+          value = c(0,100))
       )
-    )
-  })
-  
-  germTrtThermalChoices <- reactive({ # create choices with validated column names and factors withut the temperature
-    cols <- sapply(1:nCols, function(i) {
-      if (rv$colStatus[[paste0("col", i)]] == T && columnValidation$Role[i] == "Factor" && columnValidation$InputId[i] != "GermTemp") columnValidation$Column[i] # TODO: need to fix this to display users column names instead otherwise error with custom column names. 
-    })
-    cols <- compact(cols) #remove all null entries 
-    setNames(as.list(c(cols)), c(cols))
-  })
-  
-  output$thermalFactorsSelect <- renderUI({
-    checkboxGroupInput(
-      inputId = "thermalFactorsSelect",
-      label = "Select other treatment factors:",
-      choices = germTrtThermalChoices()
-      #, selected = c("TrtID")
     )
   })
   
   # create choices with all germ temperature levels 
   TempFactorLevelChoices <- reactive({
-    req(TTModelReady())
-    df <- as.factor(rv$data[[input$GermTemp]])
-    cols <- levels(df)
+    req(rv$modelReady$ThermalTime)
+    temps <- as.factor(rv$data[[input$GermTemp]])
+    cols <- levels(temps)
   })
+  
   
   # Create checkbox with all Temperature levels to be included in the model analysis
   output$tempFactorLevelSelect <- renderUI({
     checkboxGroupInput(
       inputId = "tempFactorLevelSelect",
-      label = "Temperature:",
+      label = "Included temperature levels:",
       choices = TempFactorLevelChoices(),
       selected = TempFactorLevelChoices()
     )
   })
   
+  # Create radio button for data input type: Original or Cleaned (no repetitive cumulative fractions, keep only initial presence of a value)
+  output$dataInputType <- renderUI({
+    radioButtons(
+      inputId = "dataInputType",
+      label = "Select data input type:",
+      choices = c("Original" = "orig",
+                  "Cleaned" = "clean")
+    )
+  })
+  
+  # create choices with validated column names and factors without GermTemp
+  germTrtThermalChoices <- reactive({
+    cols <- sapply(1:nCols, function(i) {
+      if (rv$colStatus[i] == T && colValidation$Role[i] == "Factor" && colValidation$InputId[i] != "GermTemp") colValidation$Column[i] 
+    })
+    cols <- compact(cols) #remove all null entries 
+    setNames(as.list(c(cols)), c(cols))
+  })
+  
+  # create choices with all available columns on dataset besides GermTemp 
+  output$thermalFactorsSelect <- renderUI({
+    checkboxGroupInput(
+      inputId = "thermalFactorsSelect",
+      label = "Filter factor levels for additional treatments:",
+      choices = germTrtThermalChoices()
+      #, selected = c("TrtID")
+    )
+  })
+  
   # create choices with all germ wp levels
   WPFactorLevelChoices <- reactive({
-    req(TTModelReady())
+    req(rv$modelReady$ThermalTime)
     req("GermWP" %in% input$thermalFactorsSelect)
     df <- as.factor(rv$data[[input$GermWP]])
     cols <- levels(df)
@@ -862,7 +679,7 @@ server <- function(input, output, session) {
   
   # Create checkbox with all WP levels to be included in the model analysis
   output$WPFactorLevelSelect <- renderUI({
-    req(TTModelReady())
+    req(rv$modelReady$ThermalTime)
     req("GermWP" %in% input$thermalFactorsSelect)
     checkboxGroupInput(
       inputId = "WPFactorLevelSelect",
@@ -872,17 +689,17 @@ server <- function(input, output, session) {
     )
   })
   
-  # create choices with all germ wp levels
+  # create choices with all TrtID levels
   TrtIDFactorLevelChoices <- reactive({
-    req(TTModelReady())
+    req(rv$modelReady$ThermalTime)
     req("TrtID" %in% input$thermalFactorsSelect)
     df <- as.factor(rv$data[[input$TrtID]])
     cols <- levels(df)
   })
   
-  # Create checkbox with all WP levels to be included in the model analysis
+  # Create checkbox with all TrtID levels to be included in the model analysis
   output$TrtIDFactorLevelSelect <- renderUI({
-    req(TTModelReady())
+    req(rv$modelReady$ThermalTime)
     req("TrtID" %in% input$thermalFactorsSelect)
     checkboxGroupInput(
       inputId = "TrtIDFactorLevelSelect",
@@ -892,17 +709,17 @@ server <- function(input, output, session) {
     )
   })
   
-  # create choices with all germ wp levels
+  # create choices with all TrtDesc levels
   TrtDescFactorLevelChoices <- reactive({
-    req(TTModelReady())
+    req(rv$modelReady$ThermalTime)
     req("TrtDesc" %in% input$thermalFactorsSelect)
     df <- as.factor(rv$data[[input$TrtDesc]])
     cols <- levels(df)
   })
   
-  # Create checkbox with all WP levels to be included in the model analysis
+  # Create checkbox with all TrtDesc levels to be included in the model analysis
   output$TrtDescFactorLevelSelect <- renderUI({
-    req(TTModelReady())
+    req(rv$modelReady$ThermalTime)
     req("TrtDesc" %in% input$thermalFactorsSelect)
     checkboxGroupInput(
       inputId = "TrtDescFactorLevelSelect",
@@ -912,68 +729,18 @@ server <- function(input, output, session) {
     )
   })
   
-  output$germFracRange <- renderUI({
-    sliderInput(
-      inputId = "germFracRange",
-      label = "Included interval (%):",
-      min = 0,
-      max = 100,
-      value = c(0,100)
-    )
-  })
-  
-  output$maxGermThermal <- renderUI({
-    sliderInput(
-      inputId = "maxGermThermal",
-      label = "Maximum germination (%) observed:",
-      min = 20,
-      max = 100,
-      step = 1,
-      value = 100
-    )
-  })
-  
-  HTML(paste0("Label (unit = m",tags$sup("2"), ')'))
-  
-  output$Tb <- renderUI({
-    numericInput(
-      inputId = "Tb",
-      label = HTML(paste0("Temperature base (T",tags$sub("b"), "):")),
-      min = 0,
-      max = 15,
-      value = 6
-    )
-  })
-  
-  output$ThetaT50 <- renderUI({
-    numericInput(
-      inputId = "ThetaT50",
-      label = HTML(paste0("Thermal time (log θ" ,tags$sub("T"), "(50):")),
-      min = 0.5,
-      max = 50,
-      value = 3
-    )
-  })
-  
-  output$ThetaTsigma <- renderUI({
-    numericInput(
-      inputId = "ThetaTsigma",
-      label = HTML(paste0("Standard deviation (log σ",tags$sub(("θ"), tags$sub("T")), "):")),
-      min = 0.0001,
-      max = 0.8,
-      value = 0.1
-    )
-  })
   
   
   
-  # Germination rate plot for thermal time model ---
-  # Reactive data ---
+  ### TTSubOModelWorkingDataset ###
   
-  germRateDataThermal <- reactive({
-    req(nrow(rv$data) > 0)
-    req(TTModelReady())
+  TTSubOModelWorkingDataset <- reactive({
+    req(DataLoaded())
+    req(rv$modelReady$ThermalTime)
+    req(input$TTSubOMaxCumFrac)
     req(input$germFracRange)
+    req(input$dataInputType)
+    
     
     # construct working dataset
     df <- tibble(TrtID = rv$data[[input$TrtID]])
@@ -984,22 +751,20 @@ server <- function(input, output, session) {
       CumFrac = rv$data[[input$CumFraction]]
     )
     
-    # regenerate cumulative fractions depending on grouping trts
-    df <- df %>%
-      group_by(TrtID) %>%
-      arrange(TrtID, CumTime, CumFrac) %>%
-      mutate(FracDiff = CumFrac - lag(CumFrac, default = 0)) %>%
-      mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
-    
     # group by the selected treatments
     df <- group_by_at(df, trts)
     
-    # merge values that occur at the same timepoint 
-    ### TODO: Is this dropping values at the same timepoint? We actually need to drop the last value of similar fraction that occur at different time points (no increase in germination since earlier observation) that is the function of the cleandata function from the pbtm package 
+    # Update data input type based on radio button selection (Original or Cleaned)
+    if (input$dataInputType == "clean"){
+      #eval(parse(text=paste("dplyr::distinct(df,",trts,",CumFrac, .keep_all = TRUE)", sep="")))
+      df <- dplyr::distinct(df,TrtID,CumFrac, .keep_all = TRUE)
+    } 
+  
+    # Filter working dataset based on treatment selections 
     df <- df %>%
-      group_by(CumTime, .add = T) %>%
-      summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-      mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+      group_by(CumTime, .add = T) #%>%
+    #summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+    #mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
     
     if (length(input$thermalFactorsSelect)>0){
       
@@ -1023,276 +788,1307 @@ server <- function(input, output, session) {
   
   
   
-  # Action button - Thermal time model optimization ---
-  observeEvent(input$optimizeThermalTModel, {
-    req(nrow(rv$data) > 0)
-    req(TTModelReady())
-    req(input$maxGermThermal)
-    req(input$Tb)
-    req(input$ThetaT50)
-    req(input$ThetaTsigma)
+  #### TTSubOModelResults ####
+  TTSubOModelResults <- reactive({
+    req(DataLoaded())
+    req(rv$modelReady$ThermalTime)
+    req(TTSubOModelWorkingDataset())
+    req(input$TTSubOMaxCumFrac)
     
-    # retrieve working dataset and parameters
-    df <- germRateDataThermal()
-    CumFrac <- as.numeric(as.character(df$CumFrac))
-    CumTime <- as.numeric(as.character(df$CumTime))
-    GermTemp <- as.numeric(as.character(df$GermTemp))
+    #Call working dataset
+    df <- TTSubOModelWorkingDataset()
     
-    # retrieve working dataset and parameters
-    ithetaT50 <- as.numeric(input$ThetaT50)
-    iTb <- as.numeric(input$Tb)
-    MaxCumFraction <- as.numeric(input$maxGermThermal)/100
-    iSigma <- as.numeric(input$ThetaTsigma)
-    
-    #lower limits
-    lTb <- 0
-    lthetaT50 <- 0.5 
-    lSigma <- 0.01
-    
-    #higher limits
-    uTb <- 15
-    uthetaT50 <- 50
-    uSigma <- 0.8
-    
-
-   # while(TRUE) {
-  #  TTSubOModel <- NULL
+    tryCatch({
+      # local vars
+      temp <- as.numeric(as.character(df$GermTemp)) #rv$data[[input$GermTemp]]
+      time <- as.numeric(as.character(df$CumTime)) #rv$data[[input$CumTime]]
+      germ <- as.numeric(as.character(df$CumFrac)) #rv$data[[input$CumFraction]]
+      max.cum.frac <- input$TTSubOMaxCumFrac/100
       
-    #Calculate Thermaltime Suboptimal Model Parameters- nls plus algorithm port used to add constraints on the parameters
-    
-    try(TTSubOModel <- nls(CumFrac ~ pnorm(log(CumTime, base = 10), mean = thetaT50 - log(GermTemp - Tb, base = 10), sd = sigma, log = FALSE) * MaxCumFraction,
-                           control = list(maxiter = 50000, minFactor = 1/5000, warnOnly = TRUE),
-                           start = list(Tb = iTb, thetaT50 = ithetaT50, sigma = iSigma),
-                           lower = list(Tb = lTb, thetaT50 = lthetaT50, sigma = lSigma), 
-                           upper = list(Tb = uTb, thetaT50 = uthetaT50, sigma = uSigma), algorithm ="port"))
-    
-   # if(!is.null(TTSubOModel)) break; # if nls works, then quit from the loop
-  #  }
-
+      # run model
+      model <- stats::nls(
+        formula = germ ~ max.cum.frac * stats::pnorm(
+          log(time, base = 10),
+          mean = thetaT50 - log(temp - Tb, base = 10),
+          sd = sigma,
+          log = FALSE),
+        start = list(
+          Tb = 6,
+          thetaT50 = 3,
+          sigma = 0.09),
+        lower = list(
+          Tb = 0,
+          thetaT50 = 0.5,
+          sigma = 0.0001),
+        upper = list(
+          Tb = 20,
+          thetaT50 = 50,
+          sigma = 1.50),
+        algorithm = "port")
       
-    #Passing fitted Thermal time Model Parameters
-    TbN <- round(summary(TTSubOModel)$coefficients[[1]],2)
-    thetaT50N <- round(summary(TTSubOModel)$coefficients[[2]],2)
-    sigmaN <- round(summary(TTSubOModel)$coefficients[[3]],3)
-    
-    updateNumericInput(session, "Tb", value = TbN)
-    updateNumericInput(session, "ThetaT50", value = thetaT50N)
-    updateNumericInput(session, "ThetaTsigma", value = sigmaN)
-    
+      # grab coefs
+      Corr <- stats::cor(germ, stats::predict(model)) ^ 2
+      Tb <- summary(model)$coefficients[[1]]
+      ThetaT50 <- summary(model)$coefficients[[2]]
+      Sigma <- summary(model)$coefficients[[3]]
+      
+      # return results
+      list(
+        Tb = Tb,
+        ThetaT50 = ThetaT50,
+        Sigma = Sigma,
+        Correlation = Corr
+      )
+    },
+      error = function(cond) {
+        paste("Unable to compute model, try adjusting parameters. ", str_to_sentence(cond[1]))
+      }
+    )
   })
   
-
+  #### TTResultsTable ####
+  output$TTResultsTable <- renderTable({
+    req(TTSubOModelResults())
+    results <- TTSubOModelResults()
+    
+    # print error message if model fails
+    validate(need(is.list(results), results))
+    
+    # convert results list to data frame
+    results %>%
+      enframe() %>%
+      unnest(value) %>%
+      rename(
+        Parameter = name,
+        Value = value
+      )
+  }, digits = 4)
   
   
-  # Thermal time model current parameters  ---
-  # Reactive data ---
-  
-  ThermalTimeCurrentParam <- reactive({
-    req(nrow(rv$data) > 0)
-    req(TTModelReady())
-    req(input$maxGermThermal)
-    req(input$Tb)
-    req(input$ThetaT50)
-    req(input$ThetaTsigma)
+  #### TTPlot ####
+  output$TTPlot <- renderPlot({
+    req(DataLoaded())
+    req(rv$modelReady$ThermalTime)
+    req(TTSubOModelWorkingDataset())
+    req(input$TTSubOMaxCumFrac)
     
-    # retrieve working dataset and parameters
+    #Call and load working dataset
+    df <- TTSubOModelWorkingDataset()
     
-    df <- germRateDataThermal()
-    CumFrac <- as.numeric(as.character(df$CumFrac))
-    CumTime <- as.numeric(as.character(df$CumTime))
-    GermTemp <- as.numeric(as.character(df$GermTemp))
-
-    cThetaT50 <- as.numeric(input$ThetaT50)
-    cTb <- as.numeric(input$Tb)
-    MaxCumFraction <- as.numeric(input$maxGermThermal)/100
-    cSigma <- as.numeric(input$ThetaTsigma)
+    #GermTemp <- as.factor(as.numeric(as.character(df$GermTemp)))
+    #CumTime <- as.factor(as.numeric(as.character(df$CumTime)))
+    #CumFraction <- as.factor(as.numeric(as.character(df$CumFraction)))
     
-   # while(TRUE) {
-  #    TTSubOModel <- NULL
-    
-    try(TTSubOModel <- nls(CumFrac ~ pnorm(log(CumTime, base = 10), mean = thetaT50 - log(GermTemp - Tb, base = 10), sd = sigma, log = FALSE) * MaxCumFraction, 
-                       start = list(Tb = cTb, thetaT50 = cThetaT50, sigma = cSigma), 
-                       lower = list(Tb = cTb, thetaT50 = cThetaT50, sigma = cSigma), 
-                       upper = list(Tb = cTb, thetaT50 = cThetaT50, sigma = cSigma), algorithm ="port"))
-    
-  #    if(!is.null(TTSubOModel)) break; # if nls works, then quit from the loop
-  #  }   
-     
-    #Passing fitted Hydrotime Model Parameters
-    Tb <- round(summary(TTSubOModel)$coefficients[[1]],2)
-    thetaT50 <- round(summary(TTSubOModel)$coefficients[[2]],2)
-    sigma <- round(summary(TTSubOModel)$coefficients[[3]],2)
-    
-    #get some estimation of goodness of fit
-    Correlation <- round(cor(CumFrac,predict(TTSubOModel))^2,3)
-    df2 <- data.frame(CumFrac,predict(TTSubOModel))  
-    colnames(df2) <- c("observed", "predicted")
-    
-    Model <- "TTsuboptimal"
-    df1 <- data.frame(Model,Tb,thetaT50,sigma,Correlation)
-
-    df3 <- data.frame(Model,cTb,cThetaT50,cSigma,MaxCumFraction)
-    
-    df4 <- summary(TTSubOModel)
-    
-    df <- list(df1, df2, df3, df4)
-    
-  })
-
-  
-  
-  #Thermal time model parameters table
-  output$ThermalTParamTable <- renderDataTable({
-    df <- ThermalTimeCurrentParam()
-    df <- df[[1]]
-    
-    df$Theta50Antilog <- round(10^df$thetaT50,0)
-    
-    colnames(df)[2] <- "T<sub>b</sub>"
-    colnames(df)[3] <- HTML(paste0("log θ" ,tags$sub("T"), "(50)"))
-    colnames(df)[4] <- HTML(paste0("log σ" ,tags$sub(("θ"), tags$sub("T"))))
-    colnames(df)[5] <- "Correlation (R<sup>2</sup>)"
-    colnames(df)[6] <- HTML(paste0("θ" ,tags$sub("T"), "(°h)"))
-
-    datatable(df[,c(1,2,3,4,6,5)], 
-              rownames = F,
-              extensions = c("Buttons", "Select"),
-              selection = "none",
-              escape = F,
-              options = list(
-              searching = F,
-              paging = F,
-              select = T,
-              ordering = F,
-              columnDefs = list(list(className = 'dt-center', targets = "_all")),
-              dom = "Bt",
-              buttons = list(
-              list(
-                  extend = "copy",
-                  text = 'Copy'
-                  )
-                )
-              ))
-  })
-  
-  
-  
-  # Render cumulative germination Thermal time Plot----
-  output$germPlotThermal <- renderPlot({
-    req(nrow(rv$data) > 0)
-    req(TTModelReady())
-    
-    df <- germRateDataThermal()
-    
-    Temp <- as.factor(as.numeric(as.character(df$GermTemp)))
-    
-    #Parameters for modellines
-    ThetaT50 <- as.numeric(input$ThetaT50)
-    Tb <- as.numeric(input$Tb)
-    MaxCumFraction <- as.numeric(input$maxGermThermal)/100
-    Sigma <- as.numeric(input$ThetaTsigma)
-    
-    
-    #Get temperature factors to build modellines
-    TreatmentsTemp <- as.numeric(levels(Temp))
-    
-    #Function to plot all predicted treatments by the Thermaltime model
-    modellines <-
-    plyr::alply(as.matrix(TreatmentsTemp), 1, function(GermTemp) {
-        stat_function(fun=function(x) { pnorm(log(x, base = 10), ThetaT50 - log(GermTemp - Tb, base = 10), Sigma,log=FALSE) * MaxCumFraction}, aes_(colour = factor(GermTemp)), size = 1.5)
-     })
-    
+    # generate the plot
     plt <- df %>%
-      ggplot(aes(x = CumTime, y = CumFrac, color = GermTemp)) +
-      geom_point(shape = 19, size = 2)
-    
-    plt <- plt + 
-      modellines +
-      scale_x_continuous(breaks = scales::pretty_breaks()) +
-      scale_y_continuous(labels = scales::percent) +
+        ggplot(aes(
+        x = CumTime,
+        y = CumFrac,
+        color = GermTemp)) +
+      annotate("rect", xmin = 0, xmax = Inf, ymin = input$TTSubOMaxCumFrac/100, ymax = 1, fill = "grey", alpha = 0.1) +
+      geom_hline(yintercept = input$TTSubOMaxCumFrac/100, color = "darkgrey", linetype = "dashed") +
+      geom_point(shape = 19, size = 2) +
+      scale_y_continuous(labels = scales::percent, expand = c(0, 0), limits = c(0, 1.02)) +
+      scale_x_continuous(expand = c(0, 0)) +
+      expand_limits(x = 0, y = 0) +
       labs(
-        #title = "Cumulative germination",
+        title = "Thermal Time Sub-optimal Model",
         x = "Time",
-        y = "Cumulative (%)"
-      ) +
+        y = "Cumulative fraction germinated (%)",
+        color = "Temperature") +
+      guides(color = guide_legend(reverse = T, order = 1)) +
       theme_classic()
     
-    lines = seq(0, 1, by = input$germSpeedRes / 100)
-    plt <- plt + geom_hline(yintercept = lines, color = "grey", size = 0.25, alpha = 0.5, linetype = "dashed")
-    
-    plt
-  })
-  
-  # Render model distribution Thermal time Plot----
-  output$distThetaThermal <- renderPlot({
-    req(TTModelReady())
-    
-    #df <- germRateDataThermal()
-    
-    # Create a sequence of numbers between -10 and 10 incrementing by 0.1.
-    cThetaT50 <- as.numeric(input$ThetaT50)
-    cSigma <- as.numeric(input$ThetaTsigma)
-    xll <- as.numeric(input$ThetaT50) - as.numeric(input$ThetaTsigma) - 1 # x lower limit
-    xhl <- as.numeric(input$ThetaT50) + as.numeric(input$ThetaTsigma) + 1 # x lower limit
-    
-    plt <-
-      ggplot(data = data.frame(x = c(xll, xhl)), aes(x)) +
-      stat_function(fun = dnorm, n=101, args = list(mean = cThetaT50, sd = cSigma), size = 1.5) 
-    
-    plt <- plt +
-      #scale_x_continuous(breaks = scales::pretty_breaks()) +
-      #scale_y_continuous(labels = scales::percent) +
-      labs(
-        title = "Model distribution",
-        x = "ThetaT(g)",
-        y = "Desnsity"
-      ) +
-      theme_classic() + theme(plot.title = element_text(hjust = 0.5, size=18))
-    
-    lines = seq(0, 1, by = input$germSpeedRes / 100)
-    plt <- plt + geom_hline(yintercept = lines, color = "grey", size = 0.25, alpha = 0.5, linetype = "dashed")
-    
-    plt
-  })
-  
-  # Render model fit Thermal time Plot----
-  output$modelFitThermal <- renderPlot({
-    req(TTModelReady())
-    
-    df <- ThermalTimeCurrentParam()
-    ModelParam <- df[[1]]
-    data_mod <- df[[2]]  #dataframe for model
-    
-    plt <-
-      ggplot(data = data_mod, aes(x = predicted, y = observed)) +
-
-      geom_point() +
-      geom_abline(intercept = 0,
-                   slope = 1,
-                   color = "red", 
-                   size = 2)
+    # use try so it will still plot on model error
+    try({
+      req(is.list(TTSubOModelResults()))
+      model <- TTSubOModelResults()
       
-    plt <- plt +
+      maxCumFrac <- model$MaxCumFrac
+      tb <- model$Tb
+      thetaT50 <- model$ThetaT50
+      sigma <- model$Sigma
+      corr <- model$Correlation
+      
+      par1 <- paste("~~T[b]==", round(tb, 1))
+      par2 <- paste("~~ThetaT(50)==", round(thetaT50, 3))
+      par3 <- paste("~~sigma==", round(sigma, 3))
+      par4 <- paste("~~R^2==", round(corr, 2))
+      
+      # Plot all predicted treatments by the thermal time model
+      #temps <- distinct(df$GermTemp, .keep_all = F)
+      Temp <- as.factor(as.numeric(as.character(df$GermTemp)))
+      temps <- as.numeric(levels(Temp))
+      
+      modelLines <- mapply(function(temp) {
+        stat_function(
+          fun = function(x) {
+            stats::pnorm(log(x, base = 10), thetaT50 - log(temp - tb, base = 10),  sigma, log = F) * input$TTSubOMaxCumFrac/100
+          },
+          aes(color = as.factor(temp))
+        )
+      },
+      temps
+      )
+      
+      plt <- plt +
+        modelLines +
+        annotate("text", x = -Inf, y = 0.95, label = " Model parameters:", color = "grey0", hjust = 0) +
+        annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T)
+    })
+    
+    plt
+  })
+
+  
+  
+  # Hydrotime model ----------------------
+
+  #### HydrotimeUI ####
+  output$HydrotimeUI <- renderUI({
+    validate(need(rv$modelReady$Hydrotime, "Please load required data for Hydrotime analysis."))
+    list(
+      p(em("The hydrotime model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values.")),
+      br(),
+      box(
+        title = "Model data input",
+        uiOutput("HTWPFactorLevelSelect"),
+        uiOutput("HTdataInputType")
+      ),
+      box(
+        title = "Model results",
+        tableOutput("HTResultsTable")
+      ),
+      box(
+        width = 12,
+        plotOutput("HTPlot")
+      ),
+      box(
+        title = "Data input filter",
+        uiOutput("HTWPFactorsSelect"),
+        uiOutput("HTtempFactorLevelSelect"),
+        uiOutput("HTTrtIDFactorLevelSelect"),
+        uiOutput("HTTrtDescFactorLevelSelect")
+      ),
+      box(
+        title = "Maximum germination (%) observed",
+        sliderInput(
+          inputId = "HTMaxCumFrac",
+          label = NULL,
+          min = 10,
+          max = 100,
+          value = 100,
+          step = 1)
+      ),
+      box(
+        title = "Included interval (%):",
+        sliderInput(
+          inputId = "HTgermFracRange",
+          label = NULL,
+          min = 0,
+          max = 100,
+          value = c(0,100))
+      )
+    )
+  })
+  
+  # create choices with all germ wp levels 
+  HTwpFactorLevelChoices <- reactive({
+    req(rv$modelReady$Hydrotime)
+    wps <- as.factor(rv$data[[input$GermWP]])
+    cols <- levels(wps)
+  })
+  
+  
+  # Create checkbox with all Temperature levels to be included in the model analysis
+  output$HTWPFactorLevelSelect <- renderUI({
+    checkboxGroupInput(
+      inputId = "HTWPFactorLevelSelect",
+      label = "Included water potential levels:",
+      choices = HTwpFactorLevelChoices(),
+      selected = HTwpFactorLevelChoices()
+    )
+  })
+  
+  # Create radio button for data input type: Original or Cleaned (no repetitive cumulative fractions, keep only initial presence of a value)
+  output$HTdataInputType <- renderUI({
+    radioButtons(
+      inputId = "HTdataInputType",
+      label = "Select data input type:",
+      choices = c("Original" = "orig",
+                  "Cleaned" = "clean")
+    )
+  })
+  
+  # create choices with validated column names and factors without GermTemp
+  germTrtHydroChoices <- reactive({
+    cols <- sapply(1:nCols, function(i) {
+      if (rv$colStatus[i] == T && colValidation$Role[i] == "Factor" && colValidation$InputId[i] != "GermWP") colValidation$Column[i] 
+    })
+    cols <- compact(cols) #remove all null entries 
+    setNames(as.list(c(cols)), c(cols))
+  })
+  
+  # create choices with all available columns on dataset besides GermTemp 
+  output$HTWPFactorsSelect <- renderUI({
+    checkboxGroupInput(
+      inputId = "HTWPFactorsSelect",
+      label = "Filter factor levels for additional treatments:",
+      choices = germTrtHydroChoices()
+      #, selected = c("TrtID")
+    )
+  })
+  
+  # create choices with all germ temp levels
+  HTtempFactorLevelChoices <- reactive({
+    req(rv$modelReady$Hydrotime)
+    req("GermTemp" %in% input$HTWPFactorsSelect)
+    df <- as.factor(rv$data[[input$GermTemp]])
+    cols <- levels(df)
+  })
+  
+  # Create checkbox with all temp levels to be included in the model analysis
+  output$HTtempFactorLevelSelect <- renderUI({
+    req(rv$modelReady$Hydrotime)
+    req("GermTemp" %in% input$HTWPFactorsSelect)
+    checkboxGroupInput(
+      inputId = "HTtempFactorLevelSelect",
+      label = "Temperature:",
+      choices = HTtempFactorLevelChoices(),
+      selected = HTtempFactorLevelChoices()
+    )
+  })
+  
+  # create choices with all TrtID levels
+  HTTrtIDFactorLevelChoices <- reactive({
+    req(rv$modelReady$Hydrotime)
+    req("TrtID" %in% input$HTWPFactorsSelect)
+    df <- as.factor(rv$data[[input$TrtID]])
+    cols <- levels(df)
+  })
+  
+  # Create checkbox with all TrtID levels to be included in the model analysis
+  output$HTTrtIDFactorLevelSelect <- renderUI({
+    req(rv$modelReady$Hydrotime)
+    req("TrtID" %in% input$HTWPFactorsSelect)
+    checkboxGroupInput(
+      inputId = "HTTrtIDFactorLevelSelect",
+      label = "Treatment ID:",
+      choices = HTTrtIDFactorLevelChoices(),
+      selected = HTTrtIDFactorLevelChoices()
+    )
+  })
+  
+  # create choices with all TrtDesc levels
+  HTTrtDescFactorLevelChoices <- reactive({
+    req(rv$modelReady$Hydrotime)
+    req("TrtDesc" %in% input$HTWPFactorsSelect)
+    df <- as.factor(rv$data[[input$TrtDesc]])
+    cols <- levels(df)
+  })
+  
+  # Create checkbox with all TrtDesc levels to be included in the model analysis
+  output$HTTrtDescFactorLevelSelect <- renderUI({
+    req(rv$modelReady$Hydrotime)
+    req("TrtDesc" %in% input$HTWPFactorsSelect)
+    checkboxGroupInput(
+      inputId = "HTTrtDescFactorLevelSelect",
+      label = "Treatment description:",
+      choices = HTTrtDescFactorLevelChoices(),
+      selected = HTTrtDescFactorLevelChoices()
+    )
+  })
+  
+  
+  
+  ### HTModelWorkingDataset ###
+  
+  HTModelWorkingDataset <- reactive({
+    req(DataLoaded())
+    req(rv$modelReady$Hydrotime)
+    req(input$HTMaxCumFrac)
+    req(input$HTgermFracRange)
+    req(input$HTdataInputType)
+    
+    
+    # construct working dataset
+    df <- tibble(TrtID = rv$data[[input$TrtID]])
+    trts <- append("GermWP", input$HTWPFactorsSelect)  # get all selected other factors + GermWP
+    for (trt in trts) { df[[trt]] <- as.factor(rv$data[[input[[trt]]]]) } #input all factors and respective data
+    df <- df %>% mutate(
+      CumTime = rv$data[[input$CumTime]],
+      CumFrac = rv$data[[input$CumFraction]]
+    )
+    
+    # group by the selected treatments
+    df <- group_by_at(df, trts)
+    
+    # Update data input type based on radio button selection (Original or Cleaned)
+    if (input$HTdataInputType == "clean"){
+      #eval(parse(text=paste("dplyr::distinct(df,",trts,",CumFrac, .keep_all = TRUE)", sep="")))
+      df <- dplyr::distinct(df,TrtID,CumFrac, .keep_all = TRUE)
+    } 
+    
+    # Filter working dataset based on treatment selections 
+    df <- df %>%
+      group_by(CumTime, .add = T) #%>%
+    #summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+    #mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+    
+    if (length(input$HTWPFactorsSelect)>0){
+      
+      if ("GermTemp" %in% input$HTWPFactorsSelect) {
+        df <- subset(df, subset = GermTemp %in% input$HTtempFactorLevelSelect)
+      }
+      if ("TrtID" %in% input$HTWPFactorsSelect) {
+        df <- subset(df, subset = TrtID %in% input$HTTrtIDFactorLevelSelect)
+      }
+      if ("TrtDesc" %in% input$HTWPFactorsSelect) {
+        df <- subset(df, subset = TrtDesc %in% input$HTTrtDescFactorLevelSelect)
+      }
+      
+    }
+    
+    df <- df %>% 
+      filter(CumFrac >= (input$HTgermFracRange[1]/100) & CumFrac <= (input$HTgermFracRange[2]/100))
+    
+    df <- subset(df, subset = GermWP %in% input$HTWPFactorLevelSelect)
+  })
+  
+  
+  
+  
+  
+  #### HTModelResults ####
+  HTModelResults <- reactive({
+    req(DataLoaded())
+    req(rv$modelReady$Hydrotime)
+    req(HTModelWorkingDataset())
+    req(input$HTMaxCumFrac)
+    
+    #Call and load working dataset
+    df <- HTModelWorkingDataset()
+    
+    tryCatch({
+      # required data
+      wp <- as.numeric(as.character(df$GermWP)) #rv$data[[input$GermWP]]
+      time <- as.numeric(as.character(df$CumTime)) #rv$data[[input$CumTime]]
+      germ <- as.numeric(as.character(df$CumFrac)) #rv$data[[input$CumFraction]]
+      max.cum.frac <- input$HTMaxCumFrac/100
+      
+      # run model
+      model <- stats::nls(
+        formula = germ ~ max.cum.frac * stats::pnorm(
+          wp - (HT / time),
+          Psib50,
+          Sigma,
+          log = FALSE),
+        start = list(
+          HT = 60,
+          Psib50 = -0.8,
+          Sigma = 0.2),
+        lower = list(
+          HT = 1,
+          Psib50 = -5,
+          Sigma = 0.0001),
+        upper = list(
+          HT = 1000,
+          Psib50 = -0.000000001,
+          Sigma = 2),
+        algorithm = "port")
+      
+      # grab coefs
+      corr <- stats::cor(germ, stats::predict(model)) ^ 2
+      HT <- summary(model)$coefficients[[1]]
+      Psib50 <- summary(model)$coefficients[[2]]
+      Sigma <- summary(model)$coefficients[[3]]
+      
+      # return results
+      list(
+        HT = HT,
+        Psib50 = Psib50,
+        Sigma = Sigma,
+        Correlation = corr)
+    },
+      error = function(cond) {
+        paste("Unable to compute model, try adjusting parameters. ", str_to_sentence(cond[1]))
+      }
+    )
+  })
+  
+  #### HTResultsTable ####
+  output$HTResultsTable <- renderTable({
+    req(HTModelResults())
+    results <- HTModelResults()
+    
+    # print error message if model fails
+    validate(need(is.list(results), results))
+    
+    # convert list to simple data frame
+    results %>%
+      enframe() %>%
+      unnest(value) %>%
+      rename(
+        Parameter = name,
+        Value = value
+      )
+  }, digits = 4)
+  
+  #### HTPlot ####
+  output$HTPlot <- renderPlot({
+    req(DataLoaded())
+    req(rv$modelReady$Hydrotime)
+    req(HTModelWorkingDataset())
+    req(input$HTMaxCumFrac)
+    
+    #Call and load working dataset
+    df <- HTModelWorkingDataset()
+    
+    # generate the plot
+    plt <- df %>%
+      ggplot(aes(
+        x = CumTime,
+        y = CumFrac,
+        color = GermWP)) +
+      annotate("rect", xmin = 0, xmax = Inf, ymin = input$HTMaxCumFrac/100, ymax = 1, fill = "grey", alpha = 0.1) +
+      geom_hline(yintercept = input$HTMaxCumFrac/100, color = "darkgrey", linetype = "dashed") +
+      geom_point(shape = 19, size = 2) +
+      scale_y_continuous(labels = scales::percent, expand = c(0, 0), limits = c(0, 1.02)) +
+      scale_x_continuous(expand = c(0, 0)) +
+      expand_limits(x = 0, y = 0) +
       labs(
-        title = "Model fit",
-        x = "Predicted",
-        y = "Observed"
-      ) +
-      theme_classic() + theme(plot.title = element_text(hjust = 0.5, size=18))
+        title = "Hydrotime Model",
+        x = "Time",
+        y = "Cumulative fraction germinated (%)",
+        color = "Water potential") +
+      guides(color = guide_legend(reverse = T, order = 1)) +
+      theme_classic()
+    
+    # use try so it will still plot on model error
+    try({
+      req(is.list(HTModelResults()))
+      model <- HTModelResults()
+      
+      maxCumFrac <- model$MaxCumFrac
+      ht <- model$HT
+      psib50 <- model$Psib50
+      sigma <- model$Sigma
+      corr <- model$Correlation
+      
+      par1 <- paste("~~HT==", round(ht, 2))
+      par2 <- paste("~~Psi[b](50)==", round(psib50, 3))
+      par3 <- paste("~~sigma== ", round(sigma, 3))
+      par4 <- paste("~~R^2== ", round(corr, 2))
+      
+      # Plot all predicted treatments by the hydrotime model
+      Wp <- as.factor(as.numeric(as.character(df$GermWP)))
+      wps <- as.numeric(levels(Wp))
+      
+      #df <- rv$data %>% distinct(.data[[input$GermWP]], .keep_all = FALSE)
+      modelLines <- mapply(function(wp) {
+        stat_function(
+          fun = function(x) {
+            stats::pnorm(wp - (ht / x), psib50, sigma, log = FALSE) * input$HTMaxCumFrac/100
+          },
+          aes(color = as.factor(wp))
+        )
+      },
+        wps
+      )
+      
+      plt <- plt +
+        modelLines +
+        annotate("text", x = -Inf, y = 0.95, label = " Model parameters", color = "grey0", hjust = 0) +
+        annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T)
+    })
     
     plt
   })
   
   
-   observeEvent(input$ShowStatsThermalT, {
-     toggle('text_div')
-     output$text <- renderPrint({
-          df <- ThermalTimeCurrentParam()
-          capture.output(df[4])
-          })
-   })
+  
+  # Hydrothermal time ----
+
+  #### HydrothermalTimeUI ####
+  output$HydrothermalTimeUI <- renderUI({
+    validate(need(rv$modelReady$HydrothermalTime, "Please load required data for Hydrothermal time analysis."))
+    list(
+      p(em("The hydrothermal time model assumes a data set with germination temperature and germination water potential as treatment conditions. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values.")),
+      br(),
+        box(
+          title = "Model data input",
+          column(width = 12,HTML("<b>Included factor levels<b>")),
+          hr(style = "margin-bottom: 0.3em"),
+          column(width = 6,
+          uiOutput("HTTWPFactorLevelSelect")),
+          column(width = 6,
+          uiOutput("HTTTempFactorLevelSelect")),
+          column(width = 6,
+          uiOutput("HTTdataInputType")),
+          column(width = 6,
+            numericInput(
+              inputId = "HTTBaseTemp",
+              label = HTML("Base temperature:"),
+              value = NULL       
+              ),
+          ),
+        ),
+        box(
+          title = "Model results",
+          tableOutput("HTTResultsTable")
+        ),
+        box(
+          width = 12,
+          plotOutput("HTTPlot")
+        ),
+        box(
+          title = "Data input filter",
+          uiOutput("HTTFactorsSelect"),
+          uiOutput("HTTTrtIDFactorLevelSelect"),
+          uiOutput("HTTTrtDescFactorLevelSelect")
+        ),
+        box(
+          title = "Maximum germination (%) observed",
+          sliderInput(
+            inputId = "HTTMaxCumFrac",
+            label = NULL,
+            min = 10,
+            max = 100,
+            value = 100,
+            step = 1)
+        ),
+        box(
+          title = "Included interval (%):",
+          sliderInput(
+            inputId = "HTTgermFracRange",
+            label = NULL,
+            min = 0,
+            max = 100,
+            value = c(0,100))
+      )
+    )
+  })
+  
+  
+  # create choices with all germ wp levels 
+  HTTwpFactorLevelChoices <- reactive({
+    req(rv$modelReady$HydrothermalTime)
+    wps <- as.factor(rv$data[[input$GermWP]])
+    cols <- levels(wps)
+  })
+  
+  
+  # Create checkbox with all wps levels to be included in the model analysis
+  output$HTTWPFactorLevelSelect <- renderUI({
+    checkboxGroupInput(
+      inputId = "HTTWPFactorLevelSelect",
+      label = "Water potential:",
+      choices = HTTwpFactorLevelChoices(),
+      selected = HTTwpFactorLevelChoices()
+    )
+  })
+  
+  # create choices with all germ temperature levels 
+  HTTTempFactorLevelChoices <- reactive({
+    req(rv$modelReady$HydrothermalTime)
+    temps <- as.factor(rv$data[[input$GermTemp]])
+    cols <- levels(temps)
+  })
+  
+  
+  # Create checkbox with all Temperature levels to be included in the model analysis
+  output$HTTTempFactorLevelSelect <- renderUI({
+    checkboxGroupInput(
+      inputId = "HTTTempFactorLevelSelect",
+      label = "Temperature:",
+      choices = HTTTempFactorLevelChoices(),
+      selected = HTTTempFactorLevelChoices()
+    )
+  })
+  
+  
+  # Create radio button for data input type: Original or Cleaned (no repetitive cumulative fractions, keep only initial presence of a value)
+  output$HTTdataInputType <- renderUI({
+    radioButtons(
+      inputId = "HTTdataInputType",
+      label = "Select data type:",
+      choices = c("Original" = "orig",
+                  "Cleaned" = "clean")
+    )
+  })
+  
+  # create choices with validated column names and factors without GermTemp nor GermWP
+  germTrtHTTChoices <- reactive({
+    cols <- sapply(1:nCols, function(i) {
+      if (rv$colStatus[i] == T && colValidation$Role[i] == "Factor" && colValidation$InputId[i] != "GermWP" && colValidation$InputId[i] != "GermTemp") colValidation$Column[i] 
+    })
+    cols <- compact(cols) #remove all null entries 
+    setNames(as.list(c(cols)), c(cols))
+  })
+  
+  # create choices with all available columns on dataset besides GermTemp 
+  output$HTTFactorsSelect <- renderUI({
+    checkboxGroupInput(
+      inputId = "HTTFactorsSelect",
+      label = "Filter factor levels for additional treatments:",
+      choices = germTrtHTTChoices()
+      #, selected = c("TrtID")
+    )
+  })
+  
+  # create choices with all TrtID levels
+  HTTTrtIDFactorLevelChoices <- reactive({
+    req(rv$modelReady$HydrothermalTime)
+    req("TrtID" %in% input$HTTFactorsSelect)
+    df <- as.factor(rv$data[[input$TrtID]])
+    cols <- levels(df)
+  })
+  
+  # Create checkbox with all TrtID levels to be included in the model analysis
+  output$HTTTrtIDFactorLevelSelect <- renderUI({
+    req(rv$modelReady$HydrothermalTime)
+    req("TrtID" %in% input$HTTFactorsSelect)
+    checkboxGroupInput(
+      inputId = "HTTTrtIDFactorLevelSelect",
+      label = "Treatment ID:",
+      choices = HTTTrtIDFactorLevelChoices(),
+      selected = HTTTrtIDFactorLevelChoices()
+    )
+  })
+  
+  # create choices with all TrtDesc levels
+  HTTTrtDescFactorLevelChoices <- reactive({
+    req(rv$modelReady$HydrothermalTime)
+    req("TrtDesc" %in% input$HTTFactorsSelect)
+    df <- as.factor(rv$data[[input$TrtDesc]])
+    cols <- levels(df)
+  })
+  
+  # Create checkbox with all TrtDesc levels to be included in the model analysis
+  output$HTTTrtDescFactorLevelSelect <- renderUI({
+    req(rv$modelReady$HydrothermalTime)
+    req("TrtDesc" %in% input$HTTFactorsSelect)
+    checkboxGroupInput(
+      inputId = "HTTTrtDescFactorLevelSelect",
+      label = "Treatment description:",
+      choices = HTTTrtDescFactorLevelChoices(),
+      selected = HTTTrtDescFactorLevelChoices()
+    )
+  })
+  
+  
+  
+  ### HTTModelWorkingDataset ###
+  HTTModelWorkingDataset <- reactive({
+    req(DataLoaded())
+    req(rv$modelReady$HydrothermalTime)
+    req(input$HTTMaxCumFrac)
+    req(input$HTTgermFracRange)
+    req(input$HTTdataInputType)
+    
+    # construct working dataset
+    df <- tibble(TrtID = rv$data[[input$TrtID]])
+    trts <- append(c("GermTemp","GermWP"), input$HTTFactorsSelect)  # get all selected other factors + GermWP
+    for (trt in trts) { df[[trt]] <- as.factor(rv$data[[input[[trt]]]]) } #input all factors and respective data
+    df <- df %>% mutate(
+      CumTime = rv$data[[input$CumTime]],
+      CumFrac = rv$data[[input$CumFraction]]
+    )
+    
+    # group by the selected treatments
+    df <- group_by_at(df, trts)
+    
+    # Update data input type based on radio button selection (Original or Cleaned)
+    if (input$HTTdataInputType == "clean"){
+      #eval(parse(text=paste("dplyr::distinct(df,",trts,",CumFrac, .keep_all = TRUE)", sep="")))
+      df <- dplyr::distinct(df,TrtID,CumFrac, .keep_all = TRUE)
+    } 
+    
+    # Filter working dataset based on treatment selections 
+    df <- df %>%
+      group_by(CumTime, .add = T) #%>%
+    #summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+    #mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+    
+    if (length(input$HTTFactorsSelect)>0){
+      
+      if ("TrtID" %in% input$HTTFactorsSelect) {
+        df <- subset(df, subset = TrtID %in% input$HTTTrtIDFactorLevelSelect)
+      }
+      if ("TrtDesc" %in% input$HTTFactorsSelect) {
+        df <- subset(df, subset = TrtDesc %in% input$HTTTrtDescFactorLevelSelect)
+      }
+      
+    }
+    
+    df <- df %>% 
+      filter(CumFrac >= (input$HTTgermFracRange[1]/100) & CumFrac <= (input$HTTgermFracRange[2]/100))
+    
+    df <- subset(df, subset = GermWP %in% input$HTTWPFactorLevelSelect)
+    df <- subset(df, subset = GermTemp %in% input$HTTTempFactorLevelSelect)
+  })
+  
+  
+  
+  #### HTTModelResults ####
+  HTTModelResults <- reactive({
+    req(DataLoaded())
+    req(rv$modelReady$HydrothermalTime)
+    req(HTTModelWorkingDataset())
+    req(input$HTTMaxCumFrac)
+    
+    #Call and load working dataset
+    df <- HTTModelWorkingDataset()
+    
+    tryCatch({
+      wp <- as.numeric(as.character(df$GermWP)) #rv$data[[input$GermWP]]
+      temp <- as.numeric(as.character(df$GermTemp)) #rv$data[[input$GermTemp]]
+      time <- as.numeric(as.character(df$CumTime)) #rv$data[[input$CumTime]]
+      germ <- as.numeric(as.character(df$CumFrac)) #rv$data[[input$CumFraction]]
+      max.cum.frac <- input$HTTMaxCumFrac/100
+      base.temp <- input$HTTBaseTemp
+      
+      # model conditions
+      start <- list(
+        HT = 800,
+        psib50 = -1,
+        sigma = 0.4)
+      lower <- list(
+        HT = 1,
+        psib50 = -5,
+        sigma = 0.0001)
+      upper <- list(
+        HT = 5000,
+        psib50 = 0,
+        sigma = 10)
+      
+      if (is.na(base.temp)) {
+        start$Tb <- 1
+        lower$Tb <- 0
+        upper$Tb <- 15
+      } else {
+        Tb <- base.temp
+      }
+      
+      # run model
+      model <- stats::nls(
+        germ ~ max.cum.frac * stats::pnorm(
+          wp - (HT / ((temp - Tb) * time)),
+          psib50,
+          sigma,
+          log = FALSE),
+        start = start,
+        lower = lower,
+        upper = upper,
+        algorithm = "port")
+      
+      # get coefs
+      corr <- stats::cor(germ, stats::predict(model)) ^ 2
+      HT <- summary(model)$coefficients[[1]]
+      Psib50 <- summary(model)$coefficients[[2]]
+      Sigma <- summary(model)$coefficients[[3]]
+      if (is.na(base.temp)) {
+        Tb <- summary(model)$coefficients[[4]]
+      } else {
+        Tb <- base.temp
+      }
+      
+      # return results
+      list(
+        HT = HT,
+        Tb = Tb,
+        Psib50 = Psib50,
+        Sigma = Sigma,
+        Correlation = corr)
+    },
+      error = function(cond) {
+        paste("Unable to compute model, try adjusting parameters. ", str_to_sentence(cond[1]))
+      }
+    )
+  })
+  
+  #### HTTResultsTable ####
+  output$HTTResultsTable <- renderTable({
+    req(HTTModelResults())
+    results <- HTTModelResults()
+    
+    # print error message if model fails
+    validate(need(is.list(results), results))
+    
+    # convert results list to data frame
+    results %>%
+      enframe() %>%
+      unnest(value) %>%
+      rename(
+        Parameter = name,
+        Value = value
+      )
+  }, digits = 4)
+  
+  #### HTTPlot ####
+  output$HTTPlot <- renderPlot({
+    req(DataLoaded())
+    req(rv$modelReady$HydrothermalTime)
+    req(HTTModelWorkingDataset())
+    req(input$HTTMaxCumFrac)    
+    
+    #Call and load working dataset
+    df <- HTTModelWorkingDataset()
+    
+    # generate the plot
+    plt <- df %>%
+      ggplot(aes(
+        x = CumTime,
+        y = CumFrac,
+        color = GermWP,
+        shape = GermTemp,
+        linetype = GermTemp)) +
+      annotate("rect", xmin = 0, xmax = Inf, ymin = input$HTTMaxCumFrac/100, ymax = 1, fill = "grey", alpha = 0.1) +
+      geom_hline(yintercept = input$HTTMaxCumFrac/100, color = "darkgrey", linetype = "dashed") +
+      geom_point(size = 2) + #geom_point(aes(shape = as.factor(.data[[input$GermTemp]])), size = 2)
+      scale_y_continuous(labels = scales::percent, expand = c(0, 0), limits = c(0, 1.02)) +
+      scale_x_continuous(expand = c(0, 0)) +
+      expand_limits(x = 0, y = 0) +
+      labs(
+        title = "Hydrothermal Time Model",
+        x = "Time",
+        y = "Cumulative fraction germinated (%)",
+        color = "Water Potential",
+        shape = "Temperature") +
+      guides(color = guide_legend(reverse = T, order = 1), linetype = FALSE) +
+      theme_classic()
+    
+    # use try so it will still plot on model error
+    try({
+      req(is.list(HTTModelResults()))
+      model <- HTTModelResults()
+      
+      maxCumFrac <- input$HTTMaxCumFrac
+      ht <- model$HT
+      psib50 <- model$Psib50
+      tb <- model$Tb
+      sigma <- model$Sigma
+      corr <- model$Correlation
+      
+      # model params
+      par1 <- paste("~~HT==", round(ht, 2))
+      par2 <- paste("~~T[b]==", round(tb, 2))
+      par3 <- paste("~~psi[b](50)==", round(psib50,3))
+      par4 <- paste("~~sigma == ", round(sigma, 3))
+      par5 <- paste("~~R^2 == ", round(corr, 2))
+      
+      # function to plot all predicted treatments by the hydro thermal time model
+      
+      Wp <- as.factor(as.numeric(as.character(df$GermWP)))
+      Temp <- as.factor(as.numeric(as.character(df$GermTemp)))
+      
+      df1 <- tibble(GermWP = Wp, GermTemp = Temp)
+      
+      df1 <- df1 %>%
+        distinct(GermWP, GermTemp, .keep_all = F) %>%
+        arrange(GermWP, GermTemp)
+
+      wps <- as.numeric(as.character(df1$GermWP))
+      temps <- as.numeric(as.character(df1$GermTemp))
+      
+      modelLines <- mapply(function(wp, temp) {
+        stat_function(
+          fun = function(x) {
+              stats::pnorm(
+              wp - (ht / ((temp - tb) * x)),
+              psib50,
+              sigma,
+              log = FALSE
+            ) *  (input$HTTMaxCumFrac/100)
+          },
+          aes(color = as.factor(wp), linetype = as.factor(temp))
+        )
+      },
+        wps,
+        temps
+      )
+      
+      plt <- plt +
+        modelLines +
+        annotate("text", x = -Inf, y = 0.95, label = " Model Parameters:", color = "grey0", hjust = 0) +
+        annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.7, label = par5, color = "grey0", hjust = 0, parse = T)
+    })
+    
+    plt
+  })
+  
+  
+  
+  # HydroPriming model ----
+  
+  
+  
+  # HydroThermalPriming model ----
+  
+  
+  
+  # Aging model ----
+  
+  #### AgingUI ####
+  output$AgingUI <- renderUI({
+    validate(need(rv$modelReady$Aging, "Please load required data for the aging model analysis."))
+    list(
+      p(em("The aging model assumes a data set with aging (natural, controlled deterioration or accelerated aging) as a treatment condition. If you have additional treatments in your dataset, please filter out those as you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values.")),
+      br(),
+      box(
+        title = "Model data input",
+        uiOutput("AgingFactorLevelSelect"),
+        uiOutput("AgdataInputType")
+      ),
+      box(
+        title = "Model results",
+        tableOutput("AgResultsTable")
+      ),
+      box(
+        width = 12,
+        plotOutput("AgPlot")
+      ),
+      box(
+        title = "Data input filter",
+        uiOutput("AgingFactorsSelect"),
+        uiOutput("AgingTrtIDFactorLevelSelect"),
+        uiOutput("AgingTrtDescFactorLevelSelect")
+      ),
+      box(
+        title = "Maximum germination (%) observed",
+        sliderInput(
+          inputId = "AgMaxCumFrac",
+          label = NULL,
+          min = 10,
+          max = 100,
+          value = 100,
+          step = 1)
+      ),
+      box(
+        title = "Included interval (%):",
+        sliderInput(
+          inputId = "AggermFracRange",
+          label = NULL,
+          min = 0,
+          max = 100,
+          value = c(0,100))
+      )
+    )
+  })
+  
+  # create choices with all aging levels 
+  AgingFactorLevelChoices <- reactive({
+    req(rv$modelReady$Aging)
+    ags <- as.factor(rv$data[[input$AgingTime]])
+    cols <- levels(ags)
+  })
+  
+  
+  # Create checkbox with all aging levels to be included in the model analysis
+  output$AgingFactorLevelSelect <- renderUI({
+    checkboxGroupInput(
+      inputId = "AgingFactorLevelSelect",
+      label = "Included aging levels:",
+      choices = AgingFactorLevelChoices(),
+      selected = AgingFactorLevelChoices()
+    )
+  })
+  
+  # Create radio button for data input type: Original or Cleaned (no repetitive cumulative fractions, keep only initial presence of a value)
+  output$AgdataInputType <- renderUI({
+    radioButtons(
+      inputId = "AgdataInputType",
+      label = "Select data input type:",
+      choices = c("Original" = "orig",
+                  "Cleaned" = "clean")
+    )
+  })
+  
+  # create choices with validated column names and factors without AgingTime
+  germTrtAgingChoices <- reactive({
+    cols <- sapply(1:nCols, function(i) {
+      if (rv$colStatus[i] == T && colValidation$Role[i] == "Factor" && colValidation$InputId[i] != "AgingTime") colValidation$Column[i] 
+    })
+    cols <- compact(cols) #remove all null entries 
+    setNames(as.list(c(cols)), c(cols))
+  })
+  
+  # create choices with all available columns on dataset besides AgingTime 
+  output$AgingFactorsSelect <- renderUI({
+    checkboxGroupInput(
+      inputId = "AgingFactorsSelect",
+      label = "Filter factor levels for additional treatments:",
+      choices = germTrtAgingChoices()
+      #, selected = c("TrtID")
+    )
+  })
+  
+  
+  # create choices with all TrtID levels
+  AgingTrtIDFactorLevelChoices <- reactive({
+    req(rv$modelReady$Aging)
+    req("TrtID" %in% input$AgingFactorsSelect)
+    df <- as.factor(rv$data[[input$TrtID]])
+    cols <- levels(df)
+  })
+  
+  # Create checkbox with all TrtID levels to be included in the model analysis
+  output$AgingTrtIDFactorLevelSelect <- renderUI({
+    req(rv$modelReady$Aging)
+    req("TrtID" %in% input$AgingFactorsSelect)
+    checkboxGroupInput(
+      inputId = "AgingTrtIDFactorLevelSelect",
+      label = "Treatment ID:",
+      choices = AgingTrtIDFactorLevelChoices(),
+      selected = AgingTrtIDFactorLevelChoices()
+    )
+  })
+  
+  # create choices with all TrtDesc levels
+  AgingTrtDescFactorLevelChoices <- reactive({
+    req(rv$modelReady$Aging)
+    req("TrtDesc" %in% input$AgingFactorsSelect)
+    df <- as.factor(rv$data[[input$TrtDesc]])
+    cols <- levels(df)
+  })
+  
+  # Create checkbox with all TrtDesc levels to be included in the model analysis
+  output$AgingTrtDescFactorLevelSelect <- renderUI({
+    req(rv$modelReady$Aging)
+    req("TrtDesc" %in% input$AgingFactorsSelect)
+    checkboxGroupInput(
+      inputId = "AgingTrtDescFactorLevelSelect",
+      label = "Treatment description:",
+      choices = AgingTrtDescFactorLevelChoices(),
+      selected = AgingTrtDescFactorLevelChoices()
+    )
+  })
+  
+  
+  
+  ### AgingModelWorkingDataset ###
+  
+  AgingModelWorkingDataset <- reactive({
+    req(DataLoaded())
+    req(rv$modelReady$Aging)
+    req(input$AgMaxCumFrac)
+    req(input$AggermFracRange)
+    req(input$AgdataInputType)
+    
+    
+    # construct working dataset
+    df <- tibble(TrtID = rv$data[[input$TrtID]])
+    trts <- append("AgingTime", input$AgingFactorsSelect)  # get all selected other factors + AgingTime
+    for (trt in trts) { df[[trt]] <- as.factor(rv$data[[input[[trt]]]]) } #input all factors and respective data
+    df <- df %>% mutate(
+      CumTime = rv$data[[input$CumTime]],
+      CumFrac = rv$data[[input$CumFraction]]
+    )
+    
+    # group by the selected treatments
+    df <- group_by_at(df, trts)
+    
+    # Update data input type based on radio button selection (Original or Cleaned)
+    if (input$AgdataInputType == "clean"){
+      #eval(parse(text=paste("dplyr::distinct(df,",trts,",CumFrac, .keep_all = TRUE)", sep="")))
+      df <- dplyr::distinct(df,TrtID,CumFrac, .keep_all = TRUE)
+    } 
+    
+    # Filter working dataset based on treatment selections 
+    df <- df %>%
+      group_by(CumTime, .add = T) #%>%
+    #summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
+    #mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
+    
+    if (length(input$AgingFactorsSelect)>0){
+      
+      if ("TrtID" %in% input$AgingFactorsSelect) {
+        df <- subset(df, subset = TrtID %in% input$AgingTrtIDFactorLevelSelect)
+      }
+      if ("TrtDesc" %in% input$AgingFactorsSelect) {
+        df <- subset(df, subset = TrtDesc %in% input$AgingTrtDescFactorLevelSelect)
+      }
+      
+    }
+    
+    df <- df %>% 
+      filter(CumFrac >= (input$AggermFracRange[1]/100) & CumFrac <= (input$AggermFracRange[2]/100))
+    
+    df <- subset(df, subset = AgingTime %in% input$AgingFactorLevelSelect)
+  })
+  
+  
+  
+  
+  
+  #### AgingModelResults ####
+  AgingModelResults <- reactive({
+    req(DataLoaded())
+    req(rv$modelReady$Aging)
+    req(AgingModelWorkingDataset())
+    req(input$AgMaxCumFrac)
+    
+    #Call and load working dataset
+    df <- AgingModelWorkingDataset()
+    
+    tryCatch({
+      # required data
+      Atime <- as.numeric(as.character(df$AgingTime)) #rv$data[[input$AgingTime]]
+      time <- as.numeric(as.character(df$CumTime)) #rv$data[[input$CumTime]]
+      germ <- as.numeric(as.character(df$CumFrac)) #rv$data[[input$CumFraction]]
+      max.cum.frac <- input$AgMaxCumFrac/100
+      
+      # run model
+      model <- stats::nls(
+        formula = germ ~ max.cum.frac * stats::pnorm(
+          -(Atime + ThetaA / time), #wp - (HT / time),
+          -Pmax50, #Psib50,
+          Sigma,
+          log = FALSE),
+        start = list(
+          ThetaA = 100,
+          Pmax50 = 10,
+          Sigma = 3),
+        lower = list(
+          ThetaA = 1,
+          Pmax50 = 1,
+          Sigma = 0.1),
+        upper = list(
+          ThetaA = 1000,
+          Pmax50 = 1000,
+          Sigma = 10),
+        algorithm = "port")
+      
+      # grab coefs
+      corr <- stats::cor(germ, stats::predict(model)) ^ 2
+      ThetaA <- summary(model)$coefficients[[1]]
+      Pmax50 <- summary(model)$coefficients[[2]]
+      Sigma <- summary(model)$coefficients[[3]]
+      
+      # return results
+      list(
+        ThetaA = ThetaA,
+        Pmax50 = Pmax50,
+        Sigma = Sigma,
+        Correlation = corr)
+    },
+    error = function(cond) {
+      paste("Unable to compute model, try adjusting parameters. ", str_to_sentence(cond[1]))
+    }
+    )
+  })
+  
+  #### AgResultsTable ####
+  output$AgResultsTable <- renderTable({
+    req(AgingModelResults())
+    results <- AgingModelResults()
+    
+    # print error message if model fails
+    validate(need(is.list(results), results))
+    
+    # convert list to simple data frame
+    results %>%
+      enframe() %>%
+      unnest(value) %>%
+      rename(
+        Parameter = name,
+        Value = value
+      )
+  }, digits = 4)
+  
+  #### AgPlot ####
+  output$AgPlot <- renderPlot({
+    req(DataLoaded())
+    req(rv$modelReady$Aging)
+    req(AgingModelWorkingDataset())
+    req(input$AgMaxCumFrac)
+    
+    #Call and load working dataset
+    df <- AgingModelWorkingDataset()
+    
+    # generate the plot
+    plt <- df %>%
+      ggplot(aes(
+        x = CumTime,
+        y = CumFrac,
+        color = AgingTime)) +
+      annotate("rect", xmin = 0, xmax = Inf, ymin = input$AgMaxCumFrac/100, ymax = 1, fill = "grey", alpha = 0.1) +
+      geom_hline(yintercept = input$AgMaxCumFrac/100, color = "darkgrey", linetype = "dashed") +
+      geom_point(shape = 19, size = 2) +
+      scale_y_continuous(labels = scales::percent, expand = c(0, 0), limits = c(0, 1.02)) +
+      scale_x_continuous(expand = c(0, 0)) +
+      expand_limits(x = 0, y = 0) +
+      labs(
+        title = "Aging Time Model",
+        x = "Time",
+        y = "Cumulative fraction germinated (%)",
+        color = "Aging Time") +
+      guides(color = guide_legend(reverse = F, order = 1)) +
+      theme_classic()
+    
+    # use try so it will still plot on model error
+    try({
+      req(is.list(AgingModelResults()))
+      model <- AgingModelResults()
+      
+      maxCumFrac <- model$MaxCumFrac
+      thetaA <- model$ThetaA
+      pmax50 <- model$Pmax50
+      sigma <- model$Sigma
+      corr <- model$Correlation
+      
+      par1 <- paste("~~", expression(theta~Age),"==", round(thetaA, 2))
+      par2 <- paste("~~Pmax(50)==", round(pmax50, 3))
+      par3 <- paste("~~sigma== ", round(sigma, 3))
+      par4 <- paste("~~R^2== ", round(corr, 2))
+      
+      # Plot all predicted treatments by the hydrotime model
+      Atimes <- as.factor(as.numeric(as.character(df$AgingTime)))
+      atimes <- as.numeric(levels(Atimes))
+      
+      #df <- rv$data %>% distinct(.data[[input$AgingTime]], .keep_all = FALSE)
+      modelLines <- mapply(function(atime) {
+        stat_function(
+          fun = function(x) {
+            stats::pnorm(-(atime + thetaA / x), -pmax50, sigma, log = FALSE) * input$AgMaxCumFrac/100
+          },
+          aes(color = as.factor(atime))
+        )
+      },
+      atimes
+      )
+      
+      plt <- plt +
+        modelLines +
+        annotate("text", x = -Inf, y = 0.95, label = " Model parameters", color = "grey0", hjust = 0) +
+        annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
+        annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T)
+    })
+    
+    plt
+  })
+  
+  
+  
+  # Promoter model ----
+  
+  
+  
+  # Inhibitor model ----
+  
   
   
 }
-
 
