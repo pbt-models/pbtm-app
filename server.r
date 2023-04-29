@@ -1,19 +1,8 @@
 # ---- Server ---- #
 
-suppressPackageStartupMessages({
-  library(tidyverse)
-  library(shiny)
-  library(shinyjs)
-  library(DT)
-  library(Cairo)
-  # library(plotly)
-})
-
 server <- function(input, output, session) {
   
   # Data definitions ----
-  
-  defaultGermSpeedFracs <- c(10, 16, 50, 84, 90)
   
   rv <- reactiveValues(
     data = tibble(),
@@ -24,185 +13,43 @@ server <- function(input, output, session) {
   
   
   
-  # Intro tab ----
+  # Module servers ----
   
-  #### Download buttons ####
-  output$downloadTemplate <- downloadHandler(
-    filename = "pbtm-data-template.csv",
-    content = function(file) {write_csv(sampleTemplate, file)})
-  
-  output$downloadSampleGermData <- downloadHandler(
-    filename = "pbtm-sample-germination-data.csv",
-    content = function(file) {write_csv(sampleGermData, file)})
-  
-  output$downloadSamplePrimingData <- downloadHandler(
-    filename = "pbtm-sample-priming-data.csv",
-    content = function(file) {write_csv(samplePrimingData, file)})
-  
-  output$downloadSampleAgingData <- downloadHandler(
-    filename = "pbtm-sample-aging-data.csv",
-    content = function(file) {write_csv(sampleAgingData, file)})
-  
-  #### output$columnDescriptions ####
-  output$columnDescriptions <- renderTable({
-    colValidation %>%
-      select(
-        `Default column name` = Column,
-        Description = LongDescription,
-        `Data type` = TypeDescription,
-        Usage
-      )
-  })
-  
+  introTabServer()
+
   
 
   # Load tab ----
   
-  #### loadMenu ####
+  loadDataVals <- loadDataServer()
+  
+  observe({
+    print(loadDataVals()$data)
+    print(loadDataVals()$colStatus)
+  })
+  
+  observe({
+    rv$data <- loadDataVals()$data
+    rv$colStatus <- loadDataVals()$colStatus
+  })
+  
+  
+  
+  ## Dashboard status icon ----
   output$loadMenu <- renderMenu({
     if (DataLoaded()) {
-      label = "OK"; color = "green"
+      label = "OK"
+      color = "green"
     } else {
-      label = "!"; color = "yellow"
+      label = "!"
+      color = "yellow"
     }
-    menuItem("Upload data", tabName = "load", badgeLabel = label, badgeColor = color)
-  })
-  
-  #### dataset load buttons ####
-  observeEvent(input$loadSampleGermData, {rv$data <- sampleGermData})
-  observeEvent(input$loadSamplePrimingData, {rv$data <- samplePrimingData})
-  observeEvent(input$loadSampleAgingData, {rv$data <- sampleAgingData})
-  observeEvent(input$userData, {
-    try({
-      df <- read_csv(input$userData$datapath, col_types = cols()) %>% distinct()
-      if (nrow(df) > 0) {rv$data <- df}
-    })
-  })
-  observeEvent(input$clearData, {
-    rv$data <- tibble()
-    reset("userData")
-  })
-  
-  #### currentDataTable ####
-  output$currentDataTable <- renderDataTable({rv$data})
-  
-  #### currentDataDisplay ####
-  output$currentDataDisplay <- renderUI({
-    validate(need(DataLoaded(), "Please load a dataset."))
-    
-    list(
-      h3("Current dataset:"),
-      div(style = "overflow: auto;", dataTableOutput("currentDataTable")),
-      hr(),
-      h3("Match column names to expected roles:"),
-      p(em("If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range.")),
-      div(style = "display: flex; flex-wrap: wrap;",
-        lapply(1:nCols, function(i) {
-          wellPanel(
-            style = "flex: 1; vertical-align: top; min-width: 15em; margin: 5px;",
-            uiOutput(paste0("colSelect", i)),
-            uiOutput(paste0("colValidate", i))
-          )
-        })
-      )
+    menuItem(
+      "Upload data",
+      tabName = "load",
+      badgeLabel = label,
+      badgeColor = color
     )
-  })
-  
-  
-  #### columnNames ####
-  columnNames <- reactive({
-    req(rv$data)
-    names(rv$data)
-  })
-  
-  #### columnChoices ####
-  columnChoices <- reactive({
-    setNames(as.list(c(NA, columnNames())), c("Not specified", columnNames()))
-  })
-  
-  #### colSelect ####
-  lapply(1:nCols, function(i) {
-    output[[paste0("colSelect", i)]] <- renderUI({
-      selectInput(
-        inputId = colValidation$InputId[i],
-        label = colValidation$Description[i],
-        choices = columnChoices(),
-        selected = colValidation$Column[i]
-      )
-    })
-  })
-  
-  
-  #### colValidate ####
-  lapply(1:nCols, function(i) {
-    
-    outCol <- paste0("colValidate", i)
-    inputId <- colValidation$InputId[i]
-    expectedType <- colValidation$Type[i]
-    minValue <- colValidation$Min[i]
-    maxValue <- colValidation$Max[i]
-    ui <- NULL
-    msg <- NULL
-    
-    output[[outCol]] <- renderUI({
-      
-      req(input[[inputId]])
-      
-      # check if no column selected
-      if (input[[inputId]] == "NA") {
-        msg <- list(span("No column specified.", style = "color:orange"))
-        rv$colStatus[i] <- F
-      } else {
-        
-        col <- rv$data[[input[[inputId]]]]
-        
-        if (anyNA(col)) {
-          msg <- list(br(), span("Warning: Missing value in data", style = "color:red"))
-        }
-        
-        colType <- class(col)
-        ui <- list(paste("Type:", colType))
-        
-        if (colType == "numeric") {
-          add <- list(br(), paste0("Range: ", round(min(col), 2), " => ", round(max(col), 2)))
-          ui <- append(ui, add)
-          
-          # column type mismatch
-          if (!is.na(expectedType) & colType != expectedType) {
-            newmsg <- list(br(), span("Error: Incorrect column type, expected", expectedType, style = "color:red"))
-            msg <- append(msg, newmsg)
-          }
-          
-          # min check
-          if (!is.na(minValue) & min(col) < minValue) {
-            newmsg <- list(br(), span("Error: Min value less than", minValue, style = "color:red"))
-            msg <- append(msg, newmsg)
-          }
-          
-          # max check
-          if (!is.na(maxValue) & max(col) > maxValue) {
-            newmsg <- list(br(), span("Error: Max value greater than ", maxValue, style = "color:red"))
-            msg <- append(msg, newmsg)
-          }
-          
-        } else if (!is.na(expectedType) & colType != expectedType) {
-          newmsg <- list(br(), span("Error: Incorrect column type, expected", expectedType, style = "color:red"))
-          msg <- append(msg, newmsg)
-        }
-        
-        # set status TRUE if no messages
-        if (is.null(msg)) {
-          msg <- list(span(strong("OK"), style = "color:blue"))
-          rv$colStatus[i] <- T
-        } else {
-          msg[1] <- NULL # remove the first br()
-          rv$colStatus[i] <- F
-        }
-      }
-      
-      # display the validation
-      p(ui, br(), msg)
-    })
   })
   
 
@@ -218,8 +65,13 @@ server <- function(input, output, session) {
   }
   
   # reactive readiness checks
-  DataLoaded <- reactive({nrow(rv$data) > 0})
-  BasicDataReady <- reactive({checkModelReadiness(colValidation$AllModels)})
+  DataLoaded <- reactive({
+    nrow(rv$data) > 0
+  })
+  
+  BasicDataReady <- reactive({
+    checkModelReadiness(colValidation$AllModels)
+  })
 
   # set reactive values for each model's readiness
   observe({
@@ -231,8 +83,19 @@ server <- function(input, output, session) {
   #### Model menu items ####
   lapply(modelNames, function(m) {
     output[[paste0(m, "Menu")]] <- renderMenu({
-      if (rv$modelReady[[m]]) {label = "OK"; color = "green"} else {label = "X"; color = "red"}
-      menuItem(m, tabName = paste0(m, "Tab"), badgeLabel = label, badgeColor = color)
+      if (rv$modelReady[[m]]) {
+        label = "OK"
+        color = "green"
+      } else {
+        label = "X"
+        color = "red"
+      }
+      menuItem(
+        m,
+        tabName = paste0(m, "Tab"),
+        badgeLabel = label,
+        badgeColor = color
+      )
     })
   })
   
@@ -2089,6 +1952,10 @@ server <- function(input, output, session) {
   # Inhibitor model ----
   
   
+  
+  # Gracefully exit ----
+  
+  session$onSessionEnded(function() { stopApp() })
   
 }
 
