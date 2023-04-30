@@ -11,7 +11,8 @@ introTabUI <- function() {
     p("Proper data preparation is required to avoid issues when working with this site or the PBTM package. The use of these data templates is not required, but if you use different column names you will have to match them to the expected names after uploading your data. Columns that specify treatment information (e.g. TrtID, GermWP) need to have the value of that treatment repeated for each member of the treatment. Each row (observation) also needs to have a value for CumTime (cumulative elapsed time) and CumFraction (fraction germinated as of that time point, ranges from 0 to 1)."),
     br(),
     h4("Sample datasets:"),
-    p(
+    div(
+      class = "flex-btns",
       downloadButton(ns("downloadTemplate"), "Empty data template"),
       downloadButton(ns("downloadSampleGermData"), "Sample germination dataset"),
       downloadButton(ns("downloadSamplePrimingData"), "Sample priming dataset"),

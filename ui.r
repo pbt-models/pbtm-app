@@ -46,9 +46,14 @@ tabs <- append(
 )
 
 body <- dashboardBody(
-  tags$head(includeHTML(("google-analytics.html"))),
-  tags$head(includeHTML(("favicons.html"))),
-  includeCSS("style.css"),
+  tags$head(
+    tags$meta(charset = "UTF-8"),
+    tags$meta(name = "description", content = "Population-based threshold models for seed germination analysis."),
+    tags$meta(name = "keywords", content = "germination, statistics, analysis, population, threshold, model"),
+    includeHTML(("www/google-analytics.html")),
+    includeHTML(("www/favicons.html")),
+    includeCSS("www/style.css")
+    ),
   useShinyjs(),
   do.call(tabItems, tabs)
 )
