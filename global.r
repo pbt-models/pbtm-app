@@ -13,8 +13,9 @@ suppressPackageStartupMessages({
 
 truthy <- function(val) {
   if (is.null(val)) return(F)
-  if (is.na(val) || val == F) return(F)
-  if (val == "NA") return(F)
+  if (length(val) == 0) return(F)
+  if (length(val) > 1) return(T)
+  if (val %in% c(NA, "NA", F, 0)) return(F)
   T
 }
 
