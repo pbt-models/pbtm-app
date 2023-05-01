@@ -29,10 +29,7 @@ sidebar <- dashboardSidebar(
 tabs <- append(
   list(
     tabItem("intro", introTabUI()),
-    tabItem("load", loadDataTabUI()),
-    tabItem("germTab", list(
-      h3("Germination rate analysis", class = "tab-title"),
-      uiOutput("germUI")))
+    tabItem("load", loadDataTabUI())
   ),
   lapply(modelNames, function(m) {
     tabItem(paste0(m, "Tab"), list(

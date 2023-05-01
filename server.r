@@ -35,31 +35,23 @@ server <- function(input, output, session) {
   ## Names and icons for dashboard tabs ----
   
   output$loadMenu <- renderMenu({
-    if (dataLoaded()) {
-      label = "OK"; color = "green";
-    } else {
-      label = "!"; color = "yellow";
-    }
+    ready <- dataLoaded()
     menuItem(
       "Upload data",
       tabName = "load",
-      badgeLabel = label,
-      badgeColor = color
+      badgeLabel = ifelse(ready, "OK", "!"),
+      badgeColor = ifelse(ready, "green", "yellow")
     )
   })
   
   lapply(modelNames, function(m) {
     output[[paste0(m, "Menu")]] <- renderMenu({
-      if (rv$modelReady[[m]]) {
-        label = "OK"; color = "green";
-      } else {
-        label = "X"; color = "red";
-      }
+      ready <- rv$modelReady[[m]]
       menuItem(
-        m,
+        to_any_case(m, case = "sentence"),
         tabName = paste0(m, "Tab"),
-        badgeLabel = label,
-        badgeColor = color
+        badgeLabel = ifelse(ready, "OK", "X"),
+        badgeColor = ifelse(ready, "green", "red")
       )
     })
   })
@@ -96,18 +88,8 @@ server <- function(input, output, session) {
   
   # Germination tab ----
   
-  #### germMenu ####
-  output$germMenu <- renderMenu({
-    if (basicDataReady()) {
-      label = "OK"; color = "green"
-    } else {
-      label = "X"; color = "red"
-    }
-    menuItem("Germination analysis", tabName = "germTab", badgeLabel = label, badgeColor = color)
-  })
-  
   #### germUI ####
-  output$germUI <- renderUI({
+  output$GerminationUI <- renderUI({
     validate(
       need(basicDataReady(), "Please load a dataset and set required column types for germination analysis.")
     )

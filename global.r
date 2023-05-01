@@ -5,6 +5,7 @@ suppressPackageStartupMessages({
   library(shinyjs)
   library(shinydashboard)
   library(tidyverse)
+  library(snakecase)
   library(DT)
 })
 
@@ -41,7 +42,9 @@ sampleAgingData <- read_csv("data/sample-aging-data.csv", col_types = cols(), pr
 
 nCols <- nrow(colValidation)
 factorCols <- filter(colValidation, Role == "Factor")$Column
-modelNames <- names(colValidation)[12:length(names(colValidation))]
+modelNames <- colValidation %>%
+  select(Germination:Inhibitor) %>%
+  names()
 
 defaultGermSpeedFracs <- c(10, 16, 50, 84, 90)
 
