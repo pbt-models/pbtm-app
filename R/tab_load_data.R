@@ -254,8 +254,6 @@ loadDataServer <- function() {
       
       
       # Returns ----
-      # rv$data
-      # rv$colStatus
       return(reactive(list(
         data = cleanData(),
         colStatus = rv$colStatus

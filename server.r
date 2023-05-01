@@ -11,33 +11,34 @@ server <- function(input, output, session) {
     germSpeedFracs = defaultGermSpeedFracs
   )
   
+  # data has rows
+  dataLoaded <- reactive({
+    nrow(rv$data) > 0
+  })
   
+  # basic data readiness
+  basicDataReady <- reactive({
+    checkModelReadiness(colValidation$AllModels, rv$colStatus)
+  })
   
-  # Module servers ----
-  
-  introTabServer()
-
-  
-
-  # Load tab ----
-  
-  loadDataReturn <- loadDataServer()
-  
+  # set reactive values for each model's readiness
   observe({
-    rv$data <- loadDataReturn()$data
-    rv$colStatus <- loadDataReturn()$colStatus
+    lapply(modelNames, function(m) {
+      rv$modelReady[[m]] <- checkModelReadiness(colValidation[[m]], rv$colStatus)
+    })
   })
   
   
   
-  ## Dashboard status icon ----
+  # Dashboard reactive UI elements ----
+  
+  ## Names and icons for dashboard tabs ----
+  
   output$loadMenu <- renderMenu({
-    if (DataLoaded()) {
-      label = "OK"
-      color = "green"
+    if (dataLoaded()) {
+      label = "OK"; color = "green";
     } else {
-      label = "!"
-      color = "yellow"
+      label = "!"; color = "yellow";
     }
     menuItem(
       "Upload data",
@@ -47,43 +48,12 @@ server <- function(input, output, session) {
     )
   })
   
-
-  # Model readiness ----
-  
-  # returns false if colStatus is false for that column
-  checkModelReadiness <- function(col) {
-    compare <- sapply(1:nCols, function(i) {
-      test <- (col[i] == T & rv$colStatus[i] == T) | (col[i] == F)
-      if (length(test) == 0) {F} else {test}
-    })
-    !(F %in% compare)
-  }
-  
-  # reactive readiness checks
-  DataLoaded <- reactive({
-    nrow(rv$data) > 0
-  })
-  
-  BasicDataReady <- reactive({
-    checkModelReadiness(colValidation$AllModels)
-  })
-
-  # set reactive values for each model's readiness
-  observe({
-    lapply(modelNames, function(m) {
-      rv$modelReady[[m]] <- checkModelReadiness(colValidation[[m]])
-    })
-  })
-  
-  #### Model menu items ####
   lapply(modelNames, function(m) {
     output[[paste0(m, "Menu")]] <- renderMenu({
       if (rv$modelReady[[m]]) {
-        label = "OK"
-        color = "green"
+        label = "OK"; color = "green";
       } else {
-        label = "X"
-        color = "red"
+        label = "X"; color = "red";
       }
       menuItem(
         m,
@@ -94,20 +64,41 @@ server <- function(input, output, session) {
     })
   })
   
-  #### Model UI placeholders ####
+  
+  ## Model UI placeholders ----
+  
   lapply(modelNames, function(m) {
     output[[paste0(m, "UI")]] <- renderUI({
       p("Under construction.")
     })
   })
+  
+  
+  
+  
+  # Modules ----
+  
+  ## Intro tab ----
+  
+  introTabServer()
 
   
+  ## Load tab ----
+  
+  loadDataReturn <- loadDataServer()
+  
+  observe({
+    rv$data <- loadDataReturn()$data
+    rv$colStatus <- loadDataReturn()$colStatus
+  })
+
+
   
   # Germination tab ----
   
   #### germMenu ####
   output$germMenu <- renderMenu({
-    if (BasicDataReady()) {
+    if (basicDataReady()) {
       label = "OK"; color = "green"
     } else {
       label = "X"; color = "red"
@@ -118,7 +109,7 @@ server <- function(input, output, session) {
   #### germUI ####
   output$germUI <- renderUI({
     validate(
-      need(BasicDataReady(), "Please load a dataset and set required column types for germination analysis.")
+      need(basicDataReady(), "Please load a dataset and set required column types for germination analysis.")
     )
     list(
       fluidRow(
@@ -196,8 +187,8 @@ server <- function(input, output, session) {
   #### germPlot ####
   output$germPlot <- renderPlot({
     validate(
-      need(DataLoaded(), "No data loaded."),
-      need(BasicDataReady(), "Necessary data columns not present.")
+      need(dataLoaded(), "No data loaded."),
+      need(basicDataReady(), "Necessary data columns not present.")
     )
     
     trts <- 0
@@ -337,7 +328,7 @@ server <- function(input, output, session) {
   
   #### germSpeedTable ####
   output$germSpeedTable <- renderDataTable({
-    req(DataLoaded())
+    req(dataLoaded())
     req(input$germSpeedType)
     
     # construct working dataset
@@ -593,7 +584,7 @@ server <- function(input, output, session) {
   ### TTSubOModelWorkingDataset ###
   
   TTSubOModelWorkingDataset <- reactive({
-    req(DataLoaded())
+    req(dataLoaded())
     req(rv$modelReady$ThermalTime)
     req(input$TTSubOMaxCumFrac)
     req(input$germFracRange)
@@ -648,7 +639,7 @@ server <- function(input, output, session) {
   
   #### TTSubOModelResults ####
   TTSubOModelResults <- reactive({
-    req(DataLoaded())
+    req(dataLoaded())
     req(rv$modelReady$ThermalTime)
     req(TTSubOModelWorkingDataset())
     req(input$TTSubOMaxCumFrac)
@@ -725,7 +716,7 @@ server <- function(input, output, session) {
   
   #### TTPlot ####
   output$TTPlot <- renderPlot({
-    req(DataLoaded())
+    req(dataLoaded())
     req(rv$modelReady$ThermalTime)
     req(TTSubOModelWorkingDataset())
     req(input$TTSubOMaxCumFrac)
@@ -965,7 +956,7 @@ server <- function(input, output, session) {
   ### HTModelWorkingDataset ###
   
   HTModelWorkingDataset <- reactive({
-    req(DataLoaded())
+    req(dataLoaded())
     req(rv$modelReady$Hydrotime)
     req(input$HTMaxCumFrac)
     req(input$HTgermFracRange)
@@ -1022,7 +1013,7 @@ server <- function(input, output, session) {
   
   #### HTModelResults ####
   HTModelResults <- reactive({
-    req(DataLoaded())
+    req(dataLoaded())
     req(rv$modelReady$Hydrotime)
     req(HTModelWorkingDataset())
     req(input$HTMaxCumFrac)
@@ -1097,7 +1088,7 @@ server <- function(input, output, session) {
   
   #### HTPlot ####
   output$HTPlot <- renderPlot({
-    req(DataLoaded())
+    req(dataLoaded())
     req(rv$modelReady$Hydrotime)
     req(HTModelWorkingDataset())
     req(input$HTMaxCumFrac)
@@ -1344,7 +1335,7 @@ server <- function(input, output, session) {
   
   ### HTTModelWorkingDataset ###
   HTTModelWorkingDataset <- reactive({
-    req(DataLoaded())
+    req(dataLoaded())
     req(rv$modelReady$HydrothermalTime)
     req(input$HTTMaxCumFrac)
     req(input$HTTgermFracRange)
@@ -1396,7 +1387,7 @@ server <- function(input, output, session) {
   
   #### HTTModelResults ####
   HTTModelResults <- reactive({
-    req(DataLoaded())
+    req(dataLoaded())
     req(rv$modelReady$HydrothermalTime)
     req(HTTModelWorkingDataset())
     req(input$HTTMaxCumFrac)
@@ -1491,7 +1482,7 @@ server <- function(input, output, session) {
   
   #### HTTPlot ####
   output$HTTPlot <- renderPlot({
-    req(DataLoaded())
+    req(dataLoaded())
     req(rv$modelReady$HydrothermalTime)
     req(HTTModelWorkingDataset())
     req(input$HTTMaxCumFrac)    
@@ -1737,7 +1728,7 @@ server <- function(input, output, session) {
   ### AgingModelWorkingDataset ###
   
   AgingModelWorkingDataset <- reactive({
-    req(DataLoaded())
+    req(dataLoaded())
     req(rv$modelReady$Aging)
     req(input$AgMaxCumFrac)
     req(input$AggermFracRange)
@@ -1791,7 +1782,7 @@ server <- function(input, output, session) {
   
   #### AgingModelResults ####
   AgingModelResults <- reactive({
-    req(DataLoaded())
+    req(dataLoaded())
     req(rv$modelReady$Aging)
     req(AgingModelWorkingDataset())
     req(input$AgMaxCumFrac)
@@ -1866,7 +1857,7 @@ server <- function(input, output, session) {
   
   #### AgPlot ####
   output$AgPlot <- renderPlot({
-    req(DataLoaded())
+    req(dataLoaded())
     req(rv$modelReady$Aging)
     req(AgingModelWorkingDataset())
     req(input$AgMaxCumFrac)

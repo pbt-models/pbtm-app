@@ -19,6 +19,15 @@ truthy <- function(val) {
   T
 }
 
+# returns false if colStatus is false for that column
+checkModelReadiness <- function(requirements, statuses) {
+  compare <- sapply(1:nCols, function(i) {
+    test <- (requirements[i] == T & statuses[i] == T) | (requirements[i] == F)
+    if (length(test) == 0) {F} else {test}
+  })
+  !(F %in% compare)
+}
+
 # Load data ----
 
 colValidation <- read_csv("data/column-validation.csv", col_types = cols(), progress = F)

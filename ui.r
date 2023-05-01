@@ -24,10 +24,7 @@ sidebar <- dashboardSidebar(
 )
 
 
-
-# Body ----
-
-
+## Body ----
 
 tabs <- append(
   list(
@@ -59,8 +56,7 @@ body <- dashboardBody(
 )
 
 
-
-# Footer ----
+## Footer ----
 
 footer <- list(
   div(
@@ -80,7 +76,7 @@ footer <- list(
 
 # Generate UI ----
 
-ui <- list(
+ui <- tagList(
   dashboardPage(header, sidebar, body),
   footer
 )
