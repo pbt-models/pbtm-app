@@ -9,6 +9,15 @@ suppressPackageStartupMessages({
 })
 
 
+# Helper functions ----
+
+truthy <- function(val) {
+  if (is.null(val)) return(F)
+  if (is.na(val) || val == F) return(F)
+  if (val == "NA") return(F)
+  T
+}
+
 # Load data ----
 
 colValidation <- read_csv("data/column-validation.csv", col_types = cols(), progress = F)

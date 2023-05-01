@@ -236,10 +236,30 @@ loadDataServer <- function() {
       })
       
       
+      cleanData <- reactive({
+        req(nrow(rv$data) > 0)
+        req(length(rv$colStatus) == nCols)
+        
+        # collect user column names
+        vars <- sapply(colValidation$InputId, \(id) { input[[id]] })
+        names(vars) <- colValidation$Column
+        vars <- vars[vars != "NA"]
+        
+        rv$data %>%
+          select(any_of(vars)) %>%
+          rename(any_of(vars))
+      }) %>% bindEvent(rv$colStatus)
+      
+      observe({print(cleanData())})
+      
+      
       # Returns ----
       # rv$data
       # rv$colStatus
-      return(reactive(rv))
+      return(reactive(list(
+        data = cleanData(),
+        colStatus = rv$colStatus
+      )))
   
     }
   )

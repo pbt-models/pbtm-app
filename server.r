@@ -21,16 +21,11 @@ server <- function(input, output, session) {
 
   # Load tab ----
   
-  loadDataVals <- loadDataServer()
+  loadDataReturn <- loadDataServer()
   
   observe({
-    print(loadDataVals()$data)
-    print(loadDataVals()$colStatus)
-  })
-  
-  observe({
-    rv$data <- loadDataVals()$data
-    rv$colStatus <- loadDataVals()$colStatus
+    rv$data <- loadDataReturn()$data
+    rv$colStatus <- loadDataReturn()$colStatus
   })
   
   
