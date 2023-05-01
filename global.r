@@ -4,6 +4,7 @@ suppressPackageStartupMessages({
   library(shiny)
   library(shinyjs)
   library(shinydashboard)
+  library(shinyBS)
   library(tidyverse)
   library(snakecase)
   library(DT)
@@ -14,9 +15,14 @@ suppressPackageStartupMessages({
 
 truthy <- function(val) {
   if (is.null(val)) return(F)
+  if (is.function(val)) return(T)
   if (length(val) == 0) return(F)
   if (length(val) > 1) return(T)
-  if (val %in% c(NA, "NA", F, 0)) return(F)
+  if (is.na(val)) return(F)
+  if (val == "NA") return(F)
+  if (val == "") return(F)
+  if (val == 0) return(F)
+  if (val == F) return(F)
   T
 }
 
@@ -45,6 +51,3 @@ factorCols <- filter(colValidation, Role == "Factor")$Column
 modelNames <- colValidation %>%
   select(Germination:Inhibitor) %>%
   names()
-
-defaultGermSpeedFracs <- c(10, 16, 50, 84, 90)
-

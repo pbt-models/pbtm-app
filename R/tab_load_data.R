@@ -1,36 +1,5 @@
 # ---- Load data tab ---- #
 
-# UI ----
-
-loadDataTabUI <- function() {
-  ns <- NS("loadData")
-  
-  tagList(
-    h3("Upload data", class = "tab-title"),
-    p(em("Upload your own data here or select one of our sample datasets to get started.")),
-    hr(),
-    p(strong("Sample datasets:")),
-    p(
-      actionButton(ns("loadSampleGermData"), "Load germination sample data"),
-      actionButton(ns("loadSamplePrimingData"), "Load priming sample data"),
-      actionButton(ns("loadSampleAgingData"), "Load aging sample data")
-    ),
-    br(),
-    p(
-      fileInput(
-        inputId = ns("userData"),
-        "Upload your own data:",
-        accept = c(".csv")
-      )
-    ),
-    p(strong("Start over:")),
-    actionButton(ns("clearData"), "Clear loaded data"),
-    hr(),
-    uiOutput(ns("currentDataUI"))
-  )
-}
-
-
 # Helpers ----
 
 validateCol <- function(col, expectedType, minValue, maxValue) {
@@ -41,7 +10,7 @@ validateCol <- function(col, expectedType, minValue, maxValue) {
   if (anyNA(col)) {
     msg <- list(span("Warning: Missing value in data", style = "color:red"), br())
   }
-    
+  
   colType <- class(col)
   info <- list(paste("Type:", colType), br())
   
@@ -76,7 +45,7 @@ validateCol <- function(col, expectedType, minValue, maxValue) {
     newmsg <- list(span("Error: Incorrect column type, expected", expectedType, style = "color:red"), br())
     msg <- append(msg, newmsg)
   }
-    
+  
   # valid if no messages yet
   if (is.null(msg)) {
     msg <- list(span(strong("OK"), style = "color:blue"))
@@ -92,15 +61,51 @@ validateCol <- function(col, expectedType, minValue, maxValue) {
 }
 
 
+# UI ----
+
+LoadDataUI <- function() {
+  ns <- NS("loadData")
+  
+  tagList(
+    h3("Upload data", class = "tab-title"),
+    p(em("Upload your own data here or select one of our sample datasets to get started.")),
+    hr(),
+    p(strong("Sample datasets:")),
+    div(
+      class = "flex-btns",
+      actionButton(ns("loadSampleGermData"), "Load germination sample data"),
+      actionButton(ns("loadSamplePrimingData"), "Load priming sample data"),
+      actionButton(ns("loadSampleAgingData"), "Load aging sample data")
+    ),
+    br(),
+    p(strong("Upload your own data (csv):")),
+    div(
+      class = "flex-btns",
+      fileInput(
+        inputId = ns("userData"),
+        label = NULL,
+        accept = c(".csv")
+      )
+    ),
+    p(strong("Start over:")),
+    div(
+      class = "flex-btns",
+      actionButton(ns("clearData"), "Clear loaded data")
+    ),
+    hr(),
+    uiOutput(ns("currentDataUI"))
+  )
+}
+
+
 # Server ----
 
 #' requires global vars:
 #' - sampleGermData
 #' - samplePrimingData
 #' - sampleAgingData
-#' - 
 
-loadDataServer <- function() {
+LoadDataServer <- function() {
   moduleServer(
     id = "loadData",
     function(input, output, session) {
@@ -156,7 +161,8 @@ loadDataServer <- function() {
       
       observeEvent(input$clearData, {
         rv$data <- tibble()
-        reset(ns("userData")) # reset file input
+        rv$colStatus <- NULL
+        reset("userData") # reset file input
       })
       
       
@@ -168,13 +174,59 @@ loadDataServer <- function() {
       output$currentDataUI <- renderUI({
         validate(need(dataReady(), "Please load a dataset."))
         
+        # tagList(
+        #   bsCollapse(
+        #     multiple = T,
+        #     open = c("raw", "validate"),
+        #     bsCollapsePanel(
+        #       title = "View currently loaded data",
+        #       value = "raw",
+        #       div(
+        #         style = "overflow: auto;",
+        #         dataTableOutput(ns("currentDataTable"))
+        #       )
+        #     ),
+        #     bsCollapsePanel(
+        #       title = "Validate data",
+        #       value = "validate",
+        #       h3("Match column names to expected roles:"),
+        #       p(em("If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range.")),
+        #       div(
+        #         class = "validation-container",
+        #         lapply(1:nCols, function(i) {
+        #           div(
+        #             class = "well validation-box",
+        #             uiOutput(paste0(ns("colSelect"), i)),
+        #             uiOutput(paste0(ns("colValidate"), i))
+        #           )
+        #         })
+        #       )
+        #     ),
+        #     bsCollapse(
+        #       title = "View finalized dataset",
+        #       value = "clean",
+        #       h3("Clean/working dataset:"),
+        #       div(
+        #         style = "overflow: auto;",
+        #         dataTableOutput(ns("cleanDataTable"))
+        #       )
+        #     )
+        #   )
+        # )
+        
         tagList(
-          h3("Current dataset:"),
-          div(
-            style = "overflow: auto;",
-            dataTableOutput(ns("currentDataTable"))
+          h3("Currently loaded data:"),
+          bsCollapse(
+            open = "tab",
+            bsCollapsePanel(
+              title = "Show/hide data table",
+              value = "tab",
+              div(
+                style = "overflow: auto;",
+                dataTableOutput(ns("currentDataTable"))
+              )
+            )
           ),
-          hr(),
           h3("Match column names to expected roles:"),
           p(em("If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range.")),
           div(
@@ -186,14 +238,28 @@ loadDataServer <- function() {
                 uiOutput(paste0(ns("colValidate"), i))
               )
             })
+          ),
+          h3("Final clean dataset for models:"),
+          bsCollapse(
+            open = "tab",
+            bsCollapsePanel(
+              title = "Show/hide data table",
+              value = "tab",
+              div(
+                style = "overflow: auto;",
+                dataTableOutput(ns("cleanDataTable"))
+              )
+            )
           )
         )
+        
       })
       
       
       ### currentDataTable ----
       
       output$currentDataTable <- renderDataTable(rv$data)
+      output$cleanDataTable <- renderDataTable(cleanData())
       
       
       ### colSelect // Renders the selectInput boxes for each column ----
@@ -236,27 +302,36 @@ loadDataServer <- function() {
       })
       
       
+      # Return values ----
+      
       cleanData <- reactive({
-        req(nrow(rv$data) > 0)
-        req(length(rv$colStatus) == nCols)
-        
-        # collect user column names
-        vars <- sapply(colValidation$InputId, \(id) { input[[id]] })
-        names(vars) <- colValidation$Column
-        vars <- vars[vars != "NA"]
-        
-        rv$data %>%
-          select(any_of(vars)) %>%
-          rename(any_of(vars))
+        if ((nrow(rv$data) > 0) & (length(rv$colStatus) == nCols)) {
+          
+          # collect user column names
+          vars <- sapply(colValidation$InputId, \(id) { input[[id]] })
+          names(vars) <- colValidation$Column
+          vars <- vars[vars != "NA"]
+          
+          rv$data %>%
+            select(any_of(vars)) %>%
+            rename(any_of(vars))
+        } else {
+          tibble()
+        }
       }) %>% bindEvent(rv$colStatus)
       
-      observe({print(cleanData())})
+      modelReady <- reactive({
+        ready <- lapply(modelNames, function(m) {
+          checkModelReadiness(colValidation[[m]], rv$colStatus)
+        })
+        names(ready) <- modelNames
+        ready
+      })
       
-      
-      # Returns ----
       return(reactive(list(
         data = cleanData(),
-        colStatus = rv$colStatus
+        colStatus = rv$colStatus,
+        modelReady = modelReady()
       )))
   
     }

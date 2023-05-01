@@ -3,40 +3,18 @@
 
 # Dashboard layout ----
 
-## Header ----
-
 header <- dashboardHeader(
   title = "PBTM Dashboard"
 )
 
-
-## Sidebar ----
-
 sidebar <- dashboardSidebar(
   sidebarMenu(
-    menuItem("Introduction", tabName = "intro"),
-    menuItemOutput("loadMenu"),
-    menuItemOutput("germMenu"),
+    menuItem("Introduction", tabName = "IntroTab"),
+    menuItemOutput("LoadMenu"),
     lapply(modelNames, function(m) {
       menuItemOutput(paste0(m, "Menu"))
     })
   )
-)
-
-
-## Body ----
-
-tabs <- append(
-  list(
-    tabItem("intro", introTabUI()),
-    tabItem("load", loadDataTabUI())
-  ),
-  lapply(modelNames, function(m) {
-    tabItem(paste0(m, "Tab"), list(
-      h3(m, class = "tab-title"),
-      uiOutput(paste0(m, "UI"))
-    ))
-  })
 )
 
 body <- dashboardBody(
@@ -49,11 +27,15 @@ body <- dashboardBody(
     includeCSS("www/style.css")
     ),
   useShinyjs(),
-  do.call(tabItems, tabs)
+  tabItems(
+    tabItem("IntroTab", IntroUI()),
+    tabItem("LoadTab", LoadDataUI()),
+    tabItem("GerminationTab", GerminationUI())
+  )
 )
 
 
-## Footer ----
+# Footer ----
 
 footer <- list(
   div(

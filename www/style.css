@@ -45,7 +45,6 @@
 .validation-container {
     display: flex;
     flex-wrap: wrap;
-    margin-bottom: 8em;
 }
 
 .validation-box {

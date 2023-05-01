@@ -1,5 +1,5 @@
 
-introTabUI <- function() {
+IntroUI <- function() {
   ns <- NS("intro")
   
   tagList(
@@ -27,7 +27,7 @@ introTabUI <- function() {
   )
 }
 
-introTabServer <- function() {
+IntroTabServer <- function() {
   moduleServer(
     id = "intro",
     function(input, output, session) {
