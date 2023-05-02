@@ -22,6 +22,7 @@ GerminationServer <- function(data, ready, trtChoices) {
       ns <- session$ns
       
       defaultGermSpeedFracs <- c(10, 16, 50, 84, 90)
+      germSpeedFracs <- reactiveVal(defaultGermSpeedFracs)
       
       
       # Reactives ----
@@ -53,11 +54,23 @@ GerminationServer <- function(data, ready, trtChoices) {
               width = 12,
               sidebarLayout(
                 sidebarPanel(
-                  uiOutput(ns("plotTrt1")),
-                  uiOutput(ns("plotTrt2"))
+                  selectInput(
+                    inputId = ns("plotTrt1"),
+                    label = "Treatment 1 (color)",
+                    choices = trtChoices()
+                  ),
+                  selectInput(
+                    inputId = ns("plotTrt2"),
+                    label = "Treatment 2 (shape)",
+                    choices = trtChoices()
+                  ),
+                  checkboxInput(
+                    inputId = ns("mergeTrts"),
+                    label = "Rescale cumulative germination?"
+                  )
                 ),
                 mainPanel(
-                  plotOutput("plot")
+                  plotOutput(ns("plot"))
                 )
               )
             ),
@@ -87,73 +100,77 @@ GerminationServer <- function(data, ready, trtChoices) {
       
       # Plot ----
       
-      ## Trt 1 selection ----
-      
-      output$plotTrt1 <- renderUI({
-        selectInput(
-          inputId = ns("plotTrt1"),
-          label = "Treatment 1 (color)",
-          choices = trtChoices()
-        )
-      })
-      
-      
-      ## Trt 2 selection ----
-      
-      output$plotTrt2 <- renderUI({
-        req(input$plotTrt1)
-        req(input$plotTrt1 != "NA")
-        
-        selectInput(
-          inputId = ns("plotTrt2"),
-          label = "Treatment 2 (shape)",
-          choices = trtChoices() - input$plotTrt1
-        )
-      })
-      
-      
-      ## Plot ----
-      
       output$plot <- renderPlot({
-        req(dataReady())
+        trt1 <- input$plotTrt1
+        trt2 <- input$plotTrt2
+        req(dataReady(), trt1, trt2)
         
-        trts <- 0
         df <- data() %>%
           group_by(TrtID) %>%
-          arrange(TrtID, CumTime, CumFrac)
+          arrange(TrtID, CumTime, CumFraction) %>%
+          mutate(FracDiff = CumFraction - lag(CumFraction, default = 0)) %>%
+          ungroup()
         
-        if (req(input$plotTrt1) != "NA") {
-          df <- mutate(df, Trt1 = as.factor(df[[input$plotTrt1]]))
-          trts <- 1
-          
-          if (req(input$plotTrt2) != "NA") {
-            df <- mutate(df, Trt2 = as.factor(df[[input$plotTrt2]]))
-            trts <- 2
+        # collect treatments
+        trts <- c()
+        if (trt1 != "NA") {
+          trts <- c(trt1)
+          if (trt2 != "NA") {
+            trts <- c(trt1, trt2)
           }
         }
         
-        if (trts == 1) {
+        # rescales cumulative fraction across retained treatments
+        if (input$mergeTrts) {
+          df <- df %>%
+            mutate(
+              MaxCumFrac = max(CumFraction),
+              .by = all_of(trts)) %>%
+            arrange(CumTime) %>%
+            summarise(
+              MaxCumFrac = max(MaxCumFrac),
+              FracDiff = sum(FracDiff),
+              .by = c(all_of(trts), CumTime)) %>%
+            mutate(CumFraction = cumsum(FracDiff) / sum(FracDiff) * MaxCumFrac, .by = all_of(trts))
+        }
+        
+        # plots by number of trts
+        if (length(trts) == 1) {
           plt <- df %>%
-            ggplot(aes(x = CumTime, y = CumFrac, group = TrtID, color = Trt1)) +
-            geom_line() +
-            geom_point(shape = 19, size = 2) +
-            labs(color = input$plotTrt1)
-        } else if (trts == 2) {
+            ggplot(aes(
+              x = CumTime,
+              y = CumFraction,
+              color = as.factor(.data[[trt1]]))) +
+            geom_point(shape = 19, size = 2.5) +
+            labs(color = trt1)
+        } else if (length(trts) == 2) {
           plt <- df %>%
-            ggplot(aes(x = CumTime, y = CumFrac, group = TrtID, color = Trt1, shape = Trt2)) +
-            geom_line() +
-            geom_point(size = 2) +
-            labs(color = input$plotTrt1, shape = input$plotTrt2)
+            ggplot(aes(
+              x = CumTime,
+              y = CumFraction,
+              color = as.factor(.data[[trt1]]),
+              shape = as.factor(.data[[trt2]]))) +
+            geom_point(size = 2.5) +
+            labs(
+              color = trt1,
+              shape = trt2)
         } else {
           plt <- df %>%
-            ggplot(aes(x = CumTime, y = CumFrac, group = TrtID)) +
-            geom_line() +
+            ggplot(aes(x = CumTime, y = CumFraction)) +
             geom_point(size = 2)
-        } 
+        }
         
+        # use TrtID to separate lines if not rescaled
+        if (input$mergeTrts) {
+          plt <- plt + geom_line()
+        } else {
+          plt <- plt + geom_line(aes(group = TrtID))
+        }
+        
+        # set theme etc
         plt <- plt +
           scale_x_continuous(breaks = scales::pretty_breaks()) +
-          scale_y_continuous(labels = scales::percent) +
+          scale_y_continuous(labels = scales::percent, limits = c(0, 1)) +
           labs(
             title = "Cumulative germination",
             x = "Time",
@@ -161,9 +178,12 @@ GerminationServer <- function(data, ready, trtChoices) {
           ) +
           theme_classic()
         
-        lines = rv$germSpeedFracs / 100
-        plt + geom_hline(yintercept = lines, color = "grey", size = 0.25, alpha = 0.5, linetype = "dashed")
+        # show speed fractions on plot
+        lines = germSpeedFracs() / 100
+        plt + geom_hline(yintercept = lines, color = "grey", linewidth = 0.25, alpha = 0.5, linetype = "dashed")
       })
+      
+      # Germination speed table ----
       
       # #### germSpeedTrtChoices ####
       # germSpeedTrtChoices <- reactive({
