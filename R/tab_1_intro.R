@@ -1,3 +1,6 @@
+# ---- Introduction content ---- #
+
+# UI ----
 
 introUI <- function() {
   ns <- NS("intro")
@@ -14,9 +17,9 @@ introUI <- function() {
     div(
       class = "flex-btns",
       downloadButton(ns("downloadTemplate"), "Empty data template"),
-      downloadButton(ns("downloadSampleGermData"), "Sample germination dataset"),
-      downloadButton(ns("downloadSamplePrimingData"), "Sample priming dataset"),
-      downloadButton(ns("downloadSampleAgingData"), "Sample aging dataset")
+      downloadButton(ns("downloadGermData"), "Sample germination dataset"),
+      downloadButton(ns("downloadPrimingData"), "Sample priming dataset"),
+      downloadButton(ns("downloadAgingData"), "Sample aging dataset")
     ),
     br(),
     h4("Expected column names and descriptions:"),
@@ -27,6 +30,15 @@ introUI <- function() {
   )
 }
 
+
+# Server ----
+
+#' @references colValidation
+#' @references sampleTemplate
+#' @references sampleGermData
+#' @references samplePrimingData
+#' @references sampleAgingData
+
 introServer <- function() {
   moduleServer(
     id = "intro",
@@ -34,39 +46,9 @@ introServer <- function() {
       ns <- session$ns
       
       
-      ## Download handlers ----
+      # Outputs ----
       
-      output$downloadTemplate <- downloadHandler(
-        filename = "pbtm-data-template.csv",
-        content = function(file) {
-          write_csv(sampleTemplate, file)
-        }
-      )
-      
-      output$downloadSampleGermData <- downloadHandler(
-        filename = "pbtm-sample-germination-data.csv",
-        content = function(file) {
-          write_csv(sampleGermData, file)
-        }
-      )
-      
-      output$downloadSamplePrimingData <- downloadHandler(
-        filename = "pbtm-sample-priming-data.csv",
-        content = function(file) {
-          write_csv(samplePrimingData, file)
-        }
-      )
-      
-      output$downloadSampleAgingData <- downloadHandler(
-        filename = "pbtm-sample-aging-data.csv",
-        content = function(file) {
-          write_csv(sampleAgingData, file)
-        }
-      )
-      
-      
-      ## Column description table ----
-      
+      ## columnDescriptions ----
       output$columnDescriptions <- renderTable({
         colValidation %>%
           select(
@@ -76,6 +58,42 @@ introServer <- function() {
             Usage
           )
       })
-    }
+
+      
+      # Download handlers ----
+      
+      ## downloadTemplate ----
+      output$downloadTemplate <- downloadHandler(
+        filename = "pbtm data template.csv",
+        content = function(file) {
+          write_csv(sampleTemplate, file)
+        }
+      )
+      
+      ## downloadGermData ----
+      output$downloadSampleGermData <- downloadHandler(
+        filename = "pbtm sample germination data.csv",
+        content = function(file) {
+          write_csv(sampleGermData, file)
+        }
+      )
+      
+      ## downloadPrimingData ----
+      output$downloadSamplePrimingData <- downloadHandler(
+        filename = "pbtm sample priming data.csv",
+        content = function(file) {
+          write_csv(samplePrimingData, file)
+        }
+      )
+      
+      ## downloadAgingData ----
+      output$downloadSampleAgingData <- downloadHandler(
+        filename = "pbtm sample aging data.csv",
+        content = function(file) {
+          write_csv(sampleAgingData, file)
+        }
+      )
+      
+    } # end
   )
 }

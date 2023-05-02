@@ -15,7 +15,6 @@ hydroTimeUI <- function() {
 # Server ----
 
 #' @references colValidation
-#' @references nCols
 #' 
 #' @param `data` a `reactive()` data frame containing the loaded clean data
 #' @param `ready` a `reactive()` boolean indicating if the model is ready
@@ -302,6 +301,6 @@ hydroTimeServer <- function(data, ready) {
         plt
       })
       
-    }
+    } # end
   )
 }

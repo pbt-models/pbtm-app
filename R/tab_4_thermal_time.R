@@ -15,13 +15,11 @@ thermalTimeUI <- function() {
 # Server ----
 
 #' @references colValidation
-#' @references nCols
 #' 
 #' @param `data` a `reactive()` data frame containing the loaded clean data
 #' @param `ready` a `reactive()` boolean indicating if the model is ready
-#' @param `trtChoices` a `reactive()` vector listing the factor columns in the dataset
 
-thermalTimeServer <- function(data, ready, trtChoices) {
+thermalTimeServer <- function(data, ready) {
   moduleServer(
     id = "thermalTime",
     function(input, output, session) {
@@ -301,6 +299,7 @@ thermalTimeServer <- function(data, ready, trtChoices) {
         plt
       })
       
-    }
+      
+    } # end
   )
 }

@@ -100,10 +100,9 @@ loadDataUI <- function() {
 
 # Server ----
 
-#' requires global vars:
-#' - sampleGermData
-#' - samplePrimingData
-#' - sampleAgingData
+#' @references sampleGermData
+#' @references samplePrimingData
+#' @references sampleAgingData
 
 loadDataServer <- function() {
   moduleServer(
@@ -112,19 +111,17 @@ loadDataServer <- function() {
       ns <- session$ns
       
       
-      ## Reactives ----
+      # Reactives ----
+      
+      # data // raw data before cleaning or assigning columns ----
+      rawData <- reactiveVal(tibble())
       
       rv <- reactiveValues(
-        data = tibble(),
         colStatus = NULL
       )
-
-      dataReady <- reactive({
-        nrow(rv$data) > 0
-      })
       
       columnNames <- reactive({
-        names(rv$data)
+        names(rawData())
       })
       
       columnChoices <- reactive({
@@ -133,46 +130,64 @@ loadDataServer <- function() {
           c("Not specified", columnNames())
         )
       })
+      
+      cleanData <- reactive({
+        if ((nrow(rawData()) > 0) & (length(rv$colStatus) == nCols)) {
+          
+          # collect user column names
+          vars <- sapply(colValidation$InputId, \(id) { input[[id]] })
+          names(vars) <- colValidation$Column
+          vars <- vars[vars != "NA"]
+          
+          rawData() %>%
+            select(any_of(vars)) %>%
+            rename(any_of(vars))
+        } else {
+          tibble()
+        }
+      }) %>% bindEvent(rv$colStatus)
+      
+      modelReady <- reactive({
+        ready <- lapply(modelNames, function(m) {
+          checkModelReadiness(colValidation[[m]], rv$colStatus)
+        })
+        names(ready) <- modelNames
+        ready
+      })
 
       
-      ## Observers ----
+      # Button handlers ----
       
-      ### Load sample data ----
+      ## Load sample data ----
+      observeEvent(input$loadSampleGermData, rawData(sampleGermData))
+      observeEvent(input$loadSamplePrimingData, rawData(samplePrimingData))
+      observeEvent(input$loadSampleAgingData, rawData(sampleAgingData))
       
-      observeEvent(input$loadSampleGermData, { rv$data <- sampleGermData })
-      observeEvent(input$loadSamplePrimingData, { rv$data <- samplePrimingData })
-      observeEvent(input$loadSampleAgingData, { rv$data <- sampleAgingData })
-      
-      
-      ### Load user data ----
-      
+      ## Load user data ----
       observeEvent(input$userData, {
         try({
-          df <- read_csv(input$userData$datapath, col_types = cols(), progress = F) %>%
+          df <- read_csv(
+            input$userData$datapath,
+            col_types = cols(),
+            progress = F) %>%
             distinct()
-          if (nrow(df) > 0) {
-            rv$data <- df
-          }
+          if (nrow(df) > 0) rawData(df)
         })
       })
       
-      
-      ### Clear data button ----
-      
+      ## Clear data button ----
       observeEvent(input$clearData, {
-        rv$data <- tibble()
+        rawData(tibble())
         rv$colStatus <- NULL
         reset("userData") # reset file input
       })
       
       
+      # Outputs ----
       
-      ## Outputs ----
-      
-      ### currentDataUI // Data display and validation when data loaded ----
-      
+      ## currentDataUI // Data display and validation when data loaded ----
       output$currentDataUI <- renderUI({
-        validate(need(dataReady(), "Please load a dataset."))
+        validate(need(nrow(rawData()) > 0, "Please load a dataset."))
         
         tagList(
           h3("Currently loaded data:"),
@@ -216,14 +231,14 @@ loadDataServer <- function() {
       })
       
       
-      ### currentDataTable ----
+      ## currentDataTable // data as it was uploaded----
+      output$currentDataTable <- renderDataTable(rawData())
       
-      output$currentDataTable <- renderDataTable(rv$data)
+      ## cleanDataTable // Shows data passed to models after column matching ----
       output$cleanDataTable <- renderDataTable(cleanData())
       
       
-      ### colSelect // Renders the selectInput boxes for each column ----
-      
+      ## colSelect[i] // Renders the selectInput boxes for each column ----
       lapply(1:nCols, function(i) {
         output[[paste0("colSelect", i)]] <- renderUI({
           selectInput(
@@ -236,8 +251,7 @@ loadDataServer <- function() {
       })
       
       
-      ### colValidate // Validation messages for each column ----
-      
+      ## colValidate[i] // Validation messages for each column ----
       lapply(1:nCols, function(i) {
         
         outCol <- paste0("colValidate", i)
@@ -253,7 +267,7 @@ loadDataServer <- function() {
             rv$colStatus[i] <- FALSE
             span("No column specified.", style = "color: orange")
           } else {
-            col <- rv$data[[input[[inputId]]]]
+            col <- rawData()[[input[[inputId]]]]
             validation <- validateCol(col, expectedType, minValue, maxValue)
             rv$colStatus[i] <- validation$valid
             validation$ui
@@ -263,37 +277,13 @@ loadDataServer <- function() {
       
       
       # Return values ----
-      
-      cleanData <- reactive({
-        if ((nrow(rv$data) > 0) & (length(rv$colStatus) == nCols)) {
-          
-          # collect user column names
-          vars <- sapply(colValidation$InputId, \(id) { input[[id]] })
-          names(vars) <- colValidation$Column
-          vars <- vars[vars != "NA"]
-          
-          rv$data %>%
-            select(any_of(vars)) %>%
-            rename(any_of(vars))
-        } else {
-          tibble()
-        }
-      }) %>% bindEvent(rv$colStatus)
-      
-      modelReady <- reactive({
-        ready <- lapply(modelNames, function(m) {
-          checkModelReadiness(colValidation[[m]], rv$colStatus)
-        })
-        names(ready) <- modelNames
-        ready
-      })
-      
+
       return(reactive(list(
         data = cleanData(),
         colStatus = rv$colStatus,
         modelReady = modelReady()
       )))
   
-    }
+    } # end
   )
 }

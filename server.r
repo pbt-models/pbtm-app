@@ -74,12 +74,10 @@ server <- function(input, output, session) {
   # Modules ----
   
   ## Intro ----
-  
   introServer()
-
+  
   
   ## Load ----
-  
   loadDataReturn <- loadDataServer()
   
   observe({
@@ -90,7 +88,6 @@ server <- function(input, output, session) {
   
   
   ## Germination ----
-  
   germinationServer(
     data = reactive(rv$data),
     ready = reactive(truthy(rv$modelReady$Germination)),
@@ -99,17 +96,12 @@ server <- function(input, output, session) {
   
   
   ## Thermal Time ----
-
   thermalTimeServer(
     data = reactive(rv$data),
-    ready = reactive(truthy(rv$modelReady$ThermalTime)),
-    trtChoices = reactive(trtChoices())
+    ready = reactive(truthy(rv$modelReady$ThermalTime))
   )
 
-  
-  
-  # Hydrotime model ----------------------
-
+  ## Hydrotime  ----
   hydroTimeServer(
     data = reactive(rv$data),
     ready = reactive(truthy(rv$modelReady$HydroTime))
