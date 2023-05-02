@@ -31,7 +31,8 @@ body <- dashboardBody(
     tabItem("IntroTab", introUI()),
     tabItem("LoadTab", loadDataUI()),
     tabItem("GerminationTab", germinationUI()),
-    tabItem("ThermalTimeTab", thermalTimeUI())
+    tabItem("ThermalTimeTab", thermalTimeUI()),
+    tabItem("HydroTimeTab", hydroTimeUI())
   )
 )
 

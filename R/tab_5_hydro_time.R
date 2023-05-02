@@ -1,12 +1,12 @@
-# ---- Thermal Time ---- #
+# ---- Hydro Time ---- #
 
 # UI ----
 
-thermalTimeUI <- function() {
-  ns <- NS("thermalTime")
+hydroTimeUI <- function() {
+  ns <- NS("hydroTime")
   
   tagList(
-    h3(class = "tab-title", "Thermal time analysis"),
+    h3(class = "tab-title", "Hydro time analysis"),
     uiOutput(ns("content"))
   )
 }
@@ -19,11 +19,10 @@ thermalTimeUI <- function() {
 #' 
 #' @param `data` a `reactive()` data frame containing the loaded clean data
 #' @param `ready` a `reactive()` boolean indicating if the model is ready
-#' @param `trtChoices` a `reactive()` vector listing the factor columns in the dataset
 
-thermalTimeServer <- function(data, ready, trtChoices) {
+hydroTimeServer <- function(data, ready) {
   moduleServer(
-    id = "thermalTime",
+    id = "hydroTime",
     function(input, output, session) {
       ns <- session$ns
       
@@ -34,12 +33,13 @@ thermalTimeServer <- function(data, ready, trtChoices) {
       dataReady <- reactive({
         truthy(data()) & ready()
       })
+
       
-      ## ttsoData // Thermal time suboptimal model data ----
-      ttsoData <- reactive({
+      ## htData // base data for model run ----
+      htData <- reactive({
         req(
           dataReady(),
-          # input$germTempSelect,
+          # input$germWPSelect,
           input$dataCleanSelect,
           input$trtIdSelect,
           input$cumFracRange,
@@ -47,7 +47,7 @@ thermalTimeServer <- function(data, ready, trtChoices) {
         )
         
         df <- data() %>%
-          # filter(GermTemp %in% input$germTempSelect) %>%
+          # filter(GermWP %in% input$germWPSelect) %>%
           filter(TrtID %in% input$trtIdSelect)
         
         # optionally remove repeated measurements at same cumulative fraction
@@ -61,10 +61,10 @@ thermalTimeServer <- function(data, ready, trtChoices) {
       })
       
       
-      ## ttsoResults // list with TTSO model results ----
-      ttsoResults <- reactive({
-        df <- ttsoData()
-        temp <- df$GermTemp
+      ## htResults // hydro time model results ----
+      htResults <- reactive({
+        df <- htData()
+        wp <- df$GermWP
         time <- df$CumTime
         germ <- df$CumFraction
         max_cum_frac <- input$maxCumFrac / 100
@@ -73,37 +73,36 @@ thermalTimeServer <- function(data, ready, trtChoices) {
         tryCatch({
           model <- stats::nls(
             formula = germ ~ max_cum_frac * stats::pnorm(
-              log(time, base = 10),
-              mean = thetaT50 - log(temp - Tb, base = 10),
-              sd = sigma,
+              wp - (HT / time),
+              Psib50,
+              Sigma,
               log = FALSE),
             start = list(
-              Tb = 6,
-              thetaT50 = 3,
-              sigma = 0.09),
+              HT = 60,
+              Psib50 = -0.8,
+              Sigma = 0.2),
             lower = list(
-              Tb = 0,
-              thetaT50 = 0.5,
-              sigma = 0.0001),
+              HT = 1,
+              Psib50 = -5,
+              Sigma = 0.0001),
             upper = list(
-              Tb = 20,
-              thetaT50 = 50,
-              sigma = 1.50),
+              HT = 1000,
+              Psib50 = -0.000000001,
+              Sigma = 2),
             algorithm = "port")
           
           # grab coefs
-          Corr <- stats::cor(germ, stats::predict(model)) ^ 2
-          Tb <- summary(model)$coefficients[[1]]
-          ThetaT50 <- summary(model)$coefficients[[2]]
+          corr <- stats::cor(germ, stats::predict(model)) ^ 2
+          HT <- summary(model)$coefficients[[1]]
+          Psib50 <- summary(model)$coefficients[[2]]
           Sigma <- summary(model)$coefficients[[3]]
           
           # return results
           list(
-            Tb = Tb,
-            ThetaT50 = ThetaT50,
+            HT = HT,
+            Psib50 = Psib50,
             Sigma = Sigma,
-            Correlation = Corr
-          )
+            Correlation = corr)
         },
           error = function(cond) {
             paste("Unable to compute model, try adjusting parameters. Reason:", str_to_sentence(cond[1]))
@@ -114,28 +113,28 @@ thermalTimeServer <- function(data, ready, trtChoices) {
       
       # Observers ----
       
-      # observe(print(ttsoData()))
-      observe(print(ttsoResults()))
+      # observe(print(htData()))
+      observe(print(htResults()))
       
       
       # Outputs ----
       
       ## content // main UI ----
       output$content <- renderUI({
-        req_cols <- colValidation$Column[colValidation$ThermalTime]
-        validate(need(dataReady(), paste("Please load a dataset with required columns for thermal time analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
+        req_cols <- colValidation$Column[colValidation$HydroTime]
+        validate(need(dataReady(), paste("Please load a dataset with required columns for hydro time analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
         
-        germTempChoices <- unique(data()$GermTemp)
+        germWPChoices <- unique(data()$GermWP)
         
         fluidRow(
-          column(12, p(em("The thermal time model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will display those treatments and include them in the model calculation which can result on unreliable or unexpected results. Please inform and remove additonal treatments when pertinent in the lower left corner of this section. Note: the model may fail to converge under certain max cumulative fraction values."))),
+          column(12, p(em("The hydrotime model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values."))),
           box(
             title = "Model data input",
             checkboxGroupInput(
-              inputId = ns("germTempSelect"),
-              label = "Included temperature levels:",
-              choices = germTempChoices,
-              selected = germTempChoices
+              inputId = ns("germWPSelect"),
+              label = "Included water potential levels:",
+              choices = germWPChoices,
+              selected = germWPChoices
             ),
             radioButtons(
               inputId = ns("dataCleanSelect"),
@@ -148,15 +147,15 @@ thermalTimeServer <- function(data, ready, trtChoices) {
           ),
           box(
             title = "Model results",
-            tableOutput(ns("ttsoTable"))
+            tableOutput(ns("htTable"))
           ),
           box(
             width = 12,
-            plotOutput(ns("ttPlot"))
+            plotOutput(ns("htPlot"))
           ),
           box(
             title = "Additional data filters",
-            uiOutput(ns("trtIdSelect"))
+            uiOutput(ns("trtIdSelect")),
           ),
           box(
             title = "Maximum germination (%) observed",
@@ -185,14 +184,13 @@ thermalTimeServer <- function(data, ready, trtChoices) {
       output$trtIdSelect <- renderUI({
         if ("TrtDesc" %in% names(data())) {
           choices <- data() %>%
-            filter(GermTemp %in% input$germTempSelect) %>%
+            filter(GermWP %in% input$germWPSelect) %>%
             mutate(Label = paste(TrtID, TrtDesc, sep = ": ")) %>%
             distinct(Label, TrtID) %>%
             deframe()
         } else {
           choices <- unique(data()$TrtID)
         }
-
         
         checkboxGroupInput(
           inputId = ns("trtIdSelect"),
@@ -202,15 +200,15 @@ thermalTimeServer <- function(data, ready, trtChoices) {
         )
       })
       
-      
-      ## ttsoTable // TTSO model results in table format ----
-      output$ttsoTable <- renderTable({
-        results <- ttsoResults()
 
+      ## htTable // render model results as table ----
+      output$htTable <- renderTable({
+        results <- htResults()
+        
         # print error message if model fails
         validate(need(is.list(results), results))
-
-        # convert results list to data frame
+        
+        # convert list to simple data frame
         results %>%
           enframe() %>%
           unnest(value) %>%
@@ -222,26 +220,27 @@ thermalTimeServer <- function(data, ready, trtChoices) {
         digits = 4,
         width = "100%"
       )
-
       
-      ## ttPlot // TTSO plot ----
-      output$ttPlot <- renderPlot({
-        df <- ttsoData()
-        max_cum_frac <- input$maxCumFrac / 100
-
+      ## htPlot // Hydro time plot ----
+      output$htPlot <- renderPlot({
+        req(htData(), htResults(), input$maxCumFrac)
+        
+        df <- htData()
+        germ_cutoff <- input$maxCumFrac / 100
+        
         # generate the plot
         plt <- df %>%
-          ggplot(aes(x = CumTime, y = CumFraction, color = as.factor(GermTemp))) +
+          ggplot(aes(x = CumTime, y = CumFraction, color = as.factor(GermWP))) +
           annotate(
             "rect",
             xmin = 0,
             xmax = Inf,
-            ymin = max_cum_frac,
+            ymin = germ_cutoff,
             ymax = 1,
             fill = "grey",
             alpha = 0.1) +
           geom_hline(
-            yintercept = max_cum_frac,
+            yintercept = germ_cutoff,
             color = "darkgrey",
             linetype = "dashed") +
           geom_point(
@@ -253,51 +252,53 @@ thermalTimeServer <- function(data, ready, trtChoices) {
             limits = c(0, 1.02)) +
           scale_x_continuous(
             expand = expansion()) +
+          expand_limits(x = 0, y = 0) +
           labs(
-            title = "Thermal Time Sub-optimal Model",
+            title = "Hydro Time Model",
             x = "Time",
             y = "Cumulative fraction germinated (%)",
-            color = "Temperature") +
+            color = "Water potential") +
           guides(color = guide_legend(reverse = T, order = 1)) +
           theme_classic()
-
+        
         # add model results if successful
-        if (is.list(ttsoResults())) {
+        if (is.list(htResults())) {
           try({
-            model <- ttsoResults()
+            model <- htResults()
             maxCumFrac <- model$MaxCumFrac
-            tb <- model$Tb
-            thetaT50 <- model$ThetaT50
+            ht <- model$HT
+            psib50 <- model$Psib50
             sigma <- model$Sigma
             corr <- model$Correlation
             
-            # Plot all predicted treatments by the thermal time model
-            modelLines <- mapply(function(temp) {
+            # Plot all predicted treatments by the hydrotime model
+            modelLines <- mapply(function(wp) {
               stat_function(
                 fun = function(x) {
-                  stats::pnorm(log(x, base = 10), thetaT50 - log(temp - tb, base = 10),  sigma, log = F) * max_cum_frac
+                  stats::pnorm(wp - (ht / x), psib50, sigma, log = FALSE) * germ_cutoff
                 },
-                aes(color = as.factor(temp))
+                aes(color = as.factor(wp))
               )
             },
-              unique(df$GermTemp)
+              unique(df$GermWP)
             )
             
-            par1 <- paste("~~T[b]==", round(tb, 1))
-            par2 <- paste("~~ThetaT(50)==", round(thetaT50, 3))
-            par3 <- paste("~~sigma==", round(sigma, 3))
-            par4 <- paste("~~R^2==", round(corr, 2))
+            par1 <- paste("~~HT==", round(ht, 2))
+            par2 <- paste("~~Psi[b](50)==", round(psib50, 3))
+            par3 <- paste("~~sigma== ", round(sigma, 3))
+            par4 <- paste("~~R^2== ", round(corr, 2))
             
             plt <- plt +
               modelLines +
-              annotate("text", x = -Inf, y = 0.95, label = " Model parameters:", color = "grey0", hjust = 0) +
+              annotate("text", x = -Inf, y = 0.95, label = " Model parameters", color = "grey0", hjust = 0) +
               annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
               annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
               annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
               annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T)
           })
+          
         }
-
+        
         plt
       })
       
