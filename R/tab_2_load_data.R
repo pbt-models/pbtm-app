@@ -63,7 +63,7 @@ validateCol <- function(col, expectedType, minValue, maxValue) {
 
 # UI ----
 
-LoadDataUI <- function() {
+loadDataUI <- function() {
   ns <- NS("loadData")
   
   tagList(
@@ -105,7 +105,7 @@ LoadDataUI <- function() {
 #' - samplePrimingData
 #' - sampleAgingData
 
-LoadDataServer <- function() {
+loadDataServer <- function() {
   moduleServer(
     id = "loadData",
     function(input, output, session) {
@@ -173,46 +173,6 @@ LoadDataServer <- function() {
       
       output$currentDataUI <- renderUI({
         validate(need(dataReady(), "Please load a dataset."))
-        
-        # tagList(
-        #   bsCollapse(
-        #     multiple = T,
-        #     open = c("raw", "validate"),
-        #     bsCollapsePanel(
-        #       title = "View currently loaded data",
-        #       value = "raw",
-        #       div(
-        #         style = "overflow: auto;",
-        #         dataTableOutput(ns("currentDataTable"))
-        #       )
-        #     ),
-        #     bsCollapsePanel(
-        #       title = "Validate data",
-        #       value = "validate",
-        #       h3("Match column names to expected roles:"),
-        #       p(em("If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range.")),
-        #       div(
-        #         class = "validation-container",
-        #         lapply(1:nCols, function(i) {
-        #           div(
-        #             class = "well validation-box",
-        #             uiOutput(paste0(ns("colSelect"), i)),
-        #             uiOutput(paste0(ns("colValidate"), i))
-        #           )
-        #         })
-        #       )
-        #     ),
-        #     bsCollapse(
-        #       title = "View finalized dataset",
-        #       value = "clean",
-        #       h3("Clean/working dataset:"),
-        #       div(
-        #         style = "overflow: auto;",
-        #         dataTableOutput(ns("cleanDataTable"))
-        #       )
-        #     )
-        #   )
-        # )
         
         tagList(
           h3("Currently loaded data:"),

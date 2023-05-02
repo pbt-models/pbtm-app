@@ -23,7 +23,7 @@ parseSpeeds <- function(x) {
 
 # UI ----
 
-GerminationUI <- function() {
+germinationUI <- function() {
   ns <- NS("germination")
   
   tagList(
@@ -42,7 +42,7 @@ GerminationUI <- function() {
 #' @param `ready` a `reactive()` boolean indicating if the model is ready
 #' @param `trtChoices` a `reactive()` vector listing the factor columns in the dataset
 
-GerminationServer <- function(data, ready, trtChoices) {
+germinationServer <- function(data, ready, trtChoices) {
   moduleServer(
     id = "germination",
     function(input, output, session) {

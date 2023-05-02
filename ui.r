@@ -28,9 +28,10 @@ body <- dashboardBody(
     ),
   useShinyjs(),
   tabItems(
-    tabItem("IntroTab", IntroUI()),
-    tabItem("LoadTab", LoadDataUI()),
-    tabItem("GerminationTab", GerminationUI())
+    tabItem("IntroTab", introUI()),
+    tabItem("LoadTab", loadDataUI()),
+    tabItem("GerminationTab", germinationUI()),
+    tabItem("ThermalTimeTab", thermalTimeUI())
   )
 )
 

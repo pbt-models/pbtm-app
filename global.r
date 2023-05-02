@@ -5,6 +5,7 @@ suppressPackageStartupMessages({
   library(shinyjs)
   library(shinydashboard)
   library(shinyBS)
+  library(stats)
   library(tidyverse)
   library(snakecase)
   library(DT)
