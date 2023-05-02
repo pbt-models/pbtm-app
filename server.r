@@ -23,12 +23,10 @@ server <- function(input, output, session) {
   
   trtChoices <- reactive({
     req(rv$colStatus)
-    
     cols <- sapply(1:nCols, function(i) {
       if (rv$colStatus[i] == T && colValidation$Role[i] == "Factor") colValidation$Column[i]
     })
-    cols <- compact(cols)
-    setNames(as.list(c(NA, cols)), c("Not specified", cols))
+    compact(cols)
   })
   
   # observe({print(trtChoices())})

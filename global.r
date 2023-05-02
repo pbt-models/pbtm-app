@@ -13,16 +13,18 @@ suppressPackageStartupMessages({
 
 # Helper functions ----
 
-truthy <- function(val) {
-  if (is.null(val)) return(F)
-  if (is.function(val)) return(T)
-  if (length(val) == 0) return(F)
-  if (length(val) > 1) return(T)
-  if (is.na(val)) return(F)
-  if (val == "NA") return(F)
-  if (val == "") return(F)
-  if (val == 0) return(F)
-  if (val == F) return(F)
+truthy <- function(x) {
+  if (is.null(x)) return(F)
+  if (inherits(x, "try-error")) return(F)
+  if (is.function(x)) return(T)
+  if (is.data.frame(x)) return(nrow(x) > 0)
+  if (length(x) == 0) return(F)
+  if (all(is.na(x))) return(F)
+  if (is.character(x) && !any(nzchar(stats::na.omit(x)))) return(F)
+  if (is.logical(x) && !any(stats::na.omit(x))) return(F)
+  if (!is.atomic(x)) return(TRUE)
+  if (length(x) > 1) return(T)
+  if (x %in% c(NA, "NA", "", 0, F)) return(F)
   T
 }
 
