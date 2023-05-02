@@ -21,8 +21,6 @@ parseSpeeds <- function(x) {
 }
 
 
-
-
 # UI ----
 
 GerminationUI <- function() {
@@ -36,9 +34,13 @@ GerminationUI <- function() {
 
 
 # Server ----
-#' requires global vars:
-#' - colValidation
-#' - nCols
+
+#' @references colValidation
+#' @references nCols
+#' 
+#' @param `data` a `reactive()` data frame containing the loaded clean data
+#' @param `ready` a `reactive()` boolean indicating if the model is ready
+#' @param `trtChoices` a `reactive()` vector listing the factor columns in the dataset
 
 GerminationServer <- function(data, ready, trtChoices) {
   moduleServer(
@@ -58,13 +60,66 @@ GerminationServer <- function(data, ready, trtChoices) {
       
       ## dataReady ----
       dataReady <- reactive({
-        print(data())
         truthy(data()) & ready()
       })
       
+      ## workingData ----
+      # slightly modified dataset used by plot and table
+      workingData <- reactive({
+        req(dataReady())
+        
+        data() %>%
+          group_by(TrtID) %>%
+          arrange(TrtID, CumTime, CumFraction) %>%
+          mutate(FracDiff = CumFraction - lag(CumFraction, default = 0)) %>%
+          ungroup()
+      })
       
-      # Main UI ----
+      ## germSpeedData ----
+      # used by germination speed table
+      germSpeedData <- reactive({
+        workingData() %>%
+          mutate(
+            MaxCumFrac = max(CumFraction),
+            .by = all_of(input$germSpeedTrts)) %>%
+          arrange(CumTime) %>%
+          summarise(
+            MaxCumFrac = max(MaxCumFrac),
+            FracDiff = sum(FracDiff),
+            .by = c(all_of(input$germSpeedTrts), CumTime)) %>%
+          mutate(CumFraction = cumsum(FracDiff) / sum(FracDiff) * MaxCumFrac, .by = all_of(input$germSpeedTrts)) %>%
+          group_by(across(all_of(input$germSpeedTrts))) %>%
+          arrange(CumTime) %>%
+          reframe(
+            {
+              approx(CumFraction, CumTime, xout = germSpeeds() / 100, ties = "ordered", rule = 2) %>%
+                setNames(c("Frac", "Time")) %>%
+                as_tibble() %>%
+                drop_na()
+            }
+          )
+      })
       
+      
+      # Observers ----
+      
+      ## set new germ speeds ----
+      observeEvent(input$setGermSpeeds, {
+        parsed <- parseSpeeds(input$newGermSpeeds)
+        if (length(parsed) > 0) germSpeeds(parsed)
+        updateTextInput(inputId = "newGermSpeeds", value = "")
+      })
+      
+      ## reset germ speeds ----
+      observeEvent(input$resetGermSpeeds, {
+        germSpeeds(defaultGermSpeeds)
+        updateTextInput(inputId = "newGermSpeeds", value = "")
+      })
+      
+      
+      # Outputs ----
+      
+      ## content // main UI ----
       output$content <- renderUI({
         validate(
           need(dataReady(), paste(
@@ -151,19 +206,13 @@ GerminationServer <- function(data, ready, trtChoices) {
         )
       })
       
-      
-      # Plot ----
-      
+
+      ## plot // germination curves ----
       output$plot <- renderPlot({
+        df <- workingData()
         trt1 <- input$plotTrt1
         trt2 <- input$plotTrt2
-        req(dataReady(), trt1, trt2)
-        
-        df <- data() %>%
-          group_by(TrtID) %>%
-          arrange(TrtID, CumTime, CumFraction) %>%
-          mutate(FracDiff = CumFraction - lag(CumFraction, default = 0)) %>%
-          ungroup()
+        req(trt1, trt2)
         
         # collect treatments
         trts <- c()
@@ -214,7 +263,7 @@ GerminationServer <- function(data, ready, trtChoices) {
             geom_point(size = 2)
         }
         
-        # use TrtID to separate lines if not rescaled
+        # use TrtID to group lines if not rescaled
         if (input$mergeTrts) {
           plt <- plt + geom_line()
         } else {
@@ -268,97 +317,9 @@ GerminationServer <- function(data, ready, trtChoices) {
         plt
       })
       
-      
-      # Germ speed table ----
-      
-      germSpeedData <- reactive({
-        req(dataReady())
-        
-        data() %>%
-          group_by(TrtID) %>%
-          arrange(TrtID, CumTime, CumFraction) %>%
-          mutate(FracDiff = CumFraction - lag(CumFraction, default = 0)) %>%
-          ungroup() %>%
-          mutate(
-            MaxCumFrac = max(CumFraction),
-            .by = all_of(input$germSpeedTrts)) %>%
-          arrange(CumTime) %>%
-          summarise(
-            MaxCumFrac = max(MaxCumFrac),
-            FracDiff = sum(FracDiff),
-            .by = c(all_of(input$germSpeedTrts), CumTime)) %>%
-          mutate(CumFraction = cumsum(FracDiff) / sum(FracDiff) * MaxCumFrac, .by = all_of(input$germSpeedTrts)) %>%
-          group_by(across(all_of(input$germSpeedTrts))) %>%
-          arrange(CumTime) %>%
-          reframe(
-            {
-              approx(CumFraction, CumTime, xout = germSpeeds() / 100, ties = "ordered", rule = 2) %>%
-                setNames(c("Frac", "Time")) %>%
-                as_tibble() %>%
-                drop_na()
-            }
-          )
-      })
-      
-      observe(print(germSpeedData()))
-      
-
-      ## handle apply button ----
-      observeEvent(input$setGermSpeeds, {
-        print("set")
-        parsed <- parseSpeeds(input$newGermSpeeds)
-        if (length(parsed) > 0) germSpeeds(parsed)
-        updateTextInput(inputId = "newGermSpeeds", value = "")
-      })
-
-      ## handle reset button ----
-      observeEvent(input$resetGermSpeeds, {
-        print("reset")
-        germSpeeds(defaultGermSpeeds)
-        updateTextInput(inputId = "newGermSpeeds", value = "")
-      })
-
-      
-      ## table ----
+      ## germSpeedTable ----
       output$germSpeedTable <- renderDataTable({
         req(input$germSpeedType)
-
-        # construct working dataset
-        # df <- tibble(TrtID = rv$data[[input$TrtID]])
-        # trts <- input$germSpeedTrtSelect
-        # for (trt in trts) { df[[trt]] <- rv$data[[input[[trt]]]] }
-        # df <- df %>% mutate(
-        #   CumTime = rv$data[[input$CumTime]],
-        #   CumFrac = rv$data[[input$CumFraction]]
-        # )
-
-        # regenerate cumulative fractions depending on grouping trts
-        # df <- df %>%
-        #   group_by(TrtID) %>%
-        #   arrange(TrtID, CumTime, CumFrac) #%>%
-        #mutate(FracDiff = CumFrac - lag(CumFrac, default = 0))
-
-        # group by the selected treatments AND TrtID to calculate speed individually
-        # df <- group_by_at(df, vars(TrtID,trts))
-
-        # merge values that occur at the same timepoint
-        #df <- df %>%
-        #group_by(CumTime, .add = T) #%>%
-        #summarise(FracDiff = sum(FracDiff), .groups = "drop_last") %>%
-        #mutate(CumFrac = cumsum(FracDiff) / sum(FracDiff))
-
-        # interpolate the curves to get the estimated value at given fraction
-
-
-        # group by the selected treatments for next step
-        # df <- group_by_at(df, vars(trts, Frac))
-
-        # Calculate average speed and standard deviations (Future) for all speed fractions
-        # df <- df %>%
-        #   summarise(
-        #     Time = mean(Time), # Time_sd = sd(Time), ADD SD in the future
-        #     .groups = "drop"
-        #   )
 
         # show as rate or cumulative fraction
         if (input$germSpeedType == "Rate") {
@@ -398,5 +359,6 @@ GerminationServer <- function(data, ready, trtChoices) {
           )
         )
       )
+      
   })
 }
