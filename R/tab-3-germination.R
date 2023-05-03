@@ -1,0 +1,411 @@
+# ---- Germination analysis ---- #
+
+# Helpers ----
+
+# parses the comma-separated germ speed input, returns an ordered vector of numbers
+parseSpeeds <- function(x) {
+  parsed <- NULL
+  suppressWarnings(
+    try({
+      vals <- strsplit(x, ",") %>%
+        unlist() %>%
+        parse_number() %>%
+        as.integer() %>%
+        unique() %>%
+        sort()
+      vals <- vals[vals > 0]
+      vals <- vals[vals <= 100]
+      parsed <- vals
+    })
+  )
+  return(parsed)
+}
+
+
+# UI ----
+
+germinationUI <- function() {
+  ns <- NS("germination")
+  
+  tagList(
+    h3(class = "tab-title", "Germination analysis"),
+    div(class = "tab-info", "<< Germination tab info goes here >>"),
+    uiOutput(ns("content"))
+  )
+}
+
+
+# Server ----
+
+#' @references colValidation
+#' @references nCols
+#' 
+#' @param `data` a `reactive()` data frame containing the loaded clean data
+#' @param `ready` a `reactive()` boolean indicating if the model is ready
+#' @param `trtChoices` a `reactive()` vector listing the factor columns in the dataset
+
+germinationServer <- function(data, ready, trtChoices) {
+  moduleServer(
+    id = "germination",
+    function(input, output, session) {
+      ns <- session$ns
+      
+      
+      # Vars ----
+      
+      defaultGermSpeeds <- c(10, 16, 50, 84, 90)
+      
+      rv <- reactiveValues(
+        germSpeeds = defaultGermSpeeds
+      )
+      
+      
+      # Reactives ----
+      
+      ## dataReady ----
+      dataReady <- reactive({
+        truthy(data()) & ready()
+      })
+      
+      ## uniqueValueCount // number of unique values for each factor column
+      uniqueValueCount <- reactive({
+        req(dataReady())
+        data() %>%
+          select(all_of(as.character(trtChoices()))) %>%
+          lapply(function(x) { length(unique(x)) }) %>%
+          unlist() %>%
+          enframe() %>%
+          mutate(label = paste0(name, " (n=", value, ")"))
+      })
+      
+      plotColorChoices <- reactive({
+        df <- uniqueValueCount()
+        as.list(c(NA, df$name)) %>%
+          setNames(c("Not specified", df$label))
+      })
+      
+      plotShapeChoices <- reactive({
+        df <- uniqueValueCount() %>%
+          filter(value <= 6)
+        as.list(c(NA, df$name)) %>%
+          setNames(c("Not specified", df$label))
+      })
+      
+      
+      ## workingData // slightly modified dataset used by plot and table ----
+      workingData <- reactive({
+        req(dataReady())
+        
+        data() %>%
+          group_by(TrtID) %>%
+          arrange(TrtID, CumTime, CumFraction) %>%
+          mutate(FracDiff = CumFraction - lag(CumFraction, default = 0)) %>%
+          ungroup()
+      })
+      
+      ## germSpeedData // used by germination speed table ----
+      germSpeedData <- reactive({
+        workingData() %>%
+          mutate(
+            MaxCumFrac = max(CumFraction),
+            .by = all_of(input$germSpeedTrts)) %>%
+          arrange(CumTime) %>%
+          summarise(
+            MaxCumFrac = max(MaxCumFrac),
+            FracDiff = sum(FracDiff),
+            .by = c(all_of(input$germSpeedTrts), CumTime)) %>%
+          mutate(CumFraction = cumsum(FracDiff) / sum(FracDiff) * MaxCumFrac, .by = all_of(input$germSpeedTrts)) %>%
+          group_by(across(all_of(input$germSpeedTrts))) %>%
+          arrange(CumTime) %>%
+          reframe(
+            {
+              approx(CumFraction, CumTime, xout = rv$germSpeeds / 100, ties = "ordered", rule = 2) %>%
+                setNames(c("Frac", "Time")) %>%
+                as_tibble() %>%
+                drop_na()
+            }
+          )
+      })
+      
+      
+      # Observers ----
+      
+      ## set new germ speeds ----
+      observeEvent(input$setGermSpeeds, {
+        parsed <- parseSpeeds(input$newGermSpeeds)
+        if (length(parsed) > 0) rv$germSpeeds <- parsed
+        updateTextInput(inputId = "newGermSpeeds", value = "")
+      })
+      
+      ## reset germ speeds ----
+      observeEvent(input$resetGermSpeeds, {
+        rv$germSpeeds <- defaultGermSpeeds
+        updateTextInput(inputId = "newGermSpeeds", value = "")
+      })
+      
+      
+      # Outputs ----
+      
+      ## content // main UI ----
+      output$content <- renderUI({
+        validate(
+          need(dataReady(), paste(
+            "Please load a dataset and set required column types for germination analysis. Minimum required columns for germination analysis are",
+            paste(colValidation$Column[colValidation$Germination], collapse = ", ")
+            )
+          )
+        )
+        
+        tagList(
+          fluidRow(
+            box(
+              title = "Cumulative germination plot",
+              status = "primary",
+              solidHeader = T,
+              width = 12,
+              wellPanel(
+                fluidRow(
+                  column(
+                    width = 6,
+                    selectInput(
+                      inputId = ns("plotColor"),
+                      label = "Treatment 1 (color)",
+                      choices = plotColorChoices()
+                    ),
+                    selectInput(
+                      inputId = ns("plotShape"),
+                      label = "Treatment 2 (shape, n <= 6)",
+                      choices = plotShapeChoices()
+                    )
+                  ),
+                  column(
+                    width = 6,
+                    strong("Additional plot options:"),
+                    checkboxInput(
+                      inputId = ns("mergeTrts"),
+                      label = "Rescale cumulative germination?"
+                    ),
+                    checkboxInput(
+                      inputId = ns("showSpeeds"),
+                      label = "Show speed estimates?"
+                    )
+                  )
+                )
+              ),
+              plotOutput(ns("plot"))
+            ),
+            box(
+              title = "Germination time analysis",
+              status = "primary",
+              solidHeader = T,
+              width = 12,
+              div(
+                style = "overflow-x: auto",
+                dataTableOutput(ns("germSpeedTable"))
+              ),
+              wellPanel(
+                fluidRow(
+                  column(
+                    width = 4,
+                    checkboxGroupInput(
+                      inputId = ns("germSpeedTrts"),
+                      label = "Select all treatment factors:",
+                      choices = trtChoices(),
+                      selected = c("TrtID")
+                    )
+                  ),
+                  column(
+                    width = 4,
+                    textInput(
+                      inputId = ns("newGermSpeeds"),
+                      label = "Set cumulative percent (separate with commas):",
+                      value = ""
+                    ),
+                    div(
+                      style = "margin-top: 1em; margin-bottom: 1em;",
+                      actionButton(ns("setGermSpeeds"), "Apply"),
+                      actionButton(ns("resetGermSpeeds"), "Reset")
+                    )
+                  ),
+                  column(
+                    width = 4,
+                    radioButtons(
+                      inputId = ns("germSpeedType"),
+                      label = "Report values as:",
+                      choices = list(
+                        "Time (to % germinated)" = "Time",
+                        "Rate (1 / time)" = "Rate"
+                      )
+                    )
+                  )
+                )
+              )
+            )
+          )
+        )
+      })
+      
+
+      ## plot // germination curves ----
+      output$plot <- renderPlot({
+        df <- workingData()
+        colorTrt <- input$plotColor
+        shapeTrt <- input$plotShape
+        req(colorTrt, shapeTrt)
+        
+        # collect treatments
+        trts <- c(colorTrt, shapeTrt)
+        trts <- trts[!trts == "NA"]
+        
+        # rescales cumulative fraction across retained treatments
+        if (input$mergeTrts) {
+          df <- df %>%
+            mutate(
+              MaxCumFrac = max(CumFraction),
+              .by = any_of(trts)) %>%
+            arrange(CumTime) %>%
+            summarise(
+              MaxCumFrac = max(MaxCumFrac),
+              FracDiff = sum(FracDiff),
+              .by = c(all_of(trts), CumTime)) %>%
+            mutate(CumFraction = cumsum(FracDiff) / sum(FracDiff) * MaxCumFrac, .by = any_of(trts))
+        }
+        
+        if (colorTrt == "NA" & shapeTrt == "NA") {
+          plt <- df %>%
+            ggplot(aes(
+              x = CumTime,
+              y = CumFraction
+            )) +
+            geom_point(shape = 19, size = 2.5) 
+        } else if (colorTrt != "NA" & shapeTrt == "NA") {
+          plt <- df %>%
+            ggplot(aes(
+              x = CumTime,
+              y = CumFraction,
+              color = as.factor(.data[[colorTrt]])
+            )) +
+            geom_point(shape = 19, size = 2.5) +
+            labs(color = colorTrt)
+        } else if (colorTrt == "NA" & shapeTrt != "NA") {
+          plt <- df %>%
+            ggplot(aes(
+              x = CumTime,
+              y = CumFraction,
+              shape = as.factor(.data[[shapeTrt]])
+            )) +
+            geom_point(size = 2.5) +
+            labs(shape = shapeTrt)
+        } else {
+          plt <- df %>%
+            ggplot(aes(
+              x = CumTime,
+              y = CumFraction,
+              color = as.factor(.data[[colorTrt]]),
+              shape = as.factor(.data[[shapeTrt]])
+            )) +
+            geom_point(size = 2.5) +
+            labs(color = colorTrt, shape = shapeTrt)
+        }
+
+        
+        # use TrtID to group lines if not rescaled
+        if (input$mergeTrts) {
+          plt <- plt + geom_line()
+        } else {
+          plt <- plt + geom_line(aes(group = TrtID))
+        }
+        
+        # set theme etc
+        plt <- plt +
+          scale_x_continuous(
+            breaks = scales::pretty_breaks(),
+            expand = expansion(c(0.1, 0.1))) +
+          scale_y_continuous(
+            labels = scales::percent,
+            limits = c(0, 1),
+            expand = expansion(c(0, 0.05))) +
+          labs(
+            title = "Cumulative germination",
+            x = "Time",
+            y = "Cumulative (%)"
+          ) +
+          theme_classic()
+        
+        # show speed fractions on plot
+        lines = rv$germSpeeds / 100
+        plt <- plt + geom_hline(
+          yintercept = lines,
+          color = "grey",
+          linewidth = 0.35,
+          linetype = "dashed")
+        
+        # optionally, show time estimates for selected speeds
+        if (input$showSpeeds) {
+          plt <- plt +
+            geom_linerange(
+              data = germSpeedData(),
+              aes(x = Time, ymax = Frac),
+              inherit.aes = F,
+              ymin = 0,
+              color = "red",
+              linewidth = 0.25
+            ) +
+            geom_point(
+              data = germSpeedData(),
+              aes(x = Time, y = Frac),
+              inherit.aes = F,
+              color = "red",
+              size = 2
+            )
+        }
+        
+        plt
+      })
+      
+      ## germSpeedTable ----
+      output$germSpeedTable <- renderDataTable({
+        req(input$germSpeedType)
+
+        # show as rate or cumulative fraction
+        if (input$germSpeedType == "Rate") {
+          germSpeedData() %>%
+            mutate(
+              Time = round(1 / Time, 6),
+              Frac = paste0("GR", Frac * 100)) %>%
+            pivot_wider(
+              names_from = "Frac",
+              values_from = "Time"
+            )
+        } else {
+          germSpeedData() %>%
+            mutate(
+              Frac = paste0("T", Frac * 100),
+              Time = round(Time, 1)) %>%
+            pivot_wider(
+              names_from = "Frac",
+              values_from = "Time"
+            )
+        }
+      },
+        rownames = F,
+        server = F,
+        extensions = c("Buttons", "Select"),
+        selection = "none",
+        options = list(
+          searching = F,
+          paging = F,
+          select = T,
+          dom = "Bfrtip",
+          buttons = list(
+            list(
+              extend = "copy",
+              text = 'Copy table to clipboard'
+            )
+          )
+        )
+      )
+      
+    } # end
+  )
+}

@@ -1,6 +1,8 @@
 
+# Germination test ----
+
 sampleGermData
-trtNames <- c("GermWP", "GermTemp")
+
 
 test <- sampleGermData %>%
   group_by_at(trtNames) %>%
@@ -9,17 +11,69 @@ test <- sampleGermData %>%
     .groups = "drop"
     )
 
+
+
+
+trts <- c()
+trts <- c("GermWP")
+trts <- c("GermWP", "GermTemp")
+
+
+# plot rescaling
+
 sampleGermData %>%
-  group_by_at(c("GermWP", "GermTemp")) %>%
+  mutate(across(all_of(trts), ~as.factor(.x))) %>%
+  ggplot(aes(
+    x = CumTime,
+    y = CumFraction,
+    group = TrtID,
+    color = GermWP,
+    shape = GermTemp
+  )) +
+  geom_line() +
+  geom_point(size = 2)
+
+
+df <- sampleGermData %>%
+  mutate(across(all_of(trts), as.factor)) %>%
+  group_by(TrtID) %>%
+  arrange(TrtID, CumTime, CumFraction) %>%
+  mutate(FracDiff = CumFraction - lag(CumFraction, default = 0)) %>%
+  ungroup()
+
+df %>%
+  mutate(
+    MaxCumFrac = max(CumFraction),
+    .by = all_of(trts)) %>%
   arrange(CumTime) %>%
   summarise(
+    MaxCumFrac = max(MaxCumFrac),
+    FracDiff = sum(FracDiff),
+    .by = c(all_of(trts), CumTime)) %>%
+  mutate(CumFraction = cumsum(FracDiff) / sum(FracDiff) * MaxCumFrac, .by = all_of(trts))
+
+ggplot(aes(
+    x = CumTime,
+    y = CumFraction,
+    group = TrtID,
+    color = GermWP
+  )) +
+  geom_line() +
+  geom_point(size = 2)
+
+
+# speed table
+
+sampleGermData %>%
+  group_by(across(all_of(trts))) %>%
+  arrange(CumTime) %>%
+  reframe(
     {
       df <- approx(CumFraction, CumTime, xout = seq(0, 1, by = 0.25), ties = "ordered", rule = 2)
       names(df) <- c("Frac", "Time")
       df <- as_tibble(df)
       drop_na(df)
-    },
-    .groups = "drop"
+    }
   ) %>%
   mutate(
     Frac = paste0("T", str_pad(Frac * 100, 2, pad = "0")),
@@ -30,6 +84,17 @@ sampleGermData %>%
   ) %>%
   mutate(across(everything(), ~ as.character(.x)))
 
+  
+
+# number of levels
+
+sampleGermData %>%
+  select(!c("CumTime", "CumFraction")) %>%
+  lapply(\(x) length(unique(x))) %>%
+  unlist() %>%
+  enframe() %>%
+  mutate(label = paste0(name, " (n=", value, ")"))
+  
 
 
 

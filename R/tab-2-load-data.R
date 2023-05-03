@@ -1,0 +1,289 @@
+# ---- Load data tab ---- #
+
+# Helpers ----
+
+validateCol <- function(col, expectedType, minValue, maxValue) {
+  info <- NULL
+  msg <- NULL
+  valid <- FALSE
+  
+  if (anyNA(col)) {
+    msg <- list(span("Warning: Missing value in data", style = "color:red"), br())
+  }
+  
+  colType <- class(col)
+  info <- list(paste("Type:", colType), br())
+  
+  # Numeric value checks
+  if (colType == "numeric") {
+    info <- append(info,
+      list(paste0("Range: ", round(min(col), 2), " => ", round(max(col), 2)), br())
+    )
+    
+    # column type mismatch
+    if (!is.na(expectedType) & colType != expectedType) {
+      msg <- append(msg,
+        list(span("Error: Incorrect column type, expected", expectedType, style = "color:red"), br())
+      )
+    }
+    
+    # min check
+    if (!is.na(minValue) & min(col) < minValue) {
+      msg <- append(msg, 
+        list(span("Error: Min value less than", minValue, style = "color:red"), br())
+      )
+    }
+    
+    # max check
+    if (!is.na(maxValue) & max(col) > maxValue) {
+      msg <- append(msg,
+        list(span("Error: Max value greater than ", maxValue, style = "color:red"), br())
+      )
+    }
+    
+  } else if (!is.na(expectedType) & colType != expectedType) {
+    newmsg <- list(span("Error: Incorrect column type, expected", expectedType, style = "color:red"), br())
+    msg <- append(msg, newmsg)
+  }
+  
+  # valid if no messages yet
+  if (is.null(msg)) {
+    msg <- list(span(strong("OK"), style = "color:blue"))
+    valid <- TRUE
+  } else {
+    msg <- head(msg, -1) # remove the last br()
+  }
+  
+  list(
+    valid = valid,
+    ui = tagList(info, msg)
+  )
+}
+
+
+# UI ----
+
+loadDataUI <- function() {
+  ns <- NS("loadData")
+  
+  tagList(
+    h3("Upload data", class = "tab-title"),
+    p(em("Upload your own data here or select one of our sample datasets to get started.")),
+    hr(),
+    p(strong("Sample datasets:")),
+    div(
+      class = "flex-btns",
+      actionButton(ns("loadSampleGermData"), "Load germination sample data"),
+      actionButton(ns("loadSamplePrimingData"), "Load priming sample data"),
+      actionButton(ns("loadSampleAgingData"), "Load aging sample data")
+    ),
+    br(),
+    p(strong("Upload your own data (csv):")),
+    div(
+      class = "flex-btns",
+      fileInput(
+        inputId = ns("userData"),
+        label = NULL,
+        accept = c(".csv")
+      )
+    ),
+    p(strong("Start over:")),
+    div(
+      class = "flex-btns",
+      actionButton(ns("clearData"), "Clear loaded data")
+    ),
+    hr(),
+    uiOutput(ns("currentDataUI"))
+  )
+}
+
+
+# Server ----
+
+#' @references sampleGermData
+#' @references samplePrimingData
+#' @references sampleAgingData
+
+loadDataServer <- function() {
+  moduleServer(
+    id = "loadData",
+    function(input, output, session) {
+      ns <- session$ns
+      
+      
+      # Reactives ----
+      
+      # data // raw data before cleaning or assigning columns ----
+      rawData <- reactiveVal(tibble())
+      
+      rv <- reactiveValues(
+        colStatus = NULL
+      )
+      
+      columnNames <- reactive({
+        names(rawData())
+      })
+      
+      columnChoices <- reactive({
+        setNames(
+          as.list(c(NA, columnNames())),
+          c("Not specified", columnNames())
+        )
+      })
+      
+      cleanData <- reactive({
+        if ((nrow(rawData()) > 0) & (length(rv$colStatus) == nCols)) {
+          
+          # collect user column names
+          vars <- sapply(colValidation$InputId, \(id) { input[[id]] })
+          names(vars) <- colValidation$Column
+          vars <- vars[vars != "NA"]
+          
+          rawData() %>%
+            select(any_of(vars)) %>%
+            rename(any_of(vars))
+        } else {
+          tibble()
+        }
+      }) %>% bindEvent(rv$colStatus)
+      
+      modelReady <- reactive({
+        ready <- lapply(modelNames, function(m) {
+          checkModelReadiness(colValidation[[m]], rv$colStatus)
+        })
+        names(ready) <- modelNames
+        ready
+      })
+
+      
+      # Button handlers ----
+      
+      ## Load sample data ----
+      observeEvent(input$loadSampleGermData, rawData(sampleGermData))
+      observeEvent(input$loadSamplePrimingData, rawData(samplePrimingData))
+      observeEvent(input$loadSampleAgingData, rawData(sampleAgingData))
+      
+      ## Load user data ----
+      observeEvent(input$userData, {
+        try({
+          df <- read_csv(
+            input$userData$datapath,
+            col_types = cols(),
+            progress = F) %>%
+            distinct()
+          if (nrow(df) > 0) rawData(df)
+        })
+      })
+      
+      ## Clear data button ----
+      observeEvent(input$clearData, {
+        rawData(tibble())
+        rv$colStatus <- NULL
+        reset("userData") # reset file input
+      })
+      
+      
+      # Outputs ----
+      
+      ## currentDataUI // Data display and validation when data loaded ----
+      output$currentDataUI <- renderUI({
+        validate(need(nrow(rawData()) > 0, "Please load a dataset."))
+        
+        tagList(
+          h3("Currently loaded data:"),
+          bsCollapse(
+            open = "tab",
+            bsCollapsePanel(
+              title = "Show/hide data table",
+              value = "tab",
+              div(
+                style = "overflow: auto;",
+                dataTableOutput(ns("currentDataTable"))
+              )
+            )
+          ),
+          h3("Match column names to expected roles:"),
+          p(em("If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range.")),
+          div(
+            class = "validation-container",
+            lapply(1:nCols, function(i) {
+              div(
+                class = "well validation-box",
+                uiOutput(paste0(ns("colSelect"), i)),
+                uiOutput(paste0(ns("colValidate"), i))
+              )
+            })
+          ),
+          h3("Final clean dataset for models:"),
+          bsCollapse(
+            open = "tab",
+            bsCollapsePanel(
+              title = "Show/hide data table",
+              value = "tab",
+              div(
+                style = "overflow: auto;",
+                dataTableOutput(ns("cleanDataTable"))
+              )
+            )
+          )
+        )
+        
+      })
+      
+      
+      ## currentDataTable // data as it was uploaded----
+      output$currentDataTable <- renderDataTable(rawData())
+      
+      ## cleanDataTable // Shows data passed to models after column matching ----
+      output$cleanDataTable <- renderDataTable(cleanData())
+      
+      
+      ## colSelect[i] // Renders the selectInput boxes for each column ----
+      lapply(1:nCols, function(i) {
+        output[[paste0("colSelect", i)]] <- renderUI({
+          selectInput(
+            inputId = ns(colValidation$InputId[i]),
+            label = colValidation$Description[i],
+            choices = columnChoices(),
+            selected = colValidation$Column[i]
+          )
+        })
+      })
+      
+      
+      ## colValidate[i] // Validation messages for each column ----
+      lapply(1:nCols, function(i) {
+        
+        outCol <- paste0("colValidate", i)
+        inputId <- colValidation$InputId[i]
+        expectedType <- colValidation$Type[i]
+        minValue <- colValidation$Min[i]
+        maxValue <- colValidation$Max[i]
+        
+        output[[outCol]] <- renderUI({
+          req(input[[inputId]])
+          
+          if (input[[inputId]] == "NA") {
+            rv$colStatus[i] <- FALSE
+            span("No column specified.", style = "color: orange")
+          } else {
+            col <- rawData()[[input[[inputId]]]]
+            validation <- validateCol(col, expectedType, minValue, maxValue)
+            rv$colStatus[i] <- validation$valid
+            validation$ui
+          }
+        })
+      })
+      
+      
+      # Return values ----
+
+      return(reactive(list(
+        data = cleanData(),
+        colStatus = rv$colStatus,
+        modelReady = modelReady()
+      )))
+  
+    } # end
+  )
+}
