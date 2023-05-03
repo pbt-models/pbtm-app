@@ -38,6 +38,7 @@ agingServer <- function(data, ready) {
       workingData <- reactive({
         req(
           dataReady(),
+          input$agingTimeSelect,
           input$dataCleanSelect,
           input$trtIdSelect,
           input$cumFracRange,
@@ -45,6 +46,7 @@ agingServer <- function(data, ready) {
         )
         
         df <- data() %>%
+          filter(AgingTime %in% input$agingTimeSelect) %>%
           filter(TrtID %in% input$trtIdSelect)
 
         # optionally remove repeated measurements at same cumulative fraction

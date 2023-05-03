@@ -7,8 +7,7 @@ server <- function(input, output, session) {
   rv <- reactiveValues(
     data = tibble(),
     colStatus = NULL,
-    modelReady = list(),
-    germSpeedFracs = defaultGermSpeedFracs
+    modelReady = list()
   )
   
   
