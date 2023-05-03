@@ -8,7 +8,6 @@ hydrothermalTimeUI <- function() {
   tagList(
     h3(class = "tab-title", "Hydro time analysis"),
     div(class = "tab-info", "The hydrothermal time model assumes a data set with germination temperature and germination water potential as treatment conditions. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values."),
-    br(),
     uiOutput(ns("content"))
   )
 }

@@ -33,7 +33,12 @@ body <- dashboardBody(
     tabItem("GerminationTab", germinationUI()),
     tabItem("ThermalTimeTab", thermalTimeUI()),
     tabItem("HydroTimeTab", hydroTimeUI()),
-    tabItem("HydrothermalTimeTab", hydrothermalTimeUI())
+    tabItem("HydrothermalTimeTab", hydrothermalTimeUI()),
+    tabItem("HydroPrimingTab", hydroPrimingUI()),
+    tabItem("HydrothermalPrimingTab", hydrothermalPrimingUI()),
+    tabItem("AgingTab", agingUI()),
+    tabItem("PromoterTab", promoterUI()),
+    tabItem("InhibitorTab", inhibitorUI())
   )
 )
 

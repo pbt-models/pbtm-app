@@ -103,12 +103,26 @@ server <- function(input, output, session) {
   
   
   # Hydro Priming // under construction ----
+  hydroPrimingServer(
+    data = reactive(rv$data),
+    ready = reactive(truthy(rv$modelReady$HydroPriming))
+  )
   
   
   # Hydrothermal Priming // under construction ----
   
+  hydrothermalPrimingServer(
+    data = reactive(rv$data),
+    ready = reactive(truthy(rv$modelReady$HydrothermalPriming))
+  )
+  
   
   # Aging ----
+  
+  agingServer(
+    data = reactive(rv$data),
+    ready = reactive(truthy(rv$modelReady$Aging))
+  )
   
   #### AgingUI ####
   output$AgingUI <- renderUI({
