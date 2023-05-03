@@ -312,54 +312,52 @@ hydrothermalTimeServer <- function(data, ready) {
         
         # use try so it will still plot on model error
         if (is.list(model)) {
-          try({
-            ht <- model$HT
-            psib50 <- model$Psib50
-            tb <- model$Tb
-            sigma <- model$Sigma
-            corr <- model$Correlation
-            
-            # model params
-            par1 <- paste("~~HT==", round(ht, 2))
-            par2 <- paste("~~T[b]==", round(tb, 2))
-            par3 <- paste("~~psi[b](50)==", round(psib50,3))
-            par4 <- paste("~~sigma == ", round(sigma, 3))
-            par5 <- paste("~~R^2 == ", round(corr, 2))
-            
-            # get combinations of wp and temp
-            fcts <- df %>% distinct(GermWP, GermTemp)
-            
-            # function to plot all predicted treatments by the hydro thermal time model
-            modelLines <- mapply(function(wp, temp) {
-              stat_function(
-                fun = function(x) {
-                  stats::pnorm(
-                    wp - (ht / ((temp - tb) * x)),
-                    psib50,
-                    sigma,
-                    log = FALSE
-                  ) *  germ_cutoff
-                },
-                aes(
-                  color = as.factor(wp),
-                  linetype = as.factor(temp),
-                  group = interaction(wp, temp)
-                )
+          ht <- model$HT
+          psib50 <- model$Psib50
+          tb <- model$Tb
+          sigma <- model$Sigma
+          corr <- model$Correlation
+          
+          # get combinations of wp and temp
+          fcts <- df %>% distinct(GermWP, GermTemp)
+          
+          # function to plot all predicted treatments by the hydro thermal time model
+          modelLines <- mapply(function(wp, temp) {
+            stat_function(
+              fun = function(x) {
+                stats::pnorm(
+                  wp - (ht / ((temp - tb) * x)),
+                  psib50,
+                  sigma,
+                  log = FALSE
+                ) *  germ_cutoff
+              },
+              aes(
+                color = as.factor(wp),
+                linetype = as.factor(temp),
+                group = interaction(wp, temp)
               )
-            },
-              fcts$GermWP,
-              fcts$GermTemp
             )
-            
-            plt <- plt +
-              modelLines +
-              annotate("text", x = -Inf, y = 0.95, label = " Model Parameters:", color = "grey0", hjust = 0) +
-              annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
-              annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
-              annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
-              annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T) +
-              annotate("text", x = -Inf, y = 0.7, label = par5, color = "grey0", hjust = 0, parse = T)
-          })
+          },
+            fcts$GermWP,
+            fcts$GermTemp
+          )
+          
+          # model params
+          par1 <- paste("~~HT==", round(ht, 2))
+          par2 <- paste("~~T[b]==", round(tb, 2))
+          par3 <- paste("~~psi[b][50]==", round(psib50,3))
+          par4 <- paste("~~sigma == ", round(sigma, 3))
+          par5 <- paste("~~R^2 == ", round(corr, 2))
+          
+          plt <- plt +
+            modelLines +
+            annotate("text", x = -Inf, y = 0.95, label = " Model Parameters:", color = "grey0", hjust = 0) +
+            annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
+            annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
+            annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
+            annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T) +
+            annotate("text", x = -Inf, y = 0.7, label = par5, color = "grey0", hjust = 0, parse = T)
         }
         
         plt

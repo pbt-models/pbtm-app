@@ -265,38 +265,36 @@ hydroTimeServer <- function(data, ready) {
         
         # add model results if successful
         if (is.list(model)) {
-          try({
-            ht <- model$HT
-            psib50 <- model$Psib50
-            sigma <- model$Sigma
-            corr <- model$Correlation
-            
-            # Plot all predicted treatments by the hydrotime model
-            modelLines <- mapply(function(wp) {
-              stat_function(
-                fun = function(x) {
-                  stats::pnorm(wp - (ht / x), psib50, sigma, log = FALSE) * germ_cutoff
-                },
-                aes(color = as.factor(wp))
-              )
-            },
-              unique(df$GermWP)
-            )
-            
-            par1 <- paste("~~HT==", round(ht, 2))
-            par2 <- paste("~~Psi[b](50)==", round(psib50, 3))
-            par3 <- paste("~~sigma== ", round(sigma, 3))
-            par4 <- paste("~~R^2== ", round(corr, 2))
-            
-            plt <- plt +
-              modelLines +
-              annotate("text", x = -Inf, y = 0.95, label = " Model parameters", color = "grey0", hjust = 0) +
-              annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
-              annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
-              annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
-              annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T)
-          })
+          ht <- model$HT
+          psib50 <- model$Psib50
+          sigma <- model$Sigma
+          corr <- model$Correlation
           
+          # Plot all predicted treatments by the hydrotime model
+          modelLines <- mapply(function(wp) {
+            stat_function(
+              fun = function(x) {
+                stats::pnorm(wp - (ht / x), psib50, sigma, log = FALSE) * germ_cutoff
+              },
+              aes(color = as.factor(wp))
+            )
+          },
+            unique(df$GermWP)
+          )
+          
+          # model params
+          par1 <- paste("~~HT==", round(ht, 2))
+          par2 <- paste("~~Psi[b](50)==", round(psib50, 3))
+          par3 <- paste("~~sigma== ", round(sigma, 3))
+          par4 <- paste("~~R^2== ", round(corr, 2))
+          
+          plt <- plt +
+            modelLines +
+            annotate("text", x = -Inf, y = 0.95, label = " Model parameters", color = "grey0", hjust = 0) +
+            annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
+            annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
+            annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
+            annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T)
         }
         
         plt

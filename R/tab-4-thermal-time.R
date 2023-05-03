@@ -261,38 +261,37 @@ thermalTimeServer <- function(data, ready) {
 
         # add model results if successful
         if (is.list(model)) {
-          try({
-            maxCumFrac <- model$MaxCumFrac
-            tb <- model$Tb
-            thetaT50 <- model$ThetaT50
-            sigma <- model$Sigma
-            corr <- model$Correlation
-            
-            # Plot all predicted treatments by the thermal time model
-            modelLines <- mapply(function(temp) {
-              stat_function(
-                fun = function(x) {
-                  stats::pnorm(log(x, base = 10), thetaT50 - log(temp - tb, base = 10),  sigma, log = F) * max_cum_frac
-                },
-                aes(color = as.factor(temp))
-              )
-            },
-              unique(df$GermTemp)
+          maxCumFrac <- model$MaxCumFrac
+          tb <- model$Tb
+          thetaT50 <- model$ThetaT50
+          sigma <- model$Sigma
+          corr <- model$Correlation
+          
+          # Plot all predicted treatments by the thermal time model
+          modelLines <- mapply(function(temp) {
+            stat_function(
+              fun = function(x) {
+                stats::pnorm(log(x, base = 10), thetaT50 - log(temp - tb, base = 10),  sigma, log = F) * max_cum_frac
+              },
+              aes(color = as.factor(temp))
             )
-            
-            par1 <- paste("~~T[b]==", round(tb, 1))
-            par2 <- paste("~~ThetaT(50)==", round(thetaT50, 3))
-            par3 <- paste("~~sigma==", round(sigma, 3))
-            par4 <- paste("~~R^2==", round(corr, 2))
-            
-            plt <- plt +
-              modelLines +
-              annotate("text", x = -Inf, y = 0.95, label = " Model parameters:", color = "grey0", hjust = 0) +
-              annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
-              annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
-              annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
-              annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T)
-          })
+          },
+            unique(df$GermTemp)
+          )
+          
+          # model parameters
+          par1 <- paste("~~T[b]==", round(tb, 1))
+          par2 <- paste("~~ThetaT(50)==", round(thetaT50, 3))
+          par3 <- paste("~~sigma==", round(sigma, 3))
+          par4 <- paste("~~R^2==", round(corr, 2))
+          
+          plt <- plt +
+            modelLines +
+            annotate("text", x = -Inf, y = 0.95, label = " Model parameters:", color = "grey0", hjust = 0) +
+            annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
+            annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
+            annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
+            annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T)
         }
 
         plt
