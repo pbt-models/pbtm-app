@@ -7,6 +7,7 @@ hydroTimeUI <- function() {
   
   tagList(
     h3(class = "tab-title", "Hydro time analysis"),
+    div(class = "tab-info", "The hydro time model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values."),
     uiOutput(ns("content"))
   )
 }
@@ -34,11 +35,11 @@ hydroTimeServer <- function(data, ready) {
       })
 
       
-      ## htData // base data for model run ----
-      htData <- reactive({
+      ## workingData // base data for model run ----
+      workingData <- reactive({
         req(
           dataReady(),
-          # input$germWPSelect,
+          input$germWPSelect,
           input$dataCleanSelect,
           input$trtIdSelect,
           input$cumFracRange,
@@ -46,13 +47,12 @@ hydroTimeServer <- function(data, ready) {
         )
         
         df <- data() %>%
-          # filter(GermWP %in% input$germWPSelect) %>%
+          filter(GermWP %in% input$germWPSelect) %>%
           filter(TrtID %in% input$trtIdSelect)
         
         # optionally remove repeated measurements at same cumulative fraction
         if (input$dataCleanSelect == "clean") {
-          df <- df %>%
-            distinct(TrtID, CumFraction, .keep_all = TRUE)
+          df <- df %>% distinct(TrtID, CumFraction, .keep_all = TRUE)
         }
         
         # filter based on cumulative fraction cutoffs
@@ -60,9 +60,9 @@ hydroTimeServer <- function(data, ready) {
       })
       
       
-      ## htResults // hydro time model results ----
-      htResults <- reactive({
-        df <- htData()
+      ## modelResults // hydro time model results ----
+      modelResults <- reactive({
+        df <- workingData()
         wp <- df$GermWP
         time <- df$CumTime
         germ <- df$CumFraction
@@ -112,8 +112,8 @@ hydroTimeServer <- function(data, ready) {
       
       # Observers ----
       
-      # observe(print(htData()))
-      observe(print(htResults()))
+      # observe(print(workingData()))
+      # observe(print(modelResults()))
       
       
       # Outputs ----
@@ -126,9 +126,9 @@ hydroTimeServer <- function(data, ready) {
         germWPChoices <- unique(data()$GermWP)
         
         fluidRow(
-          column(12, p(em("The hydrotime model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values."))),
           box(
-            title = "Model data input",
+            width = 6,
+            title = "Model parameters",
             checkboxGroupInput(
               inputId = ns("germWPSelect"),
               label = "Included water potential levels:",
@@ -145,35 +145,38 @@ hydroTimeServer <- function(data, ready) {
             )
           ),
           box(
+            width = 6,
             title = "Model results",
-            tableOutput(ns("htTable"))
+            tableOutput(ns("resultsTable"))
           ),
           box(
             width = 12,
-            plotOutput(ns("htPlot"))
+            title = "Germination data and hydro time model fit",
+            plotOutput(ns("plot"))
           ),
           box(
+            width = 6,
             title = "Additional data filters",
             uiOutput(ns("trtIdSelect")),
           ),
           box(
-            title = "Maximum germination (%) observed",
+            width = 6,
+            title = "Additional model constraints",
             sliderInput(
               inputId = ns("maxCumFrac"),
-              label = NULL,
+              label = "Maximum germination (%) observed",
               min = 10,
               max = 100,
               value = 100,
-              step = 1)
-          ),
-          box(
-            title = "Included interval (%):",
+              step = 1
+            ),
             sliderInput(
               inputId = ns("cumFracRange"),
-              label = NULL,
+              label = "Included interval (%):",
               min = 0,
               max = 100,
-              value = c(0, 100))
+              value = c(0, 100)
+            )
           )
         )
       })
@@ -183,7 +186,6 @@ hydroTimeServer <- function(data, ready) {
       output$trtIdSelect <- renderUI({
         if ("TrtDesc" %in% names(data())) {
           choices <- data() %>%
-            filter(GermWP %in% input$germWPSelect) %>%
             mutate(Label = paste(TrtID, TrtDesc, sep = ": ")) %>%
             distinct(Label, TrtID) %>%
             deframe()
@@ -200,9 +202,9 @@ hydroTimeServer <- function(data, ready) {
       })
       
 
-      ## htTable // render model results as table ----
-      output$htTable <- renderTable({
-        results <- htResults()
+      ## resultsTable // render model results as table ----
+      output$resultsTable <- renderTable({
+        results <- modelResults()
         
         # print error message if model fails
         validate(need(is.list(results), results))
@@ -220,11 +222,12 @@ hydroTimeServer <- function(data, ready) {
         width = "100%"
       )
       
-      ## htPlot // Hydro time plot ----
-      output$htPlot <- renderPlot({
-        req(htData(), htResults(), input$maxCumFrac)
+      ## plot // Hydro time plot ----
+      output$plot <- renderPlot({
+        req(input$maxCumFrac)
         
-        df <- htData()
+        df <- workingData()
+        model <- modelResults()
         germ_cutoff <- input$maxCumFrac / 100
         
         # generate the plot
@@ -261,10 +264,8 @@ hydroTimeServer <- function(data, ready) {
           theme_classic()
         
         # add model results if successful
-        if (is.list(htResults())) {
+        if (is.list(model)) {
           try({
-            model <- htResults()
-            maxCumFrac <- model$MaxCumFrac
             ht <- model$HT
             psib50 <- model$Psib50
             sigma <- model$Sigma

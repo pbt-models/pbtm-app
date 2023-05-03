@@ -2,6 +2,7 @@
 
 # Helpers ----
 
+# parses the comma-separated germ speed input, returns an ordered vector of numbers
 parseSpeeds <- function(x) {
   parsed <- NULL
   suppressWarnings(
@@ -28,6 +29,7 @@ germinationUI <- function() {
   
   tagList(
     h3(class = "tab-title", "Germination analysis"),
+    div(class = "tab-info", "<< Germination tab info goes here >>"),
     uiOutput(ns("content"))
   )
 }
@@ -48,12 +50,14 @@ germinationServer <- function(data, ready, trtChoices) {
     function(input, output, session) {
       ns <- session$ns
       
+      
+      # Vars ----
+      
       defaultGermSpeeds <- c(10, 16, 50, 84, 90)
-      germSpeeds <- reactiveVal(defaultGermSpeeds)
-      plotTrtChoices <- reactive({
-        vals <- trtChoices()
-        setNames(as.list(c(NA, vals)), c("Not specified", vals))
-      })
+      
+      rv <- reactiveValues(
+        germSpeeds = defaultGermSpeeds
+      )
       
       
       # Reactives ----
@@ -63,8 +67,32 @@ germinationServer <- function(data, ready, trtChoices) {
         truthy(data()) & ready()
       })
       
-      ## workingData ----
-      # slightly modified dataset used by plot and table
+      ## uniqueValueCount // number of unique values for each factor column
+      uniqueValueCount <- reactive({
+        req(dataReady())
+        data() %>%
+          select(all_of(as.character(trtChoices()))) %>%
+          lapply(function(x) { length(unique(x)) }) %>%
+          unlist() %>%
+          enframe() %>%
+          mutate(label = paste0(name, " (n=", value, ")"))
+      })
+      
+      plotColorChoices <- reactive({
+        df <- uniqueValueCount()
+        as.list(c(NA, df$name)) %>%
+          setNames(c("Not specified", df$label))
+      })
+      
+      plotShapeChoices <- reactive({
+        df <- uniqueValueCount() %>%
+          filter(value <= 6)
+        as.list(c(NA, df$name)) %>%
+          setNames(c("Not specified", df$label))
+      })
+      
+      
+      ## workingData // slightly modified dataset used by plot and table ----
       workingData <- reactive({
         req(dataReady())
         
@@ -75,8 +103,7 @@ germinationServer <- function(data, ready, trtChoices) {
           ungroup()
       })
       
-      ## germSpeedData ----
-      # used by germination speed table
+      ## germSpeedData // used by germination speed table ----
       germSpeedData <- reactive({
         workingData() %>%
           mutate(
@@ -92,7 +119,7 @@ germinationServer <- function(data, ready, trtChoices) {
           arrange(CumTime) %>%
           reframe(
             {
-              approx(CumFraction, CumTime, xout = germSpeeds() / 100, ties = "ordered", rule = 2) %>%
+              approx(CumFraction, CumTime, xout = rv$germSpeeds / 100, ties = "ordered", rule = 2) %>%
                 setNames(c("Frac", "Time")) %>%
                 as_tibble() %>%
                 drop_na()
@@ -106,13 +133,13 @@ germinationServer <- function(data, ready, trtChoices) {
       ## set new germ speeds ----
       observeEvent(input$setGermSpeeds, {
         parsed <- parseSpeeds(input$newGermSpeeds)
-        if (length(parsed) > 0) germSpeeds(parsed)
+        if (length(parsed) > 0) rv$germSpeeds <- parsed
         updateTextInput(inputId = "newGermSpeeds", value = "")
       })
       
       ## reset germ speeds ----
       observeEvent(input$resetGermSpeeds, {
-        germSpeeds(defaultGermSpeeds)
+        rv$germSpeeds <- defaultGermSpeeds
         updateTextInput(inputId = "newGermSpeeds", value = "")
       })
       
@@ -136,68 +163,80 @@ germinationServer <- function(data, ready, trtChoices) {
               status = "primary",
               solidHeader = T,
               width = 12,
-              sidebarLayout(
-                sidebarPanel(
-                  selectInput(
-                    inputId = ns("plotTrt1"),
-                    label = "Treatment 1 (color)",
-                    choices = plotTrtChoices()
+              wellPanel(
+                fluidRow(
+                  column(
+                    width = 6,
+                    selectInput(
+                      inputId = ns("plotColor"),
+                      label = "Treatment 1 (color)",
+                      choices = plotColorChoices()
+                    ),
+                    selectInput(
+                      inputId = ns("plotShape"),
+                      label = "Treatment 2 (shape, n <= 6)",
+                      choices = plotShapeChoices()
+                    )
                   ),
-                  selectInput(
-                    inputId = ns("plotTrt2"),
-                    label = "Treatment 2 (shape)",
-                    choices = plotTrtChoices()
-                  ),
-                  checkboxInput(
-                    inputId = ns("mergeTrts"),
-                    label = "Rescale cumulative germination?"
-                  ),
-                  checkboxInput(
-                    inputId = ns("showSpeeds"),
-                    label = "Show speed estimates?"
+                  column(
+                    width = 6,
+                    strong("Additional plot options:"),
+                    checkboxInput(
+                      inputId = ns("mergeTrts"),
+                      label = "Rescale cumulative germination?"
+                    ),
+                    checkboxInput(
+                      inputId = ns("showSpeeds"),
+                      label = "Show speed estimates?"
+                    )
                   )
-                ),
-                mainPanel(
-                  plotOutput(ns("plot"))
                 )
-              )
+              ),
+              plotOutput(ns("plot"))
             ),
             box(
               title = "Germination time analysis",
               status = "primary",
               solidHeader = T,
               width = 12,
-              sidebarLayout(
-                sidebarPanel(
-                  checkboxGroupInput(
-                    inputId = ns("germSpeedTrts"),
-                    label = "Select all treatment factors:",
-                    choices = trtChoices(),
-                    selected = c("TrtID")
-                  ),
-                  textInput(
-                    inputId = ns("newGermSpeeds"),
-                    label = "Set cumulative percent (separate with commas):",
-                    value = ""
-                  ),
-                  div(
-                    style = "margin-top: 1em; margin-bottom: 1em;",
-                    actionButton(ns("setGermSpeeds"), "Apply"),
-                    actionButton(ns("resetGermSpeeds"), "Reset")
-                  ),
-                  radioButtons(
-                    inputId = ns("germSpeedType"),
-                    label = "Report values as:",
-                    choices = list(
-                      "Time (to % germinated)" = "Time",
-                      "Rate (1 / time)" = "Rate"
+              div(
+                style = "overflow-x: auto",
+                dataTableOutput(ns("germSpeedTable"))
+              ),
+              wellPanel(
+                fluidRow(
+                  column(
+                    width = 4,
+                    checkboxGroupInput(
+                      inputId = ns("germSpeedTrts"),
+                      label = "Select all treatment factors:",
+                      choices = trtChoices(),
+                      selected = c("TrtID")
                     )
-                  )
-                ),
-                mainPanel(
-                  div(
-                    style = "overflow-x: auto",
-                    dataTableOutput(ns("germSpeedTable"))
+                  ),
+                  column(
+                    width = 4,
+                    textInput(
+                      inputId = ns("newGermSpeeds"),
+                      label = "Set cumulative percent (separate with commas):",
+                      value = ""
+                    ),
+                    div(
+                      style = "margin-top: 1em; margin-bottom: 1em;",
+                      actionButton(ns("setGermSpeeds"), "Apply"),
+                      actionButton(ns("resetGermSpeeds"), "Reset")
+                    )
+                  ),
+                  column(
+                    width = 4,
+                    radioButtons(
+                      inputId = ns("germSpeedType"),
+                      label = "Report values as:",
+                      choices = list(
+                        "Time (to % germinated)" = "Time",
+                        "Rate (1 / time)" = "Rate"
+                      )
+                    )
                   )
                 )
               )
@@ -210,58 +249,65 @@ germinationServer <- function(data, ready, trtChoices) {
       ## plot // germination curves ----
       output$plot <- renderPlot({
         df <- workingData()
-        trt1 <- input$plotTrt1
-        trt2 <- input$plotTrt2
-        req(trt1, trt2)
+        colorTrt <- input$plotColor
+        shapeTrt <- input$plotShape
+        req(colorTrt, shapeTrt)
         
         # collect treatments
-        trts <- c()
-        if (trt1 != "NA") {
-          trts <- c(trt1)
-          if (trt2 != "NA") {
-            trts <- c(trt1, trt2)
-          }
-        }
+        trts <- c(colorTrt, shapeTrt)
+        trts <- trts[!trts == "NA"]
         
         # rescales cumulative fraction across retained treatments
         if (input$mergeTrts) {
           df <- df %>%
             mutate(
               MaxCumFrac = max(CumFraction),
-              .by = all_of(trts)) %>%
+              .by = any_of(trts)) %>%
             arrange(CumTime) %>%
             summarise(
               MaxCumFrac = max(MaxCumFrac),
               FracDiff = sum(FracDiff),
               .by = c(all_of(trts), CumTime)) %>%
-            mutate(CumFraction = cumsum(FracDiff) / sum(FracDiff) * MaxCumFrac, .by = all_of(trts))
+            mutate(CumFraction = cumsum(FracDiff) / sum(FracDiff) * MaxCumFrac, .by = any_of(trts))
         }
         
-        # plots by number of trts
-        if (length(trts) == 1) {
+        if (colorTrt == "NA" & shapeTrt == "NA") {
+          plt <- df %>%
+            ggplot(aes(
+              x = CumTime,
+              y = CumFraction
+            )) +
+            geom_point(shape = 19, size = 2.5) 
+        } else if (colorTrt != "NA" & shapeTrt == "NA") {
           plt <- df %>%
             ggplot(aes(
               x = CumTime,
               y = CumFraction,
-              color = as.factor(.data[[trt1]]))) +
+              color = as.factor(.data[[colorTrt]])
+            )) +
             geom_point(shape = 19, size = 2.5) +
-            labs(color = trt1)
-        } else if (length(trts) == 2) {
+            labs(color = colorTrt)
+        } else if (colorTrt == "NA" & shapeTrt != "NA") {
           plt <- df %>%
             ggplot(aes(
               x = CumTime,
               y = CumFraction,
-              color = as.factor(.data[[trt1]]),
-              shape = as.factor(.data[[trt2]]))) +
+              shape = as.factor(.data[[shapeTrt]])
+            )) +
             geom_point(size = 2.5) +
-            labs(
-              color = trt1,
-              shape = trt2)
+            labs(shape = shapeTrt)
         } else {
           plt <- df %>%
-            ggplot(aes(x = CumTime, y = CumFraction)) +
-            geom_point(size = 2)
+            ggplot(aes(
+              x = CumTime,
+              y = CumFraction,
+              color = as.factor(.data[[colorTrt]]),
+              shape = as.factor(.data[[shapeTrt]])
+            )) +
+            geom_point(size = 2.5) +
+            labs(color = colorTrt, shape = shapeTrt)
         }
+
         
         # use TrtID to group lines if not rescaled
         if (input$mergeTrts) {
@@ -274,11 +320,11 @@ germinationServer <- function(data, ready, trtChoices) {
         plt <- plt +
           scale_x_continuous(
             breaks = scales::pretty_breaks(),
-            expand = expansion(c(.1, .1))) +
+            expand = expansion(c(0.1, 0.1))) +
           scale_y_continuous(
             labels = scales::percent,
             limits = c(0, 1),
-            expand = expansion(c(0, .1))) +
+            expand = expansion(c(0, 0.05))) +
           labs(
             title = "Cumulative germination",
             x = "Time",
@@ -287,7 +333,7 @@ germinationServer <- function(data, ready, trtChoices) {
           theme_classic()
         
         # show speed fractions on plot
-        lines = germSpeeds() / 100
+        lines = rv$germSpeeds / 100
         plt <- plt + geom_hline(
           yintercept = lines,
           color = "grey",
@@ -360,5 +406,6 @@ germinationServer <- function(data, ready, trtChoices) {
         )
       )
       
-  })
+    } # end
+  )
 }

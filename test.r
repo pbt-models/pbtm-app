@@ -85,7 +85,15 @@ sampleGermData %>%
   mutate(across(everything(), ~ as.character(.x)))
 
   
-  
+
+# number of levels
+
+sampleGermData %>%
+  select(!c("CumTime", "CumFraction")) %>%
+  lapply(\(x) length(unique(x))) %>%
+  unlist() %>%
+  enframe() %>%
+  mutate(label = paste0(name, " (n=", value, ")"))
   
 
 
