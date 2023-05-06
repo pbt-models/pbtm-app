@@ -17,8 +17,8 @@ agingUI <- function() {
 
 #' @references colValidation
 #' 
-#' @param `data` a `reactive()` data frame containing the loaded clean data
-#' @param `ready` a `reactive()` boolean indicating if the model is ready
+#' @param `data` reactive data frame containing the loaded clean data
+#' @param `ready` reactive boolean indicating if the model is ready
 
 agingServer <- function(data, ready) {
   moduleServer(
@@ -27,17 +27,41 @@ agingServer <- function(data, ready) {
       ns <- session$ns
       
       
-      # Reactives ----
-      
-      ## dataReady ----
-      dataReady <- reactive({
-        truthy(data()) & ready()
+      ## content // Rendered UI ----
+      output$content <- renderUI({
+        req_cols <- colValidation$Column[colValidation$Aging]
+        validate(need(ready(), "Please load required data for the aging model analysis. Minimum required columns are:", paste(req_cols, collapse = ", ")))
+        
+        agingTimeChoices <- unique(data()$AgingTime)
+        
+        fluidRow(
+          box(
+            width = 6,
+            title = "Model parameters",
+            checkboxGroupInput(
+              inputId = ns("agingTimeSelect"),
+              label = "Included aging times:",
+              choices = agingTimeChoices,
+              selected = agingTimeChoices
+            ),
+            dataCleanSelect(ns)
+          ),
+          resultsTable(ns, reactive(modelResults())),
+          box(
+            width = 12,
+            title = "Germination data and aging model fit",
+            plotOutput(ns("plot"))
+          ),
+          trtIdSelect(ns, reactive(data())),
+          cumFracSliders(ns)
+        )
       })
       
-      ## workingDataset // for model and plot ----
+      
+      # workingDataset // for model and plot ----
       workingData <- reactive({
         req(
-          dataReady(),
+          ready(),
           input$agingTimeSelect,
           input$dataCleanSelect,
           input$trtIdSelect,
@@ -58,28 +82,32 @@ agingServer <- function(data, ready) {
         df %>% filter(between(CumFraction * 100, input$cumFracRange[1], input$cumFracRange[2]))
       })
       
+      # observe(print(workingData()))
       
-      ## modelResults // list or error message ----
+      
+      # modelResults // list of coefficients or string error message ----
       modelResults <- reactive({
+        
+        # collect data
         df <- workingData()
-        Atime <- df$AgingTime
+        aging <- df$AgingTime
         time <- df$CumTime
         germ <- df$CumFraction
         max_cum_frac <- input$maxCumFrac / 100
         
         # set model conditions
-        lower <- list(ThetaA = 1   , Pmax50 = 1   , Sigma = 0.1)
-        start <- list(ThetaA = 100 , Pmax50 = 10  , Sigma = 3  )
-        upper <- list(ThetaA = 1000, Pmax50 = 1000, Sigma = 10 )
+        lower <- list(thetaA = 1, pmax50 = 1, sigma = 0.1)
+        start <- list(thetaA = 100, pmax50 = 10, sigma = 3)
+        upper <- list(thetaA = 1000, pmax50 = 1000, sigma = 10)
         
         # run model
         tryCatch({
           model <- stats::nls(
             formula = germ ~ max_cum_frac * stats::pnorm(
-              -(Atime + ThetaA / time), #wp - (HT / time),
-              -Pmax50, #Psib50,
-              Sigma,
-              log = FALSE),
+              -(aging + thetaA / time),
+              -pmax50,
+              sigma
+            ),
             start = start,
             lower = lower,
             upper = upper,
@@ -88,15 +116,15 @@ agingServer <- function(data, ready) {
           
           # grab coefs
           corr <- stats::cor(germ, stats::predict(model)) ^ 2
-          ThetaA <- summary(model)$coefficients[[1]]
-          Pmax50 <- summary(model)$coefficients[[2]]
-          Sigma <- summary(model)$coefficients[[3]]
+          thetaA <- summary(model)$coefficients[[1]]
+          pmax50 <- summary(model)$coefficients[[2]]
+          sigma <- summary(model)$coefficients[[3]]
           
           # return results
           list(
-            ThetaA = ThetaA,
-            Pmax50 = Pmax50,
-            Sigma = Sigma,
+            ThetaA = thetaA,
+            Pmax50 = pmax50,
+            Sigma = sigma,
             Correlation = corr
           )
         },
@@ -106,119 +134,7 @@ agingServer <- function(data, ready) {
         )
       })
       
-      
-      # Observers ----
-      
-      # observe(print(workingData()))
       # observe(print(modelResults()))
-      
-      
-      # Outputs ----
-      
-      ## content // main UI ----
-      output$content <- renderUI({
-        req_cols <- colValidation$Column[colValidation$Aging]
-        validate(need(dataReady(), "Please load required data for the aging model analysis. Minimum required columns are:", paste(req_cols, collapse = ", ")))
-        
-        agingTimeChoices <- unique(data()$AgingTime)
-        
-        fluidRow(
-          box(
-            width = 6,
-            title = "Model parameters",
-            checkboxGroupInput(
-              inputId = ns("agingTimeSelect"),
-              label = "Included aging times:",
-              choices = agingTimeChoices,
-              selected = agingTimeChoices
-            ),
-            radioButtons(
-              inputId = ns("dataCleanSelect"),
-              label = "Select data cleaning:",
-              choices = list(
-                "Original" = "original",
-                "Cleaned (remove repeats)" = "clean"
-              )
-            )
-          ),
-          box(
-            width = 6,
-            title = "Model results",
-            tableOutput(ns("resultsTable"))
-          ),
-          box(
-            width = 12,
-            title = "Germination data and aging model fit",
-            plotOutput(ns("plot"))
-          ),
-          box(
-            width = 6,
-            title = "Additional treatment filters",
-            uiOutput(ns("trtIdSelect"))
-          ),
-          box(
-            width = 6,
-            title = "Additional model contraints",
-            sliderInput(
-              inputId = ns("maxCumFrac"),
-              label = "Maximum germination (%) observed",
-              min = 10,
-              max = 100,
-              value = 100,
-              step = 1
-            ),
-            sliderInput(
-              inputId = ns("cumFracRange"),
-              label = "Included interval (%):",
-              min = 0,
-              max = 100,
-              value = c(0, 100)
-            )
-          )
-        )
-      })
-      
-      
-      ## trtIdSelect // Create checkbox with all TrtID levels to be included in the model analysis ----
-      output$trtIdSelect <- renderUI({
-        if ("TrtDesc" %in% names(data())) {
-          choices <- data() %>%
-            mutate(Label = paste(TrtID, TrtDesc, sep = ": ")) %>%
-            distinct(Label, TrtID) %>%
-            mutate(Label = str_trunc(Label, 30)) %>%
-            deframe()
-        } else {
-          choices <- unique(data()$TrtID)
-        }
-        
-        checkboxGroupInput(
-          inputId = ns("trtIdSelect"),
-          label = "Treatment ID:",
-          choices = choices,
-          selected = choices
-        )
-      })
-      
-      
-      ## resultsTable ----
-      output$resultsTable <- renderTable({
-        results <- modelResults()
-        
-        # print error message if model fails
-        validate(need(is.list(results), results))
-        
-        # convert list to simple data frame
-        results %>%
-          enframe() %>%
-          unnest(value) %>%
-          rename(
-            Parameter = name,
-            Value = value
-          )
-      },
-        digits = 4,
-        width = "100%"
-      )
       
       
       ## plot ----
@@ -276,12 +192,16 @@ agingServer <- function(data, ready) {
           sigma <- model$Sigma
           corr <- model$Correlation
           
-          modelLines <- mapply(function(atime) {
+          modelLines <- mapply(function(aging) {
             stat_function(
               fun = function(x) {
-                stats::pnorm(-(atime + thetaA / x), -pmax50, sigma, log = FALSE) * germ_cutoff
+                stats::pnorm(
+                  -(aging + thetaA / x),
+                  -pmax50,
+                  sigma
+                ) * germ_cutoff
               },
-              aes(color = as.factor(atime))
+              aes(color = as.factor(aging))
             )
           },
             unique(df$AgingTime)

@@ -1,13 +1,13 @@
-# ---- Hydro Priming ---- #
+# ---- Hydrothermal Priming ---- #
 
 # UI ----
 
-hydroPrimingUI <- function() {
-  ns <- NS("hydroPriming")
+hydrothermalPrimingUI <- function() {
+  ns <- NS("hydrothermalPriming")
   
   tagList(
-    h3(class = "tab-title", "Hydro priming analysis"),
-    div(class = "tab-info", "This hydro priming analysis component is still under contruction."),
+    h3(class = "tab-title", "Hydrothermal priming analysis"),
+    div(class = "tab-info", "This hydrothermal priming analysis component is still under contruction."),
     uiOutput(ns("content"))
   )
 }
@@ -20,19 +20,14 @@ hydroPrimingUI <- function() {
 #' @param `data` a `reactive()` data frame containing the loaded clean data
 #' @param `ready` a `reactive()` boolean indicating if the model is ready
 
-hydroPrimingServer <- function(data, ready) {
+hydrothermalPrimingServer <- function(data, ready) {
   moduleServer(
-    id = "hydroPriming",
+    id = "hydrothermalPriming",
     function(input, output, session) {
       ns <- session$ns
       
       
       # Reactives ----
-      
-      ## dataReady ----
-      dataReady <- reactive({
-        truthy(data()) & ready()
-      })
       
       
       # Observers ----

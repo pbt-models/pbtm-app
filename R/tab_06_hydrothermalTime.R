@@ -1,6 +1,6 @@
 # ---- Hydrothermal Time ---- #
 
-# UI ----
+# Static UI ----
 
 hydrothermalTimeUI <- function() {
   ns <- NS("hydrothermalTime")
@@ -26,17 +26,54 @@ hydrothermalTimeServer <- function(data, ready) {
     function(input, output, session) {
       ns <- session$ns
       
-      # Reactives ----
       
-      ## dataReady ----
-      dataReady <- reactive({
-        truthy(data()) & ready()
+      # content // Rendered UI ----
+      output$content <- renderUI({
+        req_cols <- colValidation$Column[colValidation$HydrothermalTime]
+        validate(need(ready(), "Please load required data for hydrothermal time analysis. Minimum required columns are:", paste(req_cols, collapse = ", ")))
+        
+        germWPChoices <- unique(data()$GermWP)
+        germTempChoices <- unique(data()$GermTemp)
+        
+        fluidRow(
+          box(
+            width = 6,
+            title = "Model parameters",
+            checkboxGroupInput(
+              inputId = ns("germWPSelect"),
+              label = "Included water potential levels:",
+              choices = germWPChoices,
+              selected = germWPChoices
+            ),
+            checkboxGroupInput(
+              inputId = ns("germTempSelect"),
+              label = "Included temperature levels:",
+              choices = germTempChoices,
+              selected = germTempChoices
+            ),
+            dataCleanSelect(ns),
+            numericInput(
+              inputId = ns("baseTemp"),
+              label = "Base temperature:",
+              value = NULL
+            )
+          ),
+          resultsTable(ns, reactive(modelResults())),
+          box(
+            width = 12,
+            title = "Germination data and hydrothermal time model fit",
+            plotOutput(ns("plot"))
+          ),
+          trtIdSelect(ns, reactive(data())),
+          cumFracSliders(ns)
+        )
       })
       
-      ## workingData // modified data for model ----
+      
+      # workingData // modified data for model ----
       workingData <- reactive({
         req(
-          dataReady(),
+          ready(),
           input$dataCleanSelect,
           input$germWPSelect,
           input$germTempSelect,
@@ -59,8 +96,10 @@ hydrothermalTimeServer <- function(data, ready) {
         df %>% filter(between(CumFraction * 100, input$cumFracRange[1], input$cumFracRange[2]))
       })
       
+      # observe(print(workingData()))
       
-      ## modelResults // list of model coefficients, or an error message ----
+      
+      # modelResults // list of model coefficients, or an error message ----
       modelResults <- reactive({
         
         # collect data
@@ -72,38 +111,28 @@ hydrothermalTimeServer <- function(data, ready) {
         max_cum_frac <- input$maxCumFrac / 100
         base_temp <- input$baseTemp
         
-        # set model conditions
-        start <- list(
-          HT = 800,
-          psib50 = -1,
-          sigma = 0.4)
+        # set model params
+        lower <- list(ht = 1, psib50 = -5, sigma = 0.0001)
+        start <- list(ht = 800, psib50 = -1, sigma = 0.4)
+        upper <- list(ht = 5000, psib50 = 0, sigma = 10)
         
-        lower <- list(
-          HT = 1,
-          psib50 = -5,
-          sigma = 0.0001)
-        
-        upper <- list(
-          HT = 5000,
-          psib50 = 0,
-          sigma = 10)
-        
+        # if base temp supplied, use it, or add defaults to params
         if (truthy(base_temp)) {
-          Tb <- base.temp
+          tb <- base_temp
         } else {
-          start$Tb <- 1
-          lower$Tb <- 0
-          upper$Tb <- 15
+          start$tb <- 1
+          lower$tb <- 0
+          upper$tb <- 15
         }
         
         # try to run the model
         tryCatch({
           model <- stats::nls(
             germ ~ max_cum_frac * stats::pnorm(
-              wp - (HT / ((temp - Tb) * time)),
+              wp - (ht / ((temp - tb) * time)),
               psib50,
-              sigma,
-              log = FALSE),
+              sigma
+            ),
             start = start,
             lower = lower,
             upper = upper,
@@ -112,21 +141,21 @@ hydrothermalTimeServer <- function(data, ready) {
           
           # get coefs
           corr <- stats::cor(germ, stats::predict(model)) ^ 2
-          HT <- summary(model)$coefficients[[1]]
-          Psib50 <- summary(model)$coefficients[[2]]
-          Sigma <- summary(model)$coefficients[[3]]
+          ht <- summary(model)$coefficients[[1]]
+          psib50 <- summary(model)$coefficients[[2]]
+          sigma <- summary(model)$coefficients[[3]]
           if (truthy(base_temp)) {
-            Tb <- base.temp
+            tb <- base_temp
           } else {
-            Tb <- summary(model)$coefficients[[4]]
+            tb <- summary(model)$coefficients[[4]]
           }
           
           # return results
           list(
-            HT = HT,
-            Tb = Tb,
-            Psib50 = Psib50,
-            Sigma = Sigma,
+            HT = ht,
+            Tb = tb,
+            Psib50 = psib50,
+            Sigma = sigma,
             Correlation = corr
           )
         },
@@ -136,134 +165,10 @@ hydrothermalTimeServer <- function(data, ready) {
         )
       })
       
-      
-      # Observers ----
-      
-      # observe(print(workingData()))
       # observe(print(modelResults()))
       
       
-      # Outputs ----
-      
-      ## content // main UI ----
-      output$content <- renderUI({
-        req_cols <- colValidation$Column[colValidation$HydrothermalTime]
-        validate(need(dataReady(), "Please load required data for hydrothermal time analysis. Minimum required columns are:", paste(req_cols, collapse = ", ")))
-        
-        germWPChoices <- unique(data()$GermWP)
-        germTempChoices <- unique(data()$GermTemp)
-        
-        fluidRow(
-          box(
-            width = 6,
-            title = "Model parameters",
-            checkboxGroupInput(
-              inputId = ns("germWPSelect"),
-              label = "Included water potential levels:",
-              choices = germWPChoices,
-              selected = germWPChoices
-            ),
-            checkboxGroupInput(
-              inputId = ns("germTempSelect"),
-              label = "Included temperature levels:",
-              choices = germTempChoices,
-              selected = germTempChoices
-            ),
-            radioButtons(
-              inputId = ns("dataCleanSelect"),
-              label = "Select data cleaning:",
-              choices = list(
-                "Original" = "original",
-                "Cleaned (remove duplicates)" = "clean"
-              )
-            ),
-            numericInput(
-              inputId = ns("baseTemp"),
-              label = "Base temperature:",
-              value = NULL
-            )
-          ),
-          box(
-            width = 6,
-            title = "Model results",
-            tableOutput(ns("resultsTable"))
-          ),
-          box(
-            width = 12,
-            title = "Germination data and hydrothermal time model fit",
-            plotOutput(ns("plot"))
-          ),
-          box(
-            width = 6,
-            title = "Additional treatment filters",
-            uiOutput(ns("trtIdSelect")),
-          ),
-          box(
-            width = 6,
-            title = "Additional model constraints",
-            sliderInput(
-              inputId = ns("maxCumFrac"),
-              label = "Maximum germination (%) observed",
-              min = 10,
-              max = 100,
-              value = 100,
-              step = 1
-            ),
-            sliderInput(
-              inputId = ns("cumFracRange"),
-              label = "Included interval (%):",
-              min = 0,
-              max = 100,
-              value = c(0, 100)
-            )
-          )
-        )
-      })
-      
-      
-      ## trtIdSelect // Create checkbox with all TrtID levels to be included in the model analysis ----
-      output$trtIdSelect <- renderUI({
-        if ("TrtDesc" %in% names(data())) {
-          choices <- data() %>%
-            mutate(Label = paste(TrtID, TrtDesc, sep = ": ")) %>%
-            distinct(Label, TrtID) %>%
-            mutate(Label = str_trunc(Label, 20)) %>%
-            deframe()
-        } else {
-          choices <- unique(data()$TrtID)
-        }
-        
-        checkboxGroupInput(
-          inputId = ns("trtIdSelect"),
-          label = "Treatment ID:",
-          choices = choices,
-          selected = choices
-        )
-      })
-      
-      
-      ## resultsTable ----
-      output$resultsTable <- renderTable({
-        results <- modelResults()
-        
-        # print error message if model fails
-        validate(need(is.list(results), results))
-        
-        # convert results list to data frame
-        results %>%
-          enframe() %>%
-          unnest(value) %>%
-          rename(
-            Parameter = name,
-            Value = value
-          )
-      },
-        digits = 4,
-        width = "100%"
-      )
-      
-      
-      ## plot ----
+      # plot ----
       output$plot <- renderPlot({
         req(
           workingData(),
@@ -278,7 +183,10 @@ hydrothermalTimeServer <- function(data, ready) {
         
         # generate the plot
         plt <- df %>%
-          ggplot(aes(x = CumTime, y = CumFraction, color = as.factor(GermWP))) +
+          ggplot(aes(
+            x = CumTime,
+            y = CumFraction,
+            color = as.factor(GermWP))) +
           annotate(
             "rect",
             xmin = 0,
@@ -328,9 +236,8 @@ hydrothermalTimeServer <- function(data, ready) {
                 stats::pnorm(
                   wp - (ht / ((temp - tb) * x)),
                   psib50,
-                  sigma,
-                  log = FALSE
-                ) *  germ_cutoff
+                  sigma
+                ) * germ_cutoff
               },
               aes(
                 color = as.factor(wp),

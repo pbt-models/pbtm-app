@@ -1,6 +1,6 @@
 # ---- Hydro Time ---- #
 
-# UI ----
+# Static UI ----
 
 hydroTimeUI <- function() {
   ns <- NS("hydroTime")
@@ -27,18 +27,43 @@ hydroTimeServer <- function(data, ready) {
       ns <- session$ns
       
       
-      # Reactives ----
+      # content // Rendered UI ----
       
-      ## dataReady ----
-      dataReady <- reactive({
-        truthy(data()) & ready()
+      output$content <- renderUI({
+        req_cols <- colValidation$Column[colValidation$HydroTime]
+        validate(need(ready(), paste("Please load a dataset with required columns for hydro time analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
+        
+        germWPChoices <- unique(data()$GermWP)
+        
+        fluidRow(
+          box(
+            width = 6,
+            title = "Model parameters",
+            checkboxGroupInput(
+              inputId = ns("germWPSelect"),
+              label = "Included water potential levels:",
+              choices = germWPChoices,
+              selected = germWPChoices
+            ),
+            dataCleanSelect(ns)
+          ),
+          resultsTable(ns, reactive(modelResults())),
+          box(
+            width = 12,
+            title = "Germination data and hydro time model fit",
+            plotOutput(ns("plot"))
+          ),
+          trtIdSelect(ns, reactive(data())),
+          cumFracSliders(ns)
+        )
       })
 
       
-      ## workingData // base data for model run ----
+      # workingData // for model and plot ----
+      
       workingData <- reactive({
         req(
-          dataReady(),
+          ready(),
           input$germWPSelect,
           input$dataCleanSelect,
           input$trtIdSelect,
@@ -59,49 +84,52 @@ hydroTimeServer <- function(data, ready) {
         df %>% filter(between(CumFraction * 100, input$cumFracRange[1], input$cumFracRange[2]))
       })
       
+      # observe(print(workingData()))
       
-      ## modelResults // hydro time model results ----
+      
+      # modelResults // list with model results or string with error ----
+      
       modelResults <- reactive({
+        
+        # collect data
         df <- workingData()
         wp <- df$GermWP
         time <- df$CumTime
         germ <- df$CumFraction
         max_cum_frac <- input$maxCumFrac / 100
         
+        # model params
+        lower = list(ht = 1, psib50 = -5, sigma = 0.0001)
+        start = list(ht = 60, psib50 = -0.8, sigma = 0.2)
+        upper = list(ht = 1000, psib50 = -0.000000001, sigma = 2)
+        
         # run model, return message if fails
         tryCatch({
           model <- stats::nls(
             formula = germ ~ max_cum_frac * stats::pnorm(
-              wp - (HT / time),
-              Psib50,
-              Sigma,
-              log = FALSE),
-            start = list(
-              HT = 60,
-              Psib50 = -0.8,
-              Sigma = 0.2),
-            lower = list(
-              HT = 1,
-              Psib50 = -5,
-              Sigma = 0.0001),
-            upper = list(
-              HT = 1000,
-              Psib50 = -0.000000001,
-              Sigma = 2),
-            algorithm = "port")
+              wp - (ht / time),
+              psib50,
+              sigma
+            ),
+            start = start,
+            lower = lower,
+            upper = upper,
+            algorithm = "port"
+          )
           
           # grab coefs
           corr <- stats::cor(germ, stats::predict(model)) ^ 2
-          HT <- summary(model)$coefficients[[1]]
-          Psib50 <- summary(model)$coefficients[[2]]
-          Sigma <- summary(model)$coefficients[[3]]
+          ht <- summary(model)$coefficients[[1]]
+          psib50 <- summary(model)$coefficients[[2]]
+          sigma <- summary(model)$coefficients[[3]]
           
           # return results
           list(
-            HT = HT,
-            Psib50 = Psib50,
-            Sigma = Sigma,
-            Correlation = corr)
+            HT = ht,
+            Psib50 = psib50,
+            Sigma = sigma,
+            Correlation = corr
+          )
         },
           error = function(cond) {
             paste("Unable to compute model, try adjusting parameters. Reason:", str_to_sentence(cond[1]))
@@ -109,120 +137,11 @@ hydroTimeServer <- function(data, ready) {
         )
       })
       
-      
-      # Observers ----
-      
-      # observe(print(workingData()))
       # observe(print(modelResults()))
       
       
-      # Outputs ----
+      # plot ----
       
-      ## content // main UI ----
-      output$content <- renderUI({
-        req_cols <- colValidation$Column[colValidation$HydroTime]
-        validate(need(dataReady(), paste("Please load a dataset with required columns for hydro time analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
-        
-        germWPChoices <- unique(data()$GermWP)
-        
-        fluidRow(
-          box(
-            width = 6,
-            title = "Model parameters",
-            checkboxGroupInput(
-              inputId = ns("germWPSelect"),
-              label = "Included water potential levels:",
-              choices = germWPChoices,
-              selected = germWPChoices
-            ),
-            radioButtons(
-              inputId = ns("dataCleanSelect"),
-              label = "Select data cleaning:",
-              choices = list(
-                "Original" = "original",
-                "Cleaned (remove duplicates)" = "clean"
-              )
-            )
-          ),
-          box(
-            width = 6,
-            title = "Model results",
-            tableOutput(ns("resultsTable"))
-          ),
-          box(
-            width = 12,
-            title = "Germination data and hydro time model fit",
-            plotOutput(ns("plot"))
-          ),
-          box(
-            width = 6,
-            title = "Additional data filters",
-            uiOutput(ns("trtIdSelect")),
-          ),
-          box(
-            width = 6,
-            title = "Additional model constraints",
-            sliderInput(
-              inputId = ns("maxCumFrac"),
-              label = "Maximum germination (%) observed",
-              min = 10,
-              max = 100,
-              value = 100,
-              step = 1
-            ),
-            sliderInput(
-              inputId = ns("cumFracRange"),
-              label = "Included interval (%):",
-              min = 0,
-              max = 100,
-              value = c(0, 100)
-            )
-          )
-        )
-      })
-      
-      
-      ## trtIdSelect // Create checkbox with all TrtID levels to be included in the model analysis ----
-      output$trtIdSelect <- renderUI({
-        if ("TrtDesc" %in% names(data())) {
-          choices <- data() %>%
-            mutate(Label = paste(TrtID, TrtDesc, sep = ": ")) %>%
-            distinct(Label, TrtID) %>%
-            deframe()
-        } else {
-          choices <- unique(data()$TrtID)
-        }
-        
-        checkboxGroupInput(
-          inputId = ns("trtIdSelect"),
-          label = "Treatment ID:",
-          choices = choices,
-          selected = choices
-        )
-      })
-      
-
-      ## resultsTable // render model results as table ----
-      output$resultsTable <- renderTable({
-        results <- modelResults()
-        
-        # print error message if model fails
-        validate(need(is.list(results), results))
-        
-        # convert list to simple data frame
-        results %>%
-          enframe() %>%
-          unnest(value) %>%
-          rename(
-            Parameter = name,
-            Value = value
-          )
-      },
-        digits = 4,
-        width = "100%"
-      )
-      
-      ## plot // Hydro time plot ----
       output$plot <- renderPlot({
         req(input$maxCumFrac)
         
@@ -274,7 +193,11 @@ hydroTimeServer <- function(data, ready) {
           modelLines <- mapply(function(wp) {
             stat_function(
               fun = function(x) {
-                stats::pnorm(wp - (ht / x), psib50, sigma, log = FALSE) * germ_cutoff
+                stats::pnorm(
+                  q = wp - (ht / x),
+                  mean = psib50,
+                  sd = sigma
+                ) * germ_cutoff
               },
               aes(color = as.factor(wp))
             )
