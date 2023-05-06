@@ -1,6 +1,6 @@
 # ---- Thermal Time ---- #
 
-# UI ----
+# Static UI ----
 
 thermalTimeUI <- function() {
   ns <- NS("thermalTime")
@@ -27,17 +27,43 @@ thermalTimeServer <- function(data, ready) {
       ns <- session$ns
       
       
-      # Reactives ----
+      # content // Rendered UI ----
       
-      ## dataReady ----
-      dataReady <- reactive({
-        truthy(data()) & ready()
+      output$content <- renderUI({
+        req_cols <- colValidation$Column[colValidation$ThermalTime]
+        validate(need(ready(), paste("Please load a dataset with required columns for thermal time analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
+        
+        germTempChoices <- unique(data()$GermTemp)
+        
+        fluidRow(
+          box(
+            width = 6,
+            title = "Model data input",
+            checkboxGroupInput(
+              inputId = ns("germTempSelect"),
+              label = "Included temperature levels:",
+              choices = germTempChoices,
+              selected = germTempChoices
+            ),
+            dataCleanSelect(ns)
+          ),
+          resultsTable(ns, reactive(modelResults())),
+          box(
+            width = 12,
+            title = "Germination plot and thermal time sub-optimal model fit",
+            plotOutput(ns("plot"))
+          ),
+          trtIdSelect(ns, reactive(data())),
+          cumFracSliders(ns)
+        )
       })
       
-      ## workingData // Thermal time suboptimal model data ----
+      
+      # workingData // modified dataset for model run ----
+      
       workingData <- reactive({
         req(
-          dataReady(),
+          ready(),
           input$germTempSelect,
           input$dataCleanSelect,
           input$trtIdSelect,
@@ -59,49 +85,51 @@ thermalTimeServer <- function(data, ready) {
         df %>% filter(between(CumFraction * 100, input$cumFracRange[1], input$cumFracRange[2]))
       })
       
+      # observe(print(workingData()))
       
-      ## modelResults // list with TTSO model results ----
+      
+      # modelResults // list with model results or string with error ----
+      
       modelResults <- reactive({
+        
+        # collect data
         df <- workingData()
         temp <- df$GermTemp
         time <- df$CumTime
         germ <- df$CumFraction
         max_cum_frac <- input$maxCumFrac / 100
         
+        # model params
+        lower <- list(tb = 0, thetaT50 = 0.5, sigma = 0.0001)
+        start <- list(tb = 6, thetaT50 = 3, sigma = 0.09)
+        upper <- list(tb = 20, thetaT50 = 50, sigma = 1.50)
+        
         # run model, return message if fails
         tryCatch({
           model <- stats::nls(
             formula = germ ~ max_cum_frac * stats::pnorm(
-              log(time, base = 10),
-              mean = thetaT50 - log(temp - Tb, base = 10),
-              sd = sigma,
-              log = FALSE),
-            start = list(
-              Tb = 6,
-              thetaT50 = 3,
-              sigma = 0.09),
-            lower = list(
-              Tb = 0,
-              thetaT50 = 0.5,
-              sigma = 0.0001),
-            upper = list(
-              Tb = 20,
-              thetaT50 = 50,
-              sigma = 1.50),
-            algorithm = "port")
+              log10(time),
+              thetaT50 - log10(temp - tb),
+              sigma
+            ),
+            start = start,
+            lower = lower,
+            upper = upper,
+            algorithm = "port"
+          )
           
           # grab coefs
-          Corr <- stats::cor(germ, stats::predict(model)) ^ 2
-          Tb <- summary(model)$coefficients[[1]]
-          ThetaT50 <- summary(model)$coefficients[[2]]
-          Sigma <- summary(model)$coefficients[[3]]
+          corr <- stats::cor(germ, stats::predict(model)) ^ 2
+          tb <- summary(model)$coefficients[[1]]
+          thetaT50 <- summary(model)$coefficients[[2]]
+          sigma <- summary(model)$coefficients[[3]]
           
           # return results
           list(
-            Tb = Tb,
-            ThetaT50 = ThetaT50,
-            Sigma = Sigma,
-            Correlation = Corr
+            Tb = tb,
+            ThetaT50 = thetaT50,
+            Sigma = sigma,
+            Correlation = corr
           )
         },
           error = function(cond) {
@@ -110,119 +138,11 @@ thermalTimeServer <- function(data, ready) {
         )
       })
       
-      
-      # Observers ----
-      
-      # observe(print(ttsoData()))
-      # observe(print(ttsoResults()))
+      # observe(print(modelResults()))
       
       
-      # Outputs ----
+      # plot ----
       
-      ## content // main UI ----
-      output$content <- renderUI({
-        req_cols <- colValidation$Column[colValidation$ThermalTime]
-        validate(need(dataReady(), paste("Please load a dataset with required columns for thermal time analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
-        
-        germTempChoices <- unique(data()$GermTemp)
-        
-        fluidRow(
-          box(
-            title = "Model data input",
-            checkboxGroupInput(
-              inputId = ns("germTempSelect"),
-              label = "Included temperature levels:",
-              choices = germTempChoices,
-              selected = germTempChoices
-            ),
-            radioButtons(
-              inputId = ns("dataCleanSelect"),
-              label = "Select data cleaning:",
-              choices = list(
-                "Original" = "original",
-                "Cleaned (remove duplicates)" = "clean"
-              )
-            )
-          ),
-          box(
-            title = "Model results",
-            tableOutput(ns("resultsTable"))
-          ),
-          box(
-            width = 12,
-            title = "Germination plot and thermal time sub-optimal model fit",
-            plotOutput(ns("plot"))
-          ),
-          box(
-            width = 6,
-            title = "Additional data filters",
-            uiOutput(ns("trtIdSelect"))
-          ),
-          box(
-            wdith = 6,
-            title = "Additional model constraints",
-            sliderInput(
-              inputId = ns("maxCumFrac"),
-              label = "Maximum germination (%) observed",
-              min = 10,
-              max = 100,
-              value = 100,
-              step = 1
-            ),
-            sliderInput(
-              inputId = ns("cumFracRange"),
-              label = "Included interval (%):",
-              min = 0,
-              max = 100,
-              value = c(0, 100)
-            )
-          )
-        )
-      })
-      
-      
-      ## trtIdSelect // Create checkbox with all TrtID levels to be included in the model analysis ----
-      output$trtIdSelect <- renderUI({
-        if ("TrtDesc" %in% names(data())) {
-          choices <- data() %>%
-            mutate(Label = paste(TrtID, TrtDesc, sep = ": ")) %>%
-            distinct(Label, TrtID) %>%
-            deframe()
-        } else {
-          choices <- unique(data()$TrtID)
-        }
-        
-        checkboxGroupInput(
-          inputId = ns("trtIdSelect"),
-          label = "Treatment ID:",
-          choices = choices,
-          selected = choices
-        )
-      })
-      
-      
-      ## resultsTable // TTSO model results in table format ----
-      output$resultsTable <- renderTable({
-        results <- modelResults()
-
-        # print error message if model fails
-        validate(need(is.list(results), results))
-
-        # convert results list to data frame
-        results %>%
-          enframe() %>%
-          unnest(value) %>%
-          rename(
-            Parameter = name,
-            Value = value
-          )
-      },
-        digits = 4,
-        width = "100%"
-      )
-
-      
-      ## plot // TTSO plot ----
       output$plot <- renderPlot({
         df <- workingData()
         model <- modelResults()
@@ -271,7 +191,11 @@ thermalTimeServer <- function(data, ready) {
           modelLines <- mapply(function(temp) {
             stat_function(
               fun = function(x) {
-                stats::pnorm(log(x, base = 10), thetaT50 - log(temp - tb, base = 10),  sigma, log = F) * max_cum_frac
+                stats::pnorm(
+                  q = log10(x),
+                  mean = thetaT50 - log10(temp - tb),
+                  sd = sigma
+                ) * max_cum_frac
               },
               aes(color = as.factor(temp))
             )

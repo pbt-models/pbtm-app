@@ -54,7 +54,7 @@ footer <- list(
     p("App developed by", a("Ben Bradford", href = "https://github.com/bzbradford"), "and", a("Pedro Bello", href = "https://github.com/pedrobello")),
     p("Based on the", a("PBTM R package", href = "https://github.com/pedrobello/pbtm"), "developed by", a("Pedro Bello", href = "https://github.com/pedrobello"), "and", a("Ben Bradford", href = "https://github.com/bzbradford")),
     p("Seed germination models developed by", a("Kent Bradford", href = "https://www.plantsciences.ucdavis.edu/people/kent-bradford"), "and", a("Pedro Bello", href = "https://www.plantsciences.ucdavis.edu/people/pedro-bello")),
-    p(a("Source code", href = "https://github.com/bzbradford/pbtm-app")),
+    p(a("Source code", href = "https://github.com/pbt-models/pbtm-app")),
     br()
   )
 )
