@@ -2,13 +2,20 @@
 
 # Static UI ----
 
-loadDataUI <- function() {
+LoadDataUI <- function() {
   ns <- NS("loadData")
   
   tagList(
     h3("Upload data", class = "tab-title"),
     p(em("Upload your own data here or select one of our sample datasets to get started.")),
-    hr(),
+    br(),
+    p(strong("Expected column names and descriptions:")),
+    bsCollapse(
+      bsCollapsePanel(
+        title = "Show/hide column descriptions",
+        tableOutput(ns("columnDescriptions"))
+      )
+    ),
     p(strong("Sample datasets:")),
     div(
       class = "flex-btns",
@@ -24,14 +31,12 @@ loadDataUI <- function() {
         inputId = ns("userData"),
         label = NULL,
         accept = c(".csv")
+      ),
+      div(
+        style = "height: min-content;",
+        actionButton(ns("clearData"), "Clear loaded data")
       )
     ),
-    p(strong("Start over:")),
-    div(
-      class = "flex-btns",
-      actionButton(ns("clearData"), "Clear loaded data")
-    ),
-    hr(),
     uiOutput(ns("currentDataUI"))
   )
 }
@@ -43,7 +48,7 @@ loadDataUI <- function() {
 #' @references samplePrimingData
 #' @references sampleAgingData
 
-loadDataServer <- function() {
+LoadDataServer <- function() {
   moduleServer(
     id = "loadData",
     function(input, output, session) {
@@ -136,7 +141,7 @@ loadDataServer <- function() {
               title = "Show/hide data table",
               value = "tab",
               div(
-                style = "overflow: auto;",
+                class = "tbl-container margin-10",
                 dataTableOutput(ns("currentDataTable"))
               )
             )
@@ -160,15 +165,26 @@ loadDataServer <- function() {
               title = "Show/hide data table",
               value = "tab",
               div(
-                style = "overflow: auto;",
+                class = "tbl-container margin-10",
                 dataTableOutput(ns("cleanDataTable"))
               )
             )
           )
         )
-        
       })
       
+      ## columnDescriptions // table showing column descriptions ----
+      output$columnDescriptions <- renderTable({
+        colValidation %>%
+          select(
+            `Default name` = Column,
+            Description = LongDescription,
+            `Data type` = TypeDescription,
+            Usage
+          )
+      },
+        spacing = "s"
+      )
       
       ## currentDataTable // data as it was uploaded----
       output$currentDataTable <- renderDataTable(rawData())

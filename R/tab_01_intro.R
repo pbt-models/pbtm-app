@@ -2,7 +2,7 @@
 
 # UI ----
 
-introUI <- function() {
+IntroUI <- function() {
   ns <- NS("intro")
   
   tagList(
@@ -39,7 +39,7 @@ introUI <- function() {
 #' @references samplePrimingData
 #' @references sampleAgingData
 
-introServer <- function() {
+IntroServer <- function() {
   moduleServer(
     id = "intro",
     function(input, output, session) {
@@ -52,12 +52,14 @@ introServer <- function() {
       output$columnDescriptions <- renderTable({
         colValidation %>%
           select(
-            `Default column name` = Column,
+            `Default name` = Column,
             Description = LongDescription,
             `Data type` = TypeDescription,
             Usage
           )
-      })
+      },
+        spacing = "s"
+      )
 
       
       # Download handlers ----

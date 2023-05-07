@@ -11,31 +11,14 @@ server <- function(input, output, session) {
   )
   
   
-  # Reactives ----
-  
-  ## dataLoaded // boolean: data has rows ----
-  dataLoaded <- reactive({
-    nrow(rv$data) > 0
-  })
-  
-  ## trtChoices // list of factor cols ----
-  trtChoices <- reactive({
-    req(rv$colStatus)
-    cols <- sapply(1:nCols, function(i) {
-      if (rv$colStatus[i] == T && colValidation$Role[i] == "Factor") colValidation$Column[i]
-    })
-    compact(cols)
-  })
-  
-  
   # Outputs ----
   
   ## Reactive menu entry for loading tab ----
   output$LoadMenu <- renderMenu({
-    ready <- dataLoaded()
+    ready <- nrow(rv$data) > 0
     menuItem(
       "Upload data",
-      tabName = "LoadTab",
+      tabName = "LoadDataTab",
       badgeLabel = ifelse(ready, "OK", "!"),
       badgeColor = ifelse(ready, "green", "yellow")
     )
@@ -57,78 +40,32 @@ server <- function(input, output, session) {
 
   # Module Servers ----
   
-  ## Intro ----
-  introServer()
+  IntroServer()
   
-  ## Load Data ----
-  loadDataReturn <- loadDataServer()
+  # capture return values from the load data server
+  loadDataReturns <- LoadDataServer()
   
+  # save return values
   observe({
-    rv$data <- loadDataReturn()$data
-    rv$colStatus <- loadDataReturn()$colStatus
-    rv$modelReady <- loadDataReturn()$modelReady
+    rv$data <- loadDataReturns()$data
+    rv$colStatus <- loadDataReturns()$colStatus
+    rv$modelReady <- loadDataReturns()$modelReady
   })
   
-  ## Germination ----
-  germinationServer(
-    data = reactive(rv$data),
-    ready = reactive(truthy(rv$modelReady$Germination)),
-    trtChoices = reactive(trtChoices())
-  )
-  
-  ## Thermal Time ----
-  thermalTimeServer(
-    data = reactive(rv$data),
-    ready = reactive(truthy(rv$modelReady$ThermalTime))
-  )
-
-  ## Hydro Time  ----
-  hydroTimeServer(
-    data = reactive(rv$data),
-    ready = reactive(truthy(rv$modelReady$HydroTime))
-  )
-  
-  ## Hydrothermal Time ----
-  hydrothermalTimeServer(
-    data = reactive(rv$data),
-    ready = reactive(truthy(rv$modelReady$HydrothermalTime))
-  )
-  
-  ## Hydro Priming ----
-  hydroPrimingServer(
-    data = reactive(rv$data),
-    ready = reactive(truthy(rv$modelReady$HydroPriming))
-  )
-  
-  ## Hydrothermal Priming ----
-  hydrothermalPrimingServer(
-    data = reactive(rv$data),
-    ready = reactive(truthy(rv$modelReady$HydrothermalPriming))
-  )
-  
-  ## Aging ----
-  agingServer(
-    data = reactive(rv$data),
-    ready = reactive(truthy(rv$modelReady$Aging))
-  )
-  
-  ## Promoter model ----
-  promoterServer(
-    data = reactive(rv$data),
-    ready = reactive(truthy(rv$modelReady$Promoter))
-  )
-  
-  ## Inhibitor model ----
-  inhibitorServer(
-    data = reactive(rv$data),
-    ready = reactive(truthy(rv$modelReady$Inhibitor))
-  )
+  # Call each of the model servers
+  lapply(modelNames, function(m) {
+    do.call(
+      paste0(m, "Server"),
+      list(
+        data = reactive(rv$data),
+        ready = reactive(truthy(rv$modelReady[[m]]))
+      )
+    )
+  })
   
   
   # Gracefully exit ----
   
-  session$onSessionEnded(function() {
-    stopApp()
-  })
+  session$onSessionEnded(\() stopApp())
   
 }

@@ -2,7 +2,7 @@
 
 # Static UI ----
 
-hydrothermalTimeUI <- function() {
+HydrothermalTimeUI <- function() {
   ns <- NS("hydrothermalTime")
   
   tagList(
@@ -20,7 +20,7 @@ hydrothermalTimeUI <- function() {
 #' @param `data` a `reactive()` data frame containing the loaded clean data
 #' @param `ready` a `reactive()` boolean indicating if the model is ready
 
-hydrothermalTimeServer <- function(data, ready) {
+HydrothermalTimeServer <- function(data, ready) {
   moduleServer(
     id = "hydrothermalTime",
     function(input, output, session) {

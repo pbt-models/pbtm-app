@@ -1,10 +1,12 @@
 # ---- checkModelReady ---- #
 
-# returns false if colStatus is false for that column
+# checks that all required columns are validated for each model
 checkModelReady <- function(requirements, statuses) {
   compare <- sapply(1:nCols, function(i) {
-    test <- (requirements[i] == T & statuses[i] == T) | (requirements[i] == F)
-    if (length(test) == 0) {F} else {test}
+    test <-
+      (requirements[i] == TRUE & statuses[i] == TRUE) |
+      (requirements[i] == FALSE)
+    ifelse(length(test) == 0, FALSE, test)
   })
-  !(F %in% compare)
+  all(compare)
 }

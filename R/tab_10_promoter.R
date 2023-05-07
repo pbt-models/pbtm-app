@@ -2,7 +2,7 @@
 
 # UI ----
 
-promoterUI <- function() {
+PromoterUI <- function() {
   ns <- NS("promoter")
   
   tagList(
@@ -20,7 +20,7 @@ promoterUI <- function() {
 #' @param `data` a `reactive()` data frame containing the loaded clean data
 #' @param `ready` a `reactive()` boolean indicating if the model is ready
 
-promoterServer <- function(data, ready) {
+PromoterServer <- function(data, ready) {
   moduleServer(
     id = "promoter",
     function(input, output, session) {
@@ -28,11 +28,6 @@ promoterServer <- function(data, ready) {
       
       
       # Reactives ----
-      
-      ## dataReady ----
-      dataReady <- reactive({
-        truthy(data()) & ready()
-      })
       
       
       # Observers ----
