@@ -2,7 +2,7 @@
 
 # UI ----
 
-agingUI <- function() {
+AgingUI <- function() {
   ns <- NS("aging")
   
   tagList(
@@ -20,7 +20,7 @@ agingUI <- function() {
 #' @param `data` reactive data frame containing the loaded clean data
 #' @param `ready` reactive boolean indicating if the model is ready
 
-agingServer <- function(data, ready) {
+AgingServer <- function(data, ready) {
   moduleServer(
     id = "aging",
     function(input, output, session) {

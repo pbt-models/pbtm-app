@@ -2,7 +2,7 @@
 
 # Static UI ----
 
-thermalTimeUI <- function() {
+ThermalTimeUI <- function() {
   ns <- NS("thermalTime")
   
   tagList(
@@ -20,7 +20,7 @@ thermalTimeUI <- function() {
 #' @param `data` a `reactive()` data frame containing the loaded clean data
 #' @param `ready` a `reactive()` boolean indicating if the model is ready
 
-thermalTimeServer <- function(data, ready) {
+ThermalTimeServer <- function(data, ready) {
   moduleServer(
     id = "thermalTime",
     function(input, output, session) {

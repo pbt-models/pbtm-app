@@ -59,3 +59,21 @@
     min-width: 15em;
     margin: 5px;
 }
+
+.margin-10 {
+    margin: 10px;
+}
+
+.tbl-container {
+    overflow: auto;
+}
+
+/* Modifications of existing styles */
+
+.panel-body {
+    padding: 0px;
+}
+
+.table {
+    margin-bottom: 0;
+}

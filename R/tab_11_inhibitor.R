@@ -2,7 +2,7 @@
 
 # UI ----
 
-inhibitorUI <- function() {
+InhibitorUI <- function() {
   ns <- NS("inhibitor")
   
   tagList(
@@ -20,7 +20,7 @@ inhibitorUI <- function() {
 #' @param `data` a `reactive()` data frame containing the loaded clean data
 #' @param `ready` a `reactive()` boolean indicating if the model is ready
 
-inhibitorServer <- function(data, ready) {
+InhibitorServer <- function(data, ready) {
   moduleServer(
     id = "inhibitor",
     function(input, output, session) {
@@ -28,11 +28,6 @@ inhibitorServer <- function(data, ready) {
       
       
       # Reactives ----
-      
-      ## dataReady ----
-      dataReady <- reactive({
-        truthy(data()) & ready()
-      })
       
       
       # Observers ----

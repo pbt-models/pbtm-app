@@ -2,7 +2,7 @@
 
 # Static UI ----
 
-germinationUI <- function() {
+GerminationUI <- function() {
   ns <- NS("germination")
   
   tagList(
@@ -20,9 +20,8 @@ germinationUI <- function() {
 #' 
 #' @param `data` a `reactive()` data frame containing the loaded clean data
 #' @param `ready` a `reactive()` boolean indicating if the model is ready
-#' @param `trtChoices` a `reactive()` vector listing the factor columns in the dataset
 
-germinationServer <- function(data, ready, trtChoices) {
+GerminationServer <- function(data, ready) {
   moduleServer(
     id = "germination",
     function(input, output, session) {
@@ -135,11 +134,20 @@ germinationServer <- function(data, ready, trtChoices) {
       
       # Reactives ----
       
+      ## trtChoices // all column names except CumTime and CumFraction
+      trtChoices <- reactive({
+        req(ready())
+        x <- names(data())
+        x[!x %in% c("CumTime", "CumFraction")]
+      })
+      
+      
       ## uniqueValueCount // number of unique values for each factor column
       uniqueValueCount <- reactive({
         req(ready())
+        
         data() %>%
-          select(all_of(as.character(trtChoices()))) %>%
+          select(all_of(trtChoices())) %>%
           lapply(function(x) { length(unique(x)) }) %>%
           unlist() %>%
           enframe() %>%

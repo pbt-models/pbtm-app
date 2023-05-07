@@ -1,12 +1,11 @@
 # ---- UI ---- #
 
-
-# Dashboard layout ----
-
+# page title
 header <- dashboardHeader(
   title = "PBTM Dashboard"
 )
 
+# dashboard side menu structure
 sidebar <- dashboardSidebar(
   sidebarMenu(
     menuItem("Introduction", tabName = "IntroTab"),
@@ -17,6 +16,13 @@ sidebar <- dashboardSidebar(
   )
 )
 
+# create dashboard tab items with the UI call for each tab
+tabs <- lapply(
+  c("Intro", "LoadData", modelNames),
+  \(m) tabItem(paste0(m, "Tab"), exec(paste0(m, "UI")))
+)
+
+# dashboard body items
 body <- dashboardBody(
   tags$head(
     tags$meta(charset = "UTF-8"),
@@ -27,24 +33,10 @@ body <- dashboardBody(
     includeCSS("www/style.css")
     ),
   useShinyjs(),
-  tabItems(
-    tabItem("IntroTab", introUI()),
-    tabItem("LoadTab", loadDataUI()),
-    tabItem("GerminationTab", germinationUI()),
-    tabItem("ThermalTimeTab", thermalTimeUI()),
-    tabItem("HydroTimeTab", hydroTimeUI()),
-    tabItem("HydrothermalTimeTab", hydrothermalTimeUI()),
-    tabItem("HydroPrimingTab", hydroPrimingUI()),
-    tabItem("HydrothermalPrimingTab", hydrothermalPrimingUI()),
-    tabItem("AgingTab", agingUI()),
-    tabItem("PromoterTab", promoterUI()),
-    tabItem("InhibitorTab", inhibitorUI())
-  )
+  do.call("tabItems", tabs)
 )
 
-
-# Footer ----
-
+# footer below the dashboard layout
 footer <- list(
   div(
     align = "center",
@@ -59,10 +51,7 @@ footer <- list(
   )
 )
 
-
-
-# Generate UI ----
-
+# build ui
 ui <- tagList(
   dashboardPage(header, sidebar, body),
   footer

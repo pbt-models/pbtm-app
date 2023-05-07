@@ -2,7 +2,7 @@
 
 # UI ----
 
-hydrothermalPrimingUI <- function() {
+HydrothermalPrimingUI <- function() {
   ns <- NS("hydrothermalPriming")
   
   tagList(
@@ -20,7 +20,7 @@ hydrothermalPrimingUI <- function() {
 #' @param `data` a `reactive()` data frame containing the loaded clean data
 #' @param `ready` a `reactive()` boolean indicating if the model is ready
 
-hydrothermalPrimingServer <- function(data, ready) {
+HydrothermalPrimingServer <- function(data, ready) {
   moduleServer(
     id = "hydrothermalPriming",
     function(input, output, session) {
