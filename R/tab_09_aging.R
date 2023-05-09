@@ -207,19 +207,15 @@ AgingServer <- function(data, ready) {
             unique(df$AgingTime)
           )
           
-          # add model results
-          par1 <- paste("~~", expression(theta~Age), "==", round(thetaA, 2))
-          par2 <- paste("~~Pmax[50]==", round(pmax50, 3))
-          par3 <- paste("~~sigma== ", round(sigma, 3))
-          par4 <- paste("~~R^2== ", round(corr, 2))
+          plt <- plt + modelLines
           
-          plt <- plt +
-            modelLines +
-            annotate("text", x = -Inf, y = 0.95, label = " Model parameters", color = "grey0", hjust = 0) +
-            annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
-            annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
-            annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
-            annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T)
+          # add model annotation
+          plt <- addParamsToPlot(plt, list(
+            paste("~~", expression(theta~Age), "==", round(thetaA, 2)),
+            sprintf("~~Pmax[50]==%.3f", pmax50),
+            sprintf("~~sigma==%.3f", sigma),
+            sprintf("~~R^2==%.2f", corr)
+          ))
         }
         
         plt

@@ -151,7 +151,7 @@ GerminationServer <- function(data, ready) {
           lapply(function(x) { length(unique(x)) }) %>%
           unlist() %>%
           enframe() %>%
-          mutate(label = paste0(name, " (n=", value, ")"))
+          mutate(label = sprintf("%s (n=%s)", name, value))
       })
       
       plotColorChoices <- reactive({
@@ -249,13 +249,16 @@ GerminationServer <- function(data, ready) {
             mutate(CumFraction = cumsum(FracDiff) / sum(FracDiff) * MaxCumFrac, .by = any_of(trts))
         }
         
+        # no color, no shape
         if (colorTrt == "NA" & shapeTrt == "NA") {
           plt <- df %>%
             ggplot(aes(
               x = CumTime,
               y = CumFraction
             )) +
-            geom_point(shape = 19, size = 2.5) 
+            geom_point(shape = 19, size = 2.5)
+          
+          # color only
         } else if (colorTrt != "NA" & shapeTrt == "NA") {
           plt <- df %>%
             ggplot(aes(
@@ -265,6 +268,8 @@ GerminationServer <- function(data, ready) {
             )) +
             geom_point(shape = 19, size = 2.5) +
             labs(color = colorTrt)
+          
+          # shape only
         } else if (colorTrt == "NA" & shapeTrt != "NA") {
           plt <- df %>%
             ggplot(aes(
@@ -274,6 +279,8 @@ GerminationServer <- function(data, ready) {
             )) +
             geom_point(size = 2.5) +
             labs(shape = shapeTrt)
+          
+          # color and shape
         } else {
           plt <- df %>%
             ggplot(aes(

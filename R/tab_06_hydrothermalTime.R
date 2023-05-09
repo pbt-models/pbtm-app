@@ -250,21 +250,16 @@ HydrothermalTimeServer <- function(data, ready) {
             fcts$GermTemp
           )
           
-          # model params
-          par1 <- paste("~~HT==", round(ht, 2))
-          par2 <- paste("~~T[b]==", round(tb, 2))
-          par3 <- paste("~~psi[b][50]==", round(psib50,3))
-          par4 <- paste("~~sigma == ", round(sigma, 3))
-          par5 <- paste("~~R^2 == ", round(corr, 2))
+          plt <- plt + modelLines
           
-          plt <- plt +
-            modelLines +
-            annotate("text", x = -Inf, y = 0.95, label = " Model Parameters:", color = "grey0", hjust = 0) +
-            annotate("text", x = -Inf, y = 0.9, label = par1, color = "grey0", hjust = 0, parse = T) +
-            annotate("text", x = -Inf, y = 0.85, label = par2, color = "grey0", hjust = 0, parse = T) +
-            annotate("text", x = -Inf, y = 0.8, label = par3, color = "grey0", hjust = 0, parse = T) +
-            annotate("text", x = -Inf, y = 0.75, label = par4, color = "grey0", hjust = 0, parse = T) +
-            annotate("text", x = -Inf, y = 0.7, label = par5, color = "grey0", hjust = 0, parse = T)
+          # add model annotation
+          plt <- addParamsToPlot(plt, list(
+            sprintf("~~HT==%.2f", ht),
+            sprintf("~~T[b]==%.2f", tb),
+            sprintf("~~psi[b][50]==%.3f", psib50),
+            sprintf("~~sigma==%.3f", sigma),
+            sprintf("~~R^2==%.2f", corr)
+          ))
         }
         
         plt
