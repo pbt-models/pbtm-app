@@ -137,6 +137,7 @@ GerminationServer <- function(data, ready) {
       ## trtChoices // all column names except CumTime and CumFraction
       trtChoices <- reactive({
         req(ready())
+        
         x <- names(data())
         x[!x %in% c("CumTime", "CumFraction")]
       })
@@ -181,6 +182,8 @@ GerminationServer <- function(data, ready) {
       
       ## germSpeedData // used by germination speed table ----
       germSpeedData <- reactive({
+        req(ready())
+        
         workingData() %>%
           mutate(
             MaxCumFrac = max(CumFraction),
@@ -226,6 +229,8 @@ GerminationServer <- function(data, ready) {
 
       ## plot // germination curves ----
       output$plot <- renderPlot({
+        req(ready())
+        
         df <- workingData()
         colorTrt <- input$plotColor
         shapeTrt <- input$plotShape
@@ -350,6 +355,7 @@ GerminationServer <- function(data, ready) {
       
       ## germSpeedTable ----
       output$germSpeedTable <- renderDataTable({
+        req(ready())
         req(input$germSpeedType)
 
         # show as rate or cumulative fraction

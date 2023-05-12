@@ -60,8 +60,8 @@ AgingServer <- function(data, ready) {
       
       # workingDataset // for model and plot ----
       workingData <- reactive({
+        req(ready())
         req(
-          ready(),
           input$agingTimeSelect,
           input$dataCleanSelect,
           input$trtIdSelect,
@@ -87,6 +87,7 @@ AgingServer <- function(data, ready) {
       
       # modelResults // list of coefficients or string error message ----
       modelResults <- reactive({
+        req(ready())
         
         # collect data
         df <- workingData()
@@ -139,6 +140,7 @@ AgingServer <- function(data, ready) {
       
       ## plot ----
       output$plot <- renderPlot({
+        req(ready())
         req(
           workingData(),
           modelResults(),

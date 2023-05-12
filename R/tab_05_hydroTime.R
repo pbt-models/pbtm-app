@@ -62,8 +62,8 @@ HydroTimeServer <- function(data, ready) {
       # workingData // for model and plot ----
       
       workingData <- reactive({
+        req(ready())
         req(
-          ready(),
           input$germWPSelect,
           input$dataCleanSelect,
           input$trtIdSelect,
@@ -90,6 +90,7 @@ HydroTimeServer <- function(data, ready) {
       # modelResults // list with model results or string with error ----
       
       modelResults <- reactive({
+        req(ready())
         
         # collect data
         df <- workingData()
@@ -143,6 +144,7 @@ HydroTimeServer <- function(data, ready) {
       # plot ----
       
       output$plot <- renderPlot({
+        req(ready())
         req(input$maxCumFrac)
         
         df <- workingData()

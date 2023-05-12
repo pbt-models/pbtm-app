@@ -62,8 +62,8 @@ ThermalTimeServer <- function(data, ready) {
       # workingData // modified dataset for model run ----
       
       workingData <- reactive({
+        req(ready())
         req(
-          ready(),
           input$germTempSelect,
           input$dataCleanSelect,
           input$trtIdSelect,
@@ -91,6 +91,7 @@ ThermalTimeServer <- function(data, ready) {
       # modelResults // list with model results or string with error ----
       
       modelResults <- reactive({
+        req(ready())
         
         # collect data
         df <- workingData()
@@ -144,6 +145,8 @@ ThermalTimeServer <- function(data, ready) {
       # plot ----
       
       output$plot <- renderPlot({
+        req(ready())
+        
         df <- workingData()
         model <- modelResults()
         max_cum_frac <- input$maxCumFrac / 100

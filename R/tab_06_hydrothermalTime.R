@@ -72,8 +72,8 @@ HydrothermalTimeServer <- function(data, ready) {
       
       # workingData // modified data for model ----
       workingData <- reactive({
+        req(ready())
         req(
-          ready(),
           input$dataCleanSelect,
           input$germWPSelect,
           input$germTempSelect,
@@ -101,6 +101,7 @@ HydrothermalTimeServer <- function(data, ready) {
       
       # modelResults // list of model coefficients, or an error message ----
       modelResults <- reactive({
+        req(ready())
         
         # collect data
         df <- workingData()
@@ -170,6 +171,7 @@ HydrothermalTimeServer <- function(data, ready) {
       
       # plot ----
       output$plot <- renderPlot({
+        req(ready())
         req(
           workingData(),
           modelResults(),
@@ -264,16 +266,6 @@ HydrothermalTimeServer <- function(data, ready) {
         
         plt
       })
-      
-      
-      
-      
-      
-      
-      
-      
-      
-      
       
     } # end
   )
