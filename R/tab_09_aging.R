@@ -30,7 +30,7 @@ AgingServer <- function(data, ready) {
       ## content // Rendered UI ----
       output$content <- renderUI({
         req_cols <- colValidation$Column[colValidation$Aging]
-        validate(need(ready(), "Please load required data for the aging model analysis. Minimum required columns are:", paste(req_cols, collapse = ", ")))
+        validate(need(ready(), paste("Please load required data for the aging model analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
         
         agingTimeChoices <- unique(data()$AgingTime)
         
@@ -60,6 +60,7 @@ AgingServer <- function(data, ready) {
       
       # workingDataset // for model and plot ----
       workingData <- reactive({
+        req(nrow(data()) > 0)
         req(ready())
         req(
           input$agingTimeSelect,
@@ -129,9 +130,7 @@ AgingServer <- function(data, ready) {
             Correlation = corr
           )
         },
-          error = function(cond) {
-            paste("Unable to compute model, try adjusting parameters. ", str_to_sentence(cond[1]))
-          }
+          error = function(cond) { paste(cond[1]) }
         )
       })
       

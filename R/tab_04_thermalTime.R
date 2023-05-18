@@ -27,8 +27,7 @@ ThermalTimeServer <- function(data, ready) {
       ns <- session$ns
       
       
-      # content // Rendered UI ----
-      
+      # Rendered UI ----
       output$content <- renderUI({
         req_cols <- colValidation$Column[colValidation$ThermalTime]
         validate(need(ready(), paste("Please load a dataset with required columns for thermal time analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
@@ -38,7 +37,7 @@ ThermalTimeServer <- function(data, ready) {
         fluidRow(
           box(
             width = 6,
-            title = "Model data input",
+            title = "Data input options",
             checkboxGroupInput(
               inputId = ns("germTempSelect"),
               label = "Included temperature levels:",
@@ -47,14 +46,45 @@ ThermalTimeServer <- function(data, ready) {
             ),
             dataCleanSelect(ns)
           ),
+          cumFracSliders(ns),
+          box(
+            width = 6,
+            title = "Model parameter settings",
+            p(em("Set model parameters in the boxes below, or leave blank to allow the model to find a best-fit value.")),
+            div(
+              class = "flex-row",
+              numericInput(
+                inputId = ns("Tb_set"),
+                label = "Tb",
+                value = NA,
+                step = .1,
+                width = "30%"
+              ),
+              numericInput(
+                inputId = ns("ThetaT50_set"),
+                label = "ThetaT50", ## explain what this is
+                value = NA,
+                step = .1,
+                width = "30%"
+              ),
+              numericInput(
+                inputId = ns("Sigma_set"),
+                label = "Sigma", ## explain what this is
+                value = NA,
+                step = .1,
+                width = "30%"
+              )
+            )
+          ),
           resultsTable(ns, reactive(modelResults())),
           box(
             width = 12,
+            status = "primary",
+            solidHeader = TRUE,
             title = "Germination plot and thermal time sub-optimal model fit",
             plotOutput(ns("plot"))
           ),
-          trtIdSelect(ns, reactive(data())),
-          cumFracSliders(ns)
+          trtIdSelect(ns, reactive(data()))
         )
       })
       
@@ -88,54 +118,97 @@ ThermalTimeServer <- function(data, ready) {
       # observe(print(workingData()))
       
       
-      # modelResults // list with model results or string with error ----
+      # MODEL ----
       
+      params <- c("Tb", "ThetaT50", "Sigma")
+      
+      # [ lower, start, upper ]
+      paramRangeDefaults <- list(
+        Tb = c(0, 6, 20),
+        ThetaT50 = c(0.5, 3, 50),
+        Sigma = c(.0001, .09, 1.5)
+      )
+      
+      rv <- reactiveValues(
+        setParams = list(
+          Tb = NA,
+          ThetaT50 = NA,
+          Sigma = NA
+        ),
+        paramRanges = paramRangeDefaults
+      )
+      
+      lapply(params, function(p) {
+        id <- paste0(p, "_set")
+        observeEvent(input[[id]], {
+          val <- input[[id]]
+          rv$setParams[[p]] <- ifelse(val != "", val, NA)
+        })
+      })
+      
+      
+      ## modelResults ----
+      #  list with model results or string with error
       modelResults <- reactive({
         req(ready())
         
         # collect data
         df <- workingData()
-        temp <- df$GermTemp
-        time <- df$CumTime
-        germ <- df$CumFraction
-        max_cum_frac <- input$maxCumFrac / 100
+        tempVec <- df$GermTemp
+        timeVec <- df$CumTime
+        germVec <- df$CumFraction
+        maxCumFrac <- input$maxCumFrac / 100
+        defined <- lower <- start <- upper <- list()
         
-        # model params
-        lower <- list(tb = 0, thetaT50 = 0.5, sigma = 0.0001)
-        start <- list(tb = 6, thetaT50 = 3, sigma = 0.09)
-        upper <- list(tb = 20, thetaT50 = 50, sigma = 1.50)
+        # model params: Tb, ThetaT50, Sigma
+        # check if a parameter is defined, or set its range constraints
+        for (p in params) {
+          paramValue <- rv$setParams[[p]]
+          if (truthy(paramValue)) {
+            defined[[p]] <- paramValue
+            assign(p, paramValue)
+          } else {
+            if (exists(c(p))) remove(list = c(p))
+            ranges <- rv$paramRanges[[p]]
+            lower[[p]] <- ranges[1]
+            start[[p]] <- ranges[2]
+            upper[[p]] <- ranges[3]
+          }
+        }
         
         # run model, return message if fails
-        tryCatch({
-          model <- stats::nls(
-            formula = germ ~ max_cum_frac * stats::pnorm(
-              log10(time),
-              thetaT50 - log10(temp - tb),
-              sigma
-            ),
-            start = start,
-            lower = lower,
-            upper = upper,
-            algorithm = "port"
+        suppressWarnings(
+          tryCatch({
+            model <- stats::nls(
+              formula = germVec ~ maxCumFrac * stats::pnorm(
+                q = log10(timeVec),
+                mean = ThetaT50 - log10(tempVec - Tb),
+                sd = Sigma
+              ),
+              start = start,
+              lower = lower,
+              upper = upper,
+              algorithm = "port"
+            )
+            
+            # grab coefs
+            # TODO: also return param p-values etc?
+            coefs <- summary(model)$coefficients %>%
+              as_tibble(rownames = "Param") %>%
+              select(1:2) %>%
+              deframe() %>%
+              as.list()
+            
+            # return results
+            results <- list()
+            for (p in params) {
+              results[[p]] <- or(defined[[p]], coefs[[p]], "unk")
+            }
+            results$Correlation <- stats::cor(germVec, stats::predict(model)) ^ 2
+            results
+          },
+            error = function(cond) { paste(cond[1]) }
           )
-          
-          # grab coefs
-          corr <- stats::cor(germ, stats::predict(model)) ^ 2
-          tb <- summary(model)$coefficients[[1]]
-          thetaT50 <- summary(model)$coefficients[[2]]
-          sigma <- summary(model)$coefficients[[3]]
-          
-          # return results
-          list(
-            Tb = tb,
-            ThetaT50 = thetaT50,
-            Sigma = sigma,
-            Correlation = corr
-          )
-        },
-          error = function(cond) {
-            paste("Unable to compute model, try adjusting parameters. Reason:", str_to_sentence(cond[1]))
-          }
         )
       })
       

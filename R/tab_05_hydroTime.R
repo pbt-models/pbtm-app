@@ -38,7 +38,7 @@ HydroTimeServer <- function(data, ready) {
         fluidRow(
           box(
             width = 6,
-            title = "Model parameters",
+            title = "Data input options",
             checkboxGroupInput(
               inputId = ns("germWPSelect"),
               label = "Included water potential levels:",
@@ -132,9 +132,7 @@ HydroTimeServer <- function(data, ready) {
             Correlation = corr
           )
         },
-          error = function(cond) {
-            paste("Unable to compute model, try adjusting parameters. Reason:", str_to_sentence(cond[1]))
-          }
+          error = function(cond) { paste(cond[1]) }
         )
       })
       

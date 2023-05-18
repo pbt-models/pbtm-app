@@ -5,7 +5,7 @@
 cumFracSliders <- function(ns) {
   box(
     width = 6,
-    title = "Additional model contraints",
+    title = "Additional data filters",
     sliderInput(
       inputId = ns("maxCumFrac"),
       label = "Maximum germination (%) observed",

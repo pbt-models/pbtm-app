@@ -35,7 +35,7 @@ truthy <- function(x) {
   if (length(x) > 1) return(TRUE)
 
   # these special cases are false
-  if (x %in% c(NA, "NA", "", 0, F)) return(FALSE)
+  if (x %in% c(NA, "NA", "", FALSE)) return(FALSE)
   
   # anything else
   TRUE

@@ -10,8 +10,7 @@ resultsTable <- function(ns, results) {
     renderTable({
       res <- results()
       
-      # print error message if model fails
-      validate(need(is.list(res), res))
+      validate(need(is.list(res), paste("Model failed to compute, try adjusting parameters. Reason:", res)))
       
       # convert list to simple data frame
       res %>%
