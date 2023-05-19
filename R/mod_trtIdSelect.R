@@ -7,7 +7,7 @@ trtIdSelect <- function(ns, data) {
   renderUI({
     if ("TrtDesc" %in% names(data())) {
       choices <- data() %>%
-        mutate(Label = paste(TrtID, TrtDesc, sep = ": ")) %>%
+        mutate(Label = sprintf("%s: %s", TrtID, TrtDesc)) %>%
         distinct(Label, TrtID) %>%
         mutate(Label = str_trunc(Label, 30)) %>%
         deframe()
@@ -15,14 +15,20 @@ trtIdSelect <- function(ns, data) {
       choices <- unique(data()$TrtID)
     }
     
-    box(
-      width = 6,
-      title = "Additional treatment filters",
-      checkboxGroupInput(
-        inputId = ns("trtIdSelect"),
-        label = "Treatment ID:",
-        choices = choices,
-        selected = choices
+    div(
+      div(
+        class = "well-title",
+        "Additional treatment filters"
+      ),
+      div(
+        class = "well",
+        checkboxGroupInput(
+          inputId = ns("trtIdSelect"),
+          label = "Treatment ID:",
+          choices = choices,
+          selected = choices,
+          inline = TRUE
+        )
       )
     )
   })

@@ -27,70 +27,35 @@ ThermalTimeServer <- function(data, ready) {
       ns <- session$ns
       
       
-      # Rendered UI ----
-      output$content <- renderUI({
-        req_cols <- colValidation$Column[colValidation$ThermalTime]
-        validate(need(ready(), paste("Please load a dataset with required columns for thermal time analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
-        
-        germTempChoices <- unique(data()$GermTemp)
-        
-        fluidRow(
-          box(
-            width = 6,
-            title = "Data input options",
-            checkboxGroupInput(
-              inputId = ns("germTempSelect"),
-              label = "Included temperature levels:",
-              choices = germTempChoices,
-              selected = germTempChoices
-            ),
-            dataCleanSelect(ns)
-          ),
-          cumFracSliders(ns),
-          box(
-            width = 6,
-            title = "Model parameter settings",
-            p(em("Set model parameters in the boxes below, or leave blank to allow the model to find a best-fit value.")),
-            div(
-              class = "flex-row",
-              numericInput(
-                inputId = ns("Tb_set"),
-                label = "Tb",
-                value = NA,
-                step = .1,
-                width = "30%"
-              ),
-              numericInput(
-                inputId = ns("ThetaT50_set"),
-                label = "ThetaT50", ## explain what this is
-                value = NA,
-                step = .1,
-                width = "30%"
-              ),
-              numericInput(
-                inputId = ns("Sigma_set"),
-                label = "Sigma", ## explain what this is
-                value = NA,
-                step = .1,
-                width = "30%"
-              )
-            )
-          ),
-          resultsTable(ns, reactive(modelResults())),
-          box(
-            width = 12,
-            status = "primary",
-            solidHeader = TRUE,
-            title = "Germination plot and thermal time sub-optimal model fit",
-            plotOutput(ns("plot"))
-          ),
-          trtIdSelect(ns, reactive(data()))
-        )
-      })
+      # Vars -------------------------------------------------------------------
+      
+      ## params ----
+      params <- c("Tb", "ThetaT50", "Sigma")
+      
+      ## paramRangeDefaults ----
+      # (lower, start, upper)
+      paramRangeDefaults <- list(
+        Tb = c(0, 6, 20),
+        ThetaT50 = c(0.5, 3, 50),
+        Sigma = c(.0001, .09, 1.5)
+      )
+      
+      ## rv $ setParams ----
+      ## rv $ paramRanges ----
+      rv <- reactiveValues(
+        setParams = list(
+          Tb = NA,
+          ThetaT50 = NA,
+          Sigma = NA
+        ),
+        paramRanges = paramRangeDefaults
+      )
       
       
-      # workingData // modified dataset for model run ----
+      # Reactives --------------------------------------------------------------
       
+      ## workingData ----
+      ## modified dataset for model run
       workingData <- reactive({
         req(ready())
         req(
@@ -118,39 +83,12 @@ ThermalTimeServer <- function(data, ready) {
       # observe(print(workingData()))
       
       
-      # MODEL ----
-      
-      params <- c("Tb", "ThetaT50", "Sigma")
-      
-      # [ lower, start, upper ]
-      paramRangeDefaults <- list(
-        Tb = c(0, 6, 20),
-        ThetaT50 = c(0.5, 3, 50),
-        Sigma = c(.0001, .09, 1.5)
-      )
-      
-      rv <- reactiveValues(
-        setParams = list(
-          Tb = NA,
-          ThetaT50 = NA,
-          Sigma = NA
-        ),
-        paramRanges = paramRangeDefaults
-      )
-      
-      lapply(params, function(p) {
-        id <- paste0(p, "_set")
-        observeEvent(input[[id]], {
-          val <- input[[id]]
-          rv$setParams[[p]] <- ifelse(val != "", val, NA)
-        })
-      })
-      
-      
       ## modelResults ----
-      #  list with model results or string with error
+      ## list with model results or string with error
       modelResults <- reactive({
         req(ready())
+        
+        if (nrow(workingData()) == 0) return("No data")
         
         # collect data
         df <- workingData()
@@ -202,7 +140,7 @@ ThermalTimeServer <- function(data, ready) {
             # return results
             results <- list()
             for (p in params) {
-              results[[p]] <- or(defined[[p]], coefs[[p]], "unk")
+              results[[p]] <- c(defined[[p]], coefs[[p]])[1]
             }
             results$Correlation <- stats::cor(germVec, stats::predict(model)) ^ 2
             results
@@ -215,8 +153,116 @@ ThermalTimeServer <- function(data, ready) {
       # observe(print(modelResults()))
       
       
-      # plot ----
       
+      # Event Reactives --------------------------------------------------------
+      
+      ## Model coefficient inputs ----
+      lapply(params, function(p) {
+        id <- paste0(p, "_set")
+        observeEvent(input[[id]], {
+          val <- input[[id]]
+          rv$setParams[[p]] <- ifelse(val != "", val, NA)
+        })
+      })
+      
+      
+      
+      # Outputs ----------------------------------------------------------------
+      
+      ## content // main UI ----
+      output$content <- renderUI({
+        req_cols <- colValidation$Column[colValidation$ThermalTime]
+        validate(need(ready(), paste("Please load a dataset with required columns for thermal time analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
+        
+        germTempChoices <- unique(data()$GermTemp)
+        
+        fluidRow(
+          box(
+            width = 12,
+            status = "primary",
+            solidHeader = TRUE,
+            collapsible = TRUE,
+            title = "Data selection",
+            fluidRow(
+              column(6,
+                div(class = "well-title", "Data input options"),
+                div(
+                  class = "well",
+                  checkboxGroupInput(
+                    inputId = ns("germTempSelect"),
+                    label = "Included temperature levels:",
+                    choices = germTempChoices,
+                    selected = germTempChoices
+                  ),
+                  dataCleanSelect(ns)
+                )
+              ),
+              column(6, cumFracSliders(ns)),
+              column(12, trtIdSelect(ns, reactive(data())))
+            ),
+            div(class = "well", uiOutput(ns("dataSummary")))
+          ),
+          box(
+            width = 12,
+            status = "primary",
+            solidHeader = TRUE,
+            collapsible = TRUE,
+            title = "Model parameters",
+            fluidRow(
+              column(6,
+                div(class = "well-title", "Specify model coefficients (optional)"),
+                div(
+                  class = "well",
+                  uiOutput(ns("setParams")),
+                  p(em("Specify individual model coefficients, or leave blank to allow the model to find a best-fit value."))
+                ),
+              ),
+              column(6, resultsTable(ns, reactive(modelResults())))
+            )
+          ),
+          box(
+            width = 12,
+            status = "primary",
+            solidHeader = TRUE,
+            collapsible = TRUE,
+            title = "Germination plot and thermal time sub-optimal model fit",
+            plotOutput(ns("plot"))
+          )
+        )
+      })
+      
+      ## dataSummary ----
+      ## data rows after filter
+      output$dataSummary <- renderUI({
+        n1 <- nrow(workingData())
+        n2 <- nrow(data())
+        pct <- round(n1 / n2 * 100, 0)
+        div(
+          align = "center",
+          style = "font-size: larger; font-weight: bold;",
+          sprintf("Using %s / %s data points (%s%%)", n1, n2, pct)
+        )
+      })
+      
+      ## setParams ----
+      ## numeric inputs for each param
+      output$setParams <- renderUI({
+        div(
+          class = "flex-row",
+          lapply(params, function(p) {
+            numericInput(
+              inputId = ns(paste0(p, "_set")),
+              label = p,
+              value = NA,
+              step = .1,
+              width = "30%"
+            )
+          })
+        )
+      })
+      
+      
+      ## Plot ----
       output$plot <- renderPlot({
         req(ready())
         
