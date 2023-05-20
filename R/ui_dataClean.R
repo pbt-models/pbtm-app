@@ -2,7 +2,7 @@
 
 #' @param ns namespace function from calling server
 
-dataCleanSelect <- function(ns) {
+dataCleanUI <- function(ns) {
   radioButtons(
     inputId = ns("dataCleanSelect"),
     label = "Select data cleaning:",

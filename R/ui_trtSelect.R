@@ -3,7 +3,7 @@
 #' @param ns namespace function from calling server
 #' @param data reactive dataset from which to pull TrtID values
 
-trtIdSelect <- function(ns, data) {
+trtSelectUI <- function(ns, data) {
   renderUI({
     if ("TrtDesc" %in% names(data())) {
       choices <- data() %>%

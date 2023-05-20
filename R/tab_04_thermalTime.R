@@ -174,57 +174,41 @@ ThermalTimeServer <- function(data, ready) {
         req_cols <- colValidation$Column[colValidation$ThermalTime]
         validate(need(ready(), paste("Please load a dataset with required columns for thermal time analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
         
-        germTempChoices <- unique(data()$GermTemp)
+        germTempChoices <- colChoices(data(), "GermTemp")
         
         fluidRow(
-          box(
-            width = 12,
-            status = "primary",
-            solidHeader = TRUE,
-            collapsible = TRUE,
+          
+          # Data selection
+          primaryBox(
             title = "Data selection",
             fluidRow(
               column(6,
-                div(class = "well-title", "Data input options"),
-                div(
-                  class = "well",
+                namedWell(
+                  title = "Data input options",
                   checkboxGroupInput(
                     inputId = ns("germTempSelect"),
                     label = "Included temperature levels:",
                     choices = germTempChoices,
                     selected = germTempChoices
                   ),
-                  dataCleanSelect(ns)
+                  dataCleanUI(ns)
                 )
               ),
-              column(6, cumFracSliders(ns)),
-              column(12, trtIdSelect(ns, reactive(data())))
+              column(6, germSlidersUI(ns)),
+              column(12, trtSelectUI(ns, reactive(data()))),
+              column(12, wellPanel(uiOutput(ns("dataSummary"))))
             ),
-            div(class = "well", uiOutput(ns("dataSummary")))
           ),
-          box(
-            width = 12,
-            status = "primary",
-            solidHeader = TRUE,
-            collapsible = TRUE,
+          
+          # Model parameters
+          primaryBox(
             title = "Model parameters",
             fluidRow(
-              column(6,
-                div(class = "well-title", "Specify model coefficients (optional)"),
-                div(
-                  class = "well",
-                  uiOutput(ns("setParams")),
-                  p(em("Specify individual model coefficients, or leave blank to allow the model to find a best-fit value."))
-                ),
-              ),
-              column(6, resultsTable(ns, reactive(modelResults())))
+              column(6, setParamsUI(ns, params)),
+              column(6, modelResultsUI(ns, reactive(modelResults())))
             )
           ),
-          box(
-            width = 12,
-            status = "primary",
-            solidHeader = TRUE,
-            collapsible = TRUE,
+          primaryBox(
             title = "Germination plot and thermal time sub-optimal model fit",
             plotOutput(ns("plot"))
           )
@@ -241,23 +225,6 @@ ThermalTimeServer <- function(data, ready) {
           align = "center",
           style = "font-size: larger; font-weight: bold;",
           sprintf("Using %s / %s data points (%s%%)", n1, n2, pct)
-        )
-      })
-      
-      ## setParams ----
-      ## numeric inputs for each param
-      output$setParams <- renderUI({
-        div(
-          class = "flex-row",
-          lapply(params, function(p) {
-            numericInput(
-              inputId = ns(paste0(p, "_set")),
-              label = p,
-              value = NA,
-              step = .1,
-              width = "30%"
-            )
-          })
         )
       })
       
