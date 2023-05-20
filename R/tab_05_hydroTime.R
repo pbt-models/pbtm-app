@@ -27,40 +27,31 @@ HydroTimeServer <- function(data, ready) {
       ns <- session$ns
       
       
-      # content // Rendered UI ----
+      # Vars ----
       
-      output$content <- renderUI({
-        req_cols <- colValidation$Column[colValidation$HydroTime]
-        validate(need(ready(), paste("Please load a dataset with required columns for hydro time analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
-        
-        germWPChoices <- unique(data()$GermWP)
-        
-        fluidRow(
-          box(
-            width = 6,
-            title = "Data input options",
-            checkboxGroupInput(
-              inputId = ns("germWPSelect"),
-              label = "Included water potential levels:",
-              choices = germWPChoices,
-              selected = germWPChoices
-            ),
-            dataCleanSelect(ns)
-          ),
-          resultsTable(ns, reactive(modelResults())),
-          box(
-            width = 12,
-            title = "Germination data and hydro time model fit",
-            plotOutput(ns("plot"))
-          ),
-          trtIdSelect(ns, reactive(data())),
-          cumFracSliders(ns)
-        )
-      })
-
+      ## params ----
+      params <- c("Ht", "PsiB50", "Sigma")
       
-      # workingData // for model and plot ----
+      ## paramRangeDefaults ----
+      # (lower, start, upper)
+      paramRangeDefaults <- list(
+        Ht = c(1, 60, 1000),
+        PsiB50 = c(-5, -.8, -1e-9),
+        Sigma = c(1e-4, .2, 2)
+      )
       
+      ## rv $ setParams ----
+      ## rv $ paramRanges ----
+      rv <- reactiveValues(
+        setParams = deframe(tibble(params, NA)),
+        paramRanges = paramRangeDefaults
+      )
+      
+      
+      # Reactives ----
+      
+      ## workingData ----
+      ## for model info and plot
       workingData <- reactive({
         req(ready())
         req(
@@ -87,30 +78,42 @@ HydroTimeServer <- function(data, ready) {
       # observe(print(workingData()))
       
       
-      # modelResults // list with model results or string with error ----
-      
+      ## modelResults ----
+      ## - list with model results or string with error
       modelResults <- reactive({
         req(ready())
+        if (nrow(workingData()) == 0) return("No data")
         
         # collect data
         df <- workingData()
-        wp <- df$GermWP
-        time <- df$CumTime
-        germ <- df$CumFraction
-        max_cum_frac <- input$maxCumFrac / 100
+        wpData <- df$GermWP
+        timeData <- df$CumTime
+        germData <- df$CumFraction
+        maxFrac <- input$maxCumFrac / 100
+        defined <- lower <- start <- upper <- list()
         
-        # model params
-        lower = list(ht = 1, psib50 = -5, sigma = 0.0001)
-        start = list(ht = 60, psib50 = -0.8, sigma = 0.2)
-        upper = list(ht = 1000, psib50 = -0.000000001, sigma = 2)
-        
+        # check if a parameter is defined, or set its range constraints if not
+        for (p in params) {
+          paramValue <- rv$setParams[[p]]
+          if (truthy(paramValue)) {
+            defined[[p]] <- paramValue
+            assign(p, paramValue)
+          } else {
+            if (exists(c(p))) remove(list = c(p))
+            ranges <- rv$paramRanges[[p]]
+            lower[[p]] <- ranges[1]
+            start[[p]] <- ranges[2]
+            upper[[p]] <- ranges[3]
+          }
+        }
+
         # run model, return message if fails
         tryCatch({
           model <- stats::nls(
-            formula = germ ~ max_cum_frac * stats::pnorm(
-              wp - (ht / time),
-              psib50,
-              sigma
+            formula = germData ~ maxFrac * stats::pnorm(
+              q = wpData - (Ht / timeData),
+              mean = PsiB50,
+              sd = Sigma
             ),
             start = start,
             lower = lower,
@@ -119,18 +122,19 @@ HydroTimeServer <- function(data, ready) {
           )
           
           # grab coefs
-          corr <- stats::cor(germ, stats::predict(model)) ^ 2
-          ht <- summary(model)$coefficients[[1]]
-          psib50 <- summary(model)$coefficients[[2]]
-          sigma <- summary(model)$coefficients[[3]]
+          coefs <- summary(model)$coefficients %>%
+            as_tibble(rownames = "Param") %>%
+            select(1:2) %>%
+            deframe() %>%
+            as.list()
           
           # return results
-          list(
-            HT = ht,
-            Psib50 = psib50,
-            Sigma = sigma,
-            Correlation = corr
-          )
+          results <- list()
+          for (p in params) {
+            results[[p]] <- c(defined[[p]], coefs[[p]])[1]
+          }
+          results$Correlation <- stats::cor(germData, stats::predict(model)) ^ 2
+          results
         },
           error = function(cond) { paste(cond[1]) }
         )
@@ -138,16 +142,93 @@ HydroTimeServer <- function(data, ready) {
       
       # observe(print(modelResults()))
       
+      # Event Reactives ----
       
-      # plot ----
+      ## Model coefficient inputs ----
+      lapply(params, function(p) {
+        id <- paste0(p, "_set")
+        observeEvent(input[[id]], {
+          val <- input[[id]]
+          rv$setParams[[p]] <- ifelse(val != "", val, NA)
+        })
+      })
       
+      
+      
+      # Outputs ----
+
+      ## content // Main UI----
+      output$content <- renderUI({
+        req_cols <- colValidation$Column[colValidation$HydroTime]
+        validate(need(ready(), paste("Please load a dataset with required columns for hydro time analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
+        
+        germWPChoices <- colChoices(data(), "GermWP")
+        
+        fluidRow(
+          
+          # Data selection
+          primaryBox(
+            title = "Data selection",
+            fluidRow(
+              column(6,
+                namedWell(
+                  title = "Data input options",
+                  checkboxGroupInput(
+                    inputId = ns("germWPSelect"),
+                    label = "Included water potential levels:",
+                    choices = germWPChoices,
+                    selected = germWPChoices
+                  ),
+                  dataCleanUI(ns)
+                )
+              ),
+              column(6, germSlidersUI(ns)),
+              column(12, trtSelectUI(ns, reactive(data()))),
+              column(12, uiOutput(ns("dataSummary")))
+            )
+          ),
+          
+          # Model parameters
+          primaryBox(
+            title = "Model parameters",
+            fluidRow(
+              column(6, setParamsUI(ns, params)),
+              column(6, modelResultsUI(ns, reactive(modelResults())))
+            )
+          ),
+          
+          # Plot
+          primaryBox(
+            title = "Germination data and hydro time model fit",
+            plotOutput(ns("plot"))
+          )
+        )
+      })
+      
+      
+      ## dataSummary ----
+      ## data rows after filter
+      output$dataSummary <- renderUI({
+        n1 <- nrow(workingData())
+        n2 <- nrow(data())
+        pct <- round(n1 / n2 * 100, 0)
+        wellPanel(
+          align = "center",
+          style = "font-size: larger; font-weight: bold;",
+          sprintf("Using %s / %s data points (%s%%)", n1, n2, pct)
+        )
+      })
+
+
+      
+      ## plot ----
       output$plot <- renderPlot({
         req(ready())
         req(input$maxCumFrac)
         
         df <- workingData()
         model <- modelResults()
-        germ_cutoff <- input$maxCumFrac / 100
+        maxGerm <- input$maxCumFrac / 100
         
         # generate the plot
         plt <- df %>%
@@ -156,12 +237,12 @@ HydroTimeServer <- function(data, ready) {
             "rect",
             xmin = 0,
             xmax = Inf,
-            ymin = germ_cutoff,
+            ymin = maxGerm,
             ymax = 1,
             fill = "grey",
             alpha = 0.1) +
           geom_hline(
-            yintercept = germ_cutoff,
+            yintercept = maxGerm,
             color = "darkgrey",
             linetype = "dashed") +
           geom_point(
@@ -183,22 +264,22 @@ HydroTimeServer <- function(data, ready) {
         
         # add model results if successful
         if (is.list(model)) {
-          ht <- model$HT
-          psib50 <- model$Psib50
+          ht <- model$Ht
+          psiB50 <- model$PsiB50
           sigma <- model$Sigma
           corr <- model$Correlation
           
           # Plot all predicted treatments by the hydrotime model
-          modelLines <- mapply(function(wp) {
+          modelLines <- mapply(function(y) {
             stat_function(
               fun = function(x) {
                 stats::pnorm(
-                  q = wp - (ht / x),
-                  mean = psib50,
+                  q = y - (ht / x),
+                  mean = psiB50,
                   sd = sigma
-                ) * germ_cutoff
+                ) * maxGerm
               },
-              aes(color = as.factor(wp))
+              aes(color = as.factor(y))
             )
           },
             unique(df$GermWP)
@@ -209,7 +290,7 @@ HydroTimeServer <- function(data, ready) {
           # add model annotation
           plt <- addParamsToPlot(plt, list(
             sprintf("~~HT==%.2f", ht),
-            sprintf("~~Psi[b](50)==%.3f", psib50),
+            sprintf("~~Psi[b](50)==%.3f", psiB50),
             sprintf("~~sigma==%.3f", sigma),
             sprintf("~~R^2==%.2f", corr)
           ))

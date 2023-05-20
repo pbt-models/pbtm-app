@@ -27,7 +27,7 @@ ThermalTimeServer <- function(data, ready) {
       ns <- session$ns
       
       
-      # Vars -------------------------------------------------------------------
+      # Vars ----
       
       ## params ----
       params <- c("Tb", "ThetaT50", "Sigma")
@@ -52,7 +52,7 @@ ThermalTimeServer <- function(data, ready) {
       )
       
       
-      # Reactives --------------------------------------------------------------
+      # Reactives ----
       
       ## workingData ----
       ## modified dataset for model run
@@ -87,19 +87,17 @@ ThermalTimeServer <- function(data, ready) {
       ## list with model results or string with error
       modelResults <- reactive({
         req(ready())
-        
         if (nrow(workingData()) == 0) return("No data")
         
         # collect data
         df <- workingData()
-        tempVec <- df$GermTemp
-        timeVec <- df$CumTime
-        germVec <- df$CumFraction
-        maxCumFrac <- input$maxCumFrac / 100
+        tempData <- df$GermTemp
+        timeData <- df$CumTime
+        germData <- df$CumFraction
+        maxFrac <- input$maxCumFrac / 100
         defined <- lower <- start <- upper <- list()
         
-        # model params: Tb, ThetaT50, Sigma
-        # check if a parameter is defined, or set its range constraints
+        # check if a parameter is defined, or set its range constraints if not
         for (p in params) {
           paramValue <- rv$setParams[[p]]
           if (truthy(paramValue)) {
@@ -118,9 +116,9 @@ ThermalTimeServer <- function(data, ready) {
         suppressWarnings(
           tryCatch({
             model <- stats::nls(
-              formula = germVec ~ maxCumFrac * stats::pnorm(
-                q = log10(timeVec),
-                mean = ThetaT50 - log10(tempVec - Tb),
+              formula = germData ~ maxFrac * stats::pnorm(
+                q = log10(timeData),
+                mean = ThetaT50 - log10(tempData - Tb),
                 sd = Sigma
               ),
               start = start,
@@ -142,7 +140,7 @@ ThermalTimeServer <- function(data, ready) {
             for (p in params) {
               results[[p]] <- c(defined[[p]], coefs[[p]])[1]
             }
-            results$Correlation <- stats::cor(germVec, stats::predict(model)) ^ 2
+            results$Correlation <- stats::cor(germData, stats::predict(model)) ^ 2
             results
           },
             error = function(cond) { paste(cond[1]) }
@@ -154,7 +152,7 @@ ThermalTimeServer <- function(data, ready) {
       
       
       
-      # Event Reactives --------------------------------------------------------
+      # Event Reactives ----
       
       ## Model coefficient inputs ----
       lapply(params, function(p) {
@@ -167,9 +165,9 @@ ThermalTimeServer <- function(data, ready) {
       
       
       
-      # Outputs ----------------------------------------------------------------
+      # Outputs ----
       
-      ## content // main UI ----
+      ## content // Main UI ----
       output$content <- renderUI({
         req_cols <- colValidation$Column[colValidation$ThermalTime]
         validate(need(ready(), paste("Please load a dataset with required columns for thermal time analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
@@ -196,7 +194,7 @@ ThermalTimeServer <- function(data, ready) {
               ),
               column(6, germSlidersUI(ns)),
               column(12, trtSelectUI(ns, reactive(data()))),
-              column(12, wellPanel(uiOutput(ns("dataSummary"))))
+              column(12, uiOutput(ns("dataSummary")))
             ),
           ),
           
@@ -208,6 +206,8 @@ ThermalTimeServer <- function(data, ready) {
               column(6, modelResultsUI(ns, reactive(modelResults())))
             )
           ),
+          
+          # Plot
           primaryBox(
             title = "Germination plot and thermal time sub-optimal model fit",
             plotOutput(ns("plot"))
@@ -218,10 +218,11 @@ ThermalTimeServer <- function(data, ready) {
       ## dataSummary ----
       ## data rows after filter
       output$dataSummary <- renderUI({
+        req()
         n1 <- nrow(workingData())
         n2 <- nrow(data())
         pct <- round(n1 / n2 * 100, 0)
-        div(
+        wellPanel(
           align = "center",
           style = "font-size: larger; font-weight: bold;",
           sprintf("Using %s / %s data points (%s%%)", n1, n2, pct)
@@ -229,13 +230,13 @@ ThermalTimeServer <- function(data, ready) {
       })
       
       
-      ## Plot ----
+      ## plot ----
       output$plot <- renderPlot({
         req(ready())
         
         df <- workingData()
         model <- modelResults()
-        max_cum_frac <- input$maxCumFrac / 100
+        maxGerm <- input$maxCumFrac / 100
 
         # generate the plot
         plt <- df %>%
@@ -244,12 +245,12 @@ ThermalTimeServer <- function(data, ready) {
             "rect",
             xmin = 0,
             xmax = Inf,
-            ymin = max_cum_frac,
+            ymin = maxGerm,
             ymax = 1,
             fill = "grey",
             alpha = 0.1) +
           geom_hline(
-            yintercept = max_cum_frac,
+            yintercept = maxGerm,
             color = "darkgrey",
             linetype = "dashed") +
           geom_point(
@@ -277,16 +278,16 @@ ThermalTimeServer <- function(data, ready) {
           corr <- model$Correlation
           
           # Plot all predicted treatments by the thermal time model
-          modelLines <- mapply(function(temp) {
+          modelLines <- mapply(function(y) {
             stat_function(
               fun = function(x) {
                 stats::pnorm(
                   q = log10(x),
-                  mean = thetaT50 - log10(temp - tb),
+                  mean = thetaT50 - log10(y - tb),
                   sd = sigma
-                ) * max_cum_frac
+                ) * maxGerm
               },
-              aes(color = as.factor(temp))
+              aes(color = as.factor(y))
             )
           },
             unique(df$GermTemp)
