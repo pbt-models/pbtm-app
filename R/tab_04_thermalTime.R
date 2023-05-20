@@ -212,7 +212,7 @@ ThermalTimeServer <- function(data, ready) {
           scale_x_continuous(expand = expansion()) +
           labs(
             title = "Cumulative germination",
-            caption = "Generated with the PBTM shiny app",
+            caption = "Generated with the PBTM app",
             x = "Time",
             y = "Cumulative fraction germinated (%)",
             color = "Temperature") +

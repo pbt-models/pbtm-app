@@ -8,7 +8,6 @@ modelResultsUI <- function(ns, results) {
     title = "Model results",
     renderTable({
       res <- results()
-      
       validate(need(res != "No data", "No data selected."))
       validate(need(is.list(res), sprintf("Unable to compute model, try adjusting parameters. Reason: %s", res)), errorClass = "model-results")
       

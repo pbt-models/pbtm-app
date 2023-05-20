@@ -170,7 +170,7 @@ AgingServer <- function(data, ready) {
           # Plot
           primaryBox(
             title = "Plot output",
-            plotOutput(ns("plot"))
+            plotOutput(ns("plot"), height = "450px")
           )
         )
       })
@@ -208,7 +208,7 @@ AgingServer <- function(data, ready) {
           scale_x_continuous(expand = expansion()) +
           labs(
             title = "Cumulative germination",
-            caption = "Generated with the PBTM shiny app",
+            caption = "Generated with the PBTM app",
             x = "Time",
             y = "Cumulative fraction germinated (%)",
             color = "Aging Time") +

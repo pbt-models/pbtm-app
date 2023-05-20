@@ -178,8 +178,7 @@ GerminationServer <- function(data, ready) {
                 )
               )
             ),
-            p(style = "font-size: 16px;", strong("Cumulative germination plot")),
-            plotOutput(ns("plot"))
+            plotOutput(ns("plot"), height = "450px")
           ),
           
           # Germination speed
@@ -321,9 +320,12 @@ GerminationServer <- function(data, ready) {
             limits = c(0, 1),
             expand = expansion(c(0, 0.05))) +
           labs(
+            title = "Cumulative germination",
+            caption = "Generated with the PBTM app",
             x = "Time",
             y = "Cumulative (%)") +
-          theme_classic()
+          theme_classic() +
+          theme(plot.title = element_text(face = "bold", size = 14))
         
         # show speed fractions on plot
         lines = rv$germSpeeds / 100

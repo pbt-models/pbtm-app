@@ -179,7 +179,7 @@ HydrothermalTimeServer <- function(data, ready) {
           # Plot
           primaryBox(
             title = "Plot output",
-            plotOutput(ns("plot"))
+            plotOutput(ns("plot"), height = "450px")
           )
         )
       })
@@ -220,7 +220,7 @@ HydrothermalTimeServer <- function(data, ready) {
             expand = expansion()) +
           labs(
             title = "Cumulative germination",
-            caption = "Generated with the PBTM shiny app",
+            caption = "Generated with the PBTM app",
             x = "Time",
             y = "Cumulative fraction germinated (%)",
             color = "Water Potential",
