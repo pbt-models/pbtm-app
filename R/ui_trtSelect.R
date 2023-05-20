@@ -1,5 +1,5 @@
-# ---- trtIdSelect ---- #
 
+#' @description a shared ui component
 #' @param ns namespace function from calling server
 #' @param data reactive dataset from which to pull TrtID values
 

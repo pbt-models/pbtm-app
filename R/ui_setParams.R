@@ -1,4 +1,8 @@
 
+#' @description a shared ui component
+#' @param ns namespace function from calling server
+#' @param params vector of param names
+
 setParamsUI <- function(ns, params) {
   namedWell(
     title = "Specify model coefficients (optional)",

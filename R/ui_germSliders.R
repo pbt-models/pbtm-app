@@ -1,5 +1,5 @@
-# ---- cumFracSliders ---- #
 
+#' @description a shared ui component
 #' @param ns namespace function from calling server
 
 germSlidersUI <- function(ns) {

@@ -1,5 +1,5 @@
-# ---- validateCol ---- #
 
+#' @description checks a data column and returns whether it's valid and a message about it
 #' @param col data vector to evaluate
 #' @param expectedType checks that `col` is this type
 #' @param minValue if `col` is numeric, checks this constraint

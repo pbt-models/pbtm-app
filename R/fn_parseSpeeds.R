@@ -1,6 +1,5 @@
-# ---- parseSpeeds ---- #
 
-# parses the comma-separated germ speed input, returns an ordered vector of numbers
+#' @description parses the comma-separated germ speed input, returns an ordered vector of numbers
 #' @param x a string to parse
 #' @returns a vector of parsed numbers from the string
 

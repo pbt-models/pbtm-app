@@ -27,114 +27,22 @@ GerminationServer <- function(data, ready) {
     function(input, output, session) {
       ns <- session$ns
       
-
+      
       # Vars ----
       
+      ## defaultGermSpeeds ----
       defaultGermSpeeds <- c(10, 16, 50, 84, 90)
       
+      ## rv $ germSpeeds ----
       rv <- reactiveValues(
         germSpeeds = defaultGermSpeeds
       )
       
       
-      # content // Rendered UI ----
-      output$content <- renderUI({
-        req_cols <- paste(colValidation$Column[colValidation$Germination], collapse = ", ")
-        validate(need(ready(), paste("Please load a dataset and set required column types for germination analysis. Minimum required columns for germination analysis are", req_cols)))
-        
-        tagList(
-          fluidRow(
-            box(
-              title = "Cumulative germination plot",
-              status = "primary",
-              solidHeader = T,
-              width = 12,
-              wellPanel(
-                fluidRow(
-                  column(
-                    width = 6,
-                    selectInput(
-                      inputId = ns("plotColor"),
-                      label = "Treatment 1 (color)",
-                      choices = plotColorChoices()
-                    ),
-                    selectInput(
-                      inputId = ns("plotShape"),
-                      label = "Treatment 2 (shape, n <= 6)",
-                      choices = plotShapeChoices()
-                    )
-                  ),
-                  column(
-                    width = 6,
-                    strong("Additional plot options:"),
-                    checkboxInput(
-                      inputId = ns("mergeTrts"),
-                      label = "Rescale cumulative germination?"
-                    ),
-                    checkboxInput(
-                      inputId = ns("showSpeeds"),
-                      label = "Show speed estimates?"
-                    )
-                  )
-                )
-              ),
-              plotOutput(ns("plot"))
-            ),
-            box(
-              title = "Germination time analysis",
-              status = "primary",
-              solidHeader = T,
-              width = 12,
-              wellPanel(
-                fluidRow(
-                  column(
-                    width = 4,
-                    checkboxGroupInput(
-                      inputId = ns("germSpeedTrts"),
-                      label = "Select all treatment factors:",
-                      choices = trtChoices(),
-                      selected = c("TrtID")
-                    )
-                  ),
-                  column(
-                    width = 4,
-                    textInput(
-                      inputId = ns("newGermSpeeds"),
-                      label = "Set cumulative percent (separate with commas):",
-                      value = ""
-                    ),
-                    div(
-                      style = "margin-top: 1em; margin-bottom: 1em;",
-                      actionButton(ns("setGermSpeeds"), "Apply"),
-                      actionButton(ns("resetGermSpeeds"), "Reset")
-                    )
-                  ),
-                  column(
-                    width = 4,
-                    radioButtons(
-                      inputId = ns("germSpeedType"),
-                      label = "Report values as:",
-                      choices = list(
-                        "Time (to % germinated)" = "Time",
-                        "Rate (1 / time)" = "Rate"
-                      )
-                    )
-                  )
-                )
-              ),
-              div(
-                style = "overflow-x: auto",
-                dataTableOutput(ns("germSpeedTable"))
-              )
-            )
-          )
-        )
-      })
-      
-      
       # Reactives ----
       
-      ## trtChoices // all column names except CumTime and CumFraction
+      ## trtChoices ----
+      # all column names except CumTime and CumFraction
       trtChoices <- reactive({
         req(ready())
         
@@ -142,8 +50,8 @@ GerminationServer <- function(data, ready) {
         x[!x %in% c("CumTime", "CumFraction")]
       })
       
-      
-      ## uniqueValueCount // number of unique values for each factor column
+      ## uniqueValueCount ----
+      # number of unique values for each factor column
       uniqueValueCount <- reactive({
         req(ready())
         
@@ -155,12 +63,14 @@ GerminationServer <- function(data, ready) {
           mutate(label = sprintf("%s (n=%s)", name, value))
       })
       
+      ## plotColorChoices ----
       plotColorChoices <- reactive({
         df <- uniqueValueCount()
         as.list(c(NA, df$name)) %>%
           setNames(c("Not specified", df$label))
       })
       
+      ## plotShapeChoices ----
       plotShapeChoices <- reactive({
         df <- uniqueValueCount() %>%
           filter(value <= 6)
@@ -168,8 +78,8 @@ GerminationServer <- function(data, ready) {
           setNames(c("Not specified", df$label))
       })
       
-      
-      ## workingData // slightly modified dataset used by plot and table ----
+      ## workingData ----
+      # slightly modified dataset used by plot and table
       workingData <- reactive({
         req(ready())
         
@@ -180,7 +90,8 @@ GerminationServer <- function(data, ready) {
           ungroup()
       })
       
-      ## germSpeedData // used by germination speed table ----
+      ## germSpeedData ----
+      # used by germination speed table
       germSpeedData <- reactive({
         req(ready())
         
@@ -209,7 +120,7 @@ GerminationServer <- function(data, ready) {
       })
       
       
-      # Observers ----
+      # Event Reactives ----
       
       ## set new germ speeds ----
       observeEvent(input$setGermSpeeds, {
@@ -226,6 +137,100 @@ GerminationServer <- function(data, ready) {
       
       
       # Outputs ----
+      
+      # content // Rendered UI ----
+      output$content <- renderUI({
+        req_cols <- paste(colValidation$Column[colValidation$Germination], collapse = ", ")
+        validate(need(ready(), paste("Please load a dataset and set required column types for germination analysis. Minimum required columns for germination analysis are", req_cols)))
+        
+        fluidRow(
+          
+          # Germination plot
+          primaryBox(
+            title = "Cumulative germination plot",
+            fluidRow(
+              column(6,
+                namedWell(
+                  title = "Treatment selection",
+                  selectInput(
+                    inputId = ns("plotColor"),
+                    label = "Treatment 1 (color)",
+                    choices = plotColorChoices()
+                  ),
+                  selectInput(
+                    inputId = ns("plotShape"),
+                    label = "Treatment 2 (shape, n <= 6)",
+                    choices = plotShapeChoices()
+                  )
+                )
+              ),
+              column(6,
+                namedWell(
+                  title = "Additional plot options",
+                  checkboxInput(
+                    inputId = ns("mergeTrts"),
+                    label = "Rescale cumulative germination?"
+                  ),
+                  checkboxInput(
+                    inputId = ns("showSpeeds"),
+                    label = "Show speed estimates?"
+                  )
+                )
+              )
+            ),
+            p(style = "font-size: 16px;", strong("Cumulative germination plot")),
+            plotOutput(ns("plot"))
+          ),
+          
+          # Germination speed
+          primaryBox(
+            title = "Germination speed analysis",
+            namedWell(
+              title = "Options",
+              fluidRow(
+                column(
+                  width = 4,
+                  checkboxGroupInput(
+                    inputId = ns("germSpeedTrts"),
+                    label = "Select all treatment factors:",
+                    choices = trtChoices(),
+                    selected = c("TrtID")
+                  )
+                ),
+                column(
+                  width = 4,
+                  textInput(
+                    inputId = ns("newGermSpeeds"),
+                    label = "Set cumulative percent (separate with commas):",
+                    value = ""
+                  ),
+                  div(
+                    style = "margin-top: 1em; margin-bottom: 1em;",
+                    actionButton(ns("setGermSpeeds"), "Apply"),
+                    actionButton(ns("resetGermSpeeds"), "Reset")
+                  )
+                ),
+                column(
+                  width = 4,
+                  radioButtons(
+                    inputId = ns("germSpeedType"),
+                    label = "Report values as:",
+                    choices = list(
+                      "Time (to % germinated)" = "Time",
+                      "Rate (1 / time)" = "Rate"
+                    )
+                  )
+                )
+              )
+            ),
+            p(style = "font-size: 16px;",  strong("Results table")),
+            div(
+              style = "overflow-x: auto",
+              dataTableOutput(ns("germSpeedTable"))
+            )
+          )
+        )
+      })
 
       ## plot // germination curves ----
       output$plot <- renderPlot({
@@ -316,10 +321,8 @@ GerminationServer <- function(data, ready) {
             limits = c(0, 1),
             expand = expansion(c(0, 0.05))) +
           labs(
-            title = "Cumulative germination",
             x = "Time",
-            y = "Cumulative (%)"
-          ) +
+            y = "Cumulative (%)") +
           theme_classic()
         
         # show speed fractions on plot
@@ -391,7 +394,11 @@ GerminationServer <- function(data, ready) {
           buttons = list(
             list(
               extend = "copy",
-              text = 'Copy table to clipboard'
+              text = "Copy table to clipboard"
+            ),
+            list(
+              extend = "csv",
+              text = "Download as csv"
             )
           )
         )

@@ -1,5 +1,5 @@
-# ---- dataCleanSelect ----#
 
+#' @description a shared ui component
 #' @param ns namespace function from calling server
 
 dataCleanUI <- function(ns) {

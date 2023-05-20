@@ -106,3 +106,10 @@
 .shiny-table thead tr th {
     border-bottom: 1px solid #bbb;
 }
+
+.data-summary {
+    text-align: center;
+    font-size: larger;
+    font-weight: bold;
+    margin-bottom: 5px;
+}

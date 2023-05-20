@@ -63,9 +63,4 @@ server <- function(input, output, session) {
     )
   })
   
-  
-  # Gracefully exit ----
-  
-  session$onSessionEnded(\() stopApp())
-  
 }

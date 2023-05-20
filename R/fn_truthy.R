@@ -1,7 +1,7 @@
-# ---- truthy ---- #
 
+#' @description checks many types of objects and determines if they're truthy
 #' @param x a value to be evaluated as `TRUE` or `FALSE`
-#' @returns boolean
+#' @returns T/F
 
 truthy <- function(x) {
   # null values are false
