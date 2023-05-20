@@ -1,4 +1,8 @@
-# ---- addParamsToPlot ---- #
+
+#' @description plot helper
+#' @param `gg` the ggplot object
+#' @param `params` list of params to add, including math notation
+#' @returns updated ggplot object
 
 addParamsToPlot <- function(gg, params) {
   y <- 0.95

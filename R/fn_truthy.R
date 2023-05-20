@@ -1,7 +1,7 @@
-# ---- truthy ---- #
 
+#' @description checks many types of objects and determines if they're truthy
 #' @param x a value to be evaluated as `TRUE` or `FALSE`
-#' @returns boolean
+#' @returns T/F
 
 truthy <- function(x) {
   # null values are false
@@ -35,7 +35,7 @@ truthy <- function(x) {
   if (length(x) > 1) return(TRUE)
 
   # these special cases are false
-  if (x %in% c(NA, "NA", "", 0, F)) return(FALSE)
+  if (x %in% c(NA, "NA", "", FALSE)) return(FALSE)
   
   # anything else
   TRUE

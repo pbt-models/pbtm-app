@@ -1,17 +1,15 @@
-# ---- resultsTable ---- #
 
+#' @description a shared ui component
 #' @param ns namespace function from calling server
 #' @param results reactive model results from calling server
 
-resultsTable <- function(ns, results) {
-  box(
-    width = 6,
+modelResultsUI <- function(ns, results) {
+  namedWell(
     title = "Model results",
     renderTable({
       res <- results()
-      
-      # print error message if model fails
-      validate(need(is.list(res), res))
+      validate(need(res != "No data", "No data selected."))
+      validate(need(is.list(res), sprintf("Unable to compute model, try adjusting parameters. Reason: %s", res)), errorClass = "model-results")
       
       # convert list to simple data frame
       res %>%
@@ -23,7 +21,9 @@ resultsTable <- function(ns, results) {
         )
     },
       digits = 4,
-      width = "100%"
+      width = "100%",
+      striped = FALSE,
+      hover = TRUE
     )
   )
 }

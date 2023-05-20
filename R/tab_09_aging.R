@@ -7,7 +7,7 @@ AgingUI <- function() {
   
   tagList(
     h3(class = "tab-title", "Aging analysis"),
-    div(class = "tab-info", "The aging model assumes a data set with aging (natural, controlled deterioration or accelerated aging) as a treatment condition. If you have additional treatments in your dataset, please filter out those as you may get unreliable or unexpected model results. Note: the model may fail to converge under certain max cumulative fraction values."),
+    div(class = "tab-info", "The aging model assumes a data set with aging (natural, controlled deterioration or accelerated aging) as a treatment condition. If you have additional treatments in your dataset, please filter those out as you may get unreliable or unexpected model results. Note: the model may fail to converge under conditions, try adjusting data or model constraints."),
     uiOutput(ns("content"))
   )
 }
@@ -27,44 +27,35 @@ AgingServer <- function(data, ready) {
       ns <- session$ns
       
       
-      ## content // Rendered UI ----
-      output$content <- renderUI({
-        req_cols <- colValidation$Column[colValidation$Aging]
-        validate(need(ready(), "Please load required data for the aging model analysis. Minimum required columns are:", paste(req_cols, collapse = ", ")))
-        
-        agingTimeChoices <- unique(data()$AgingTime)
-        
-        fluidRow(
-          box(
-            width = 6,
-            title = "Model parameters",
-            checkboxGroupInput(
-              inputId = ns("agingTimeSelect"),
-              label = "Included aging times:",
-              choices = agingTimeChoices,
-              selected = agingTimeChoices
-            ),
-            dataCleanSelect(ns)
-          ),
-          resultsTable(ns, reactive(modelResults())),
-          box(
-            width = 12,
-            title = "Germination data and aging model fit",
-            plotOutput(ns("plot"))
-          ),
-          trtIdSelect(ns, reactive(data())),
-          cumFracSliders(ns)
-        )
-      })
+      # Vars ----
+      
+      ## paramRangeDefaults ----
+      # model constraints: (lower, start, upper)
+      paramRangeDefaults <- list(
+        ThetaA = c(1, 100, 1000),
+        Pmax50 = c(1, 10, 1000),
+        Sigma = c(.1, 3, 10)
+      )
+      
+      ## params ----
+      params <- names(paramRangeDefaults)
+      
+      ## rv $ setParams ----
+      ## rv $ paramRanges ----
+      rv <- reactiveValues(
+        setParams = deframe(tibble(params, NA)),
+        paramRanges = paramRangeDefaults
+      )
       
       
-      # workingDataset // for model and plot ----
+      # Reactives ----
+      
+      ## workingDataset ----
+      # modified/filtered dataset for model and plot
       workingData <- reactive({
         req(
           ready(),
-          input$agingTimeSelect,
           input$dataCleanSelect,
-          input$trtIdSelect,
           input$cumFracRange,
           input$maxCumFrac
         )
@@ -72,7 +63,7 @@ AgingServer <- function(data, ready) {
         df <- data() %>%
           filter(AgingTime %in% input$agingTimeSelect) %>%
           filter(TrtID %in% input$trtIdSelect)
-
+        
         # optionally remove repeated measurements at same cumulative fraction
         if (input$dataCleanSelect == "clean") {
           df <- df %>% distinct(TrtID, CumFraction, .keep_all = TRUE)
@@ -82,73 +73,125 @@ AgingServer <- function(data, ready) {
         df %>% filter(between(CumFraction * 100, input$cumFracRange[1], input$cumFracRange[2]))
       })
       
-      # observe(print(workingData()))
       
-      
-      # modelResults // list of coefficients or string error message ----
+      ## modelResults ----
+      # list of coefficients or string error message
       modelResults <- reactive({
+        req(ready())
+        if (nrow(workingData()) == 0) return("No data")
+        
+        # check if a parameter is defined, or set its range constraints if not
+        buildModelParams(rv$setParams, rv$paramRanges)
         
         # collect data
         df <- workingData()
-        aging <- df$AgingTime
-        time <- df$CumTime
-        germ <- df$CumFraction
-        max_cum_frac <- input$maxCumFrac / 100
-        
-        # set model conditions
-        lower <- list(thetaA = 1, pmax50 = 1, sigma = 0.1)
-        start <- list(thetaA = 100, pmax50 = 10, sigma = 3)
-        upper <- list(thetaA = 1000, pmax50 = 1000, sigma = 10)
+        AgingTime <- df$AgingTime
+        CumTime <- df$CumTime
+        CumFraction <- df$CumFraction
+        maxCumFrac <- input$maxCumFrac / 100
         
         # run model
-        tryCatch({
-          model <- stats::nls(
-            formula = germ ~ max_cum_frac * stats::pnorm(
-              -(aging + thetaA / time),
-              -pmax50,
-              sigma
-            ),
-            start = start,
-            lower = lower,
-            upper = upper,
-            algorithm = "port"
+        suppressWarnings(
+          tryCatch({
+            model <- nls(
+              formula = CumFraction ~ maxCumFrac * pnorm(
+                q = -(AgingTime + ThetaA / CumTime),
+                mean = -Pmax50,
+                sd = Sigma
+              ),
+              start = start, lower = lower, upper = upper,
+              algorithm = "port"
+            )
+            
+            # grab coefs from model or user-set values
+            buildModelResults(model, params, defined, CumFraction)
+          },
+            error = function(cond) { paste(cond[1]) }
           )
-          
-          # grab coefs
-          corr <- stats::cor(germ, stats::predict(model)) ^ 2
-          thetaA <- summary(model)$coefficients[[1]]
-          pmax50 <- summary(model)$coefficients[[2]]
-          sigma <- summary(model)$coefficients[[3]]
-          
-          # return results
-          list(
-            ThetaA = thetaA,
-            Pmax50 = pmax50,
-            Sigma = sigma,
-            Correlation = corr
-          )
-        },
-          error = function(cond) {
-            paste("Unable to compute model, try adjusting parameters. ", str_to_sentence(cond[1]))
-          }
         )
       })
       
-      # observe(print(modelResults()))
       
+      # Event Reactives ----
+      
+      ## Model coefficient input observers ----
+      lapply(params, function(p) {
+        id <- paste0(p, "_set")
+        observeEvent(input[[id]], {
+          val <- input[[id]]
+          rv$setParams[[p]] <- ifelse(val != "", val, NA)
+        })
+      })
+      
+      
+      
+      # Outputs ----
+      
+      ## content // Main UI ----
+      output$content <- renderUI({
+        req_cols <- colValidation$Column[colValidation$Aging]
+        validate(need(ready(), paste("Please load required data for the aging model analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
+        
+        agingTimeChoices <- getColChoices(data(), "AgingTime")
+        
+        fluidRow(
+          
+          # Data selection
+          primaryBox(
+            title = "Data selection",
+            fluidRow(
+              column(6,
+                namedWell(
+                  title = "Data input options",
+                  checkboxGroupInput(
+                    inputId = ns("agingTimeSelect"),
+                    label = "Included aging times:",
+                    choices = agingTimeChoices,
+                    selected = agingTimeChoices
+                  ),
+                  dataCleanUI(ns)
+                )
+              ),
+              column(6, germSlidersUI(ns)),
+              column(12, trtSelectUI(ns, reactive(data()))),
+              column(12, wellPanel(class = "data-summary", textOutput(ns("dataSummary"))))
+            )
+          ),
+          
+          # Model parameters
+          primaryBox(
+            title = "Model parameters",
+            fluidRow(
+              column(6, setParamsUI(ns, params)),
+              column(6, modelResultsUI(ns, reactive(modelResults())))
+            )
+          ),
+          
+          # Plot
+          primaryBox(
+            title = "Plot output",
+            plotOutput(ns("plot"), height = "450px")
+          )
+        )
+      })
+      
+      ## dataSummary ----
+      # displays data remaining after filter
+      output$dataSummary <- renderText({
+        n1 <- nrow(workingData())
+        n2 <- nrow(data())
+        pct <- round(n1 / n2 * 100, 0)
+        sprintf("Using %s / %s data points (%s%%)", n1, n2, pct)
+      })
       
       ## plot ----
       output$plot <- renderPlot({
-        req(
-          workingData(),
-          modelResults(),
-          input$maxCumFrac,
-          input$cumFracRange
-        )
+        req(ready())
+        validate(need(nrow(workingData()) > 0, "No data selected."))
         
         df <- workingData()
-        germ_cutoff <- input$maxCumFrac / 100
         model <- modelResults()
+        maxFrac <- input$maxCumFrac / 100
         
         # generate the plot
         plt <- df %>%
@@ -156,58 +199,47 @@ AgingServer <- function(data, ready) {
             x = CumTime,
             y = CumFraction,
             color = as.factor(AgingTime))) +
-          annotate(
-            "rect",
-            xmin = 0,
-            xmax = Inf,
-            ymin = germ_cutoff,
-            ymax = 1,
-            fill = "grey",
-            alpha = 0.1) +
-          geom_hline(
-            yintercept = germ_cutoff,
-            color = "darkgrey",
-            linetype = "dashed") +
-          geom_point(
-            shape = 19,
-            size = 2) +
+          addFracToPlot(maxFrac) +
+          geom_point(shape = 19, size = 2) +
           scale_y_continuous(
             labels = scales::percent,
             expand = expansion(),
             limits = c(0, 1.02)) +
-          scale_x_continuous(
-            expand = expansion()) +
+          scale_x_continuous(expand = expansion()) +
           labs(
+            title = "Cumulative germination",
+            caption = "Generated with the PBTM app",
             x = "Time",
             y = "Cumulative fraction germinated (%)",
             color = "Aging Time") +
           guides(color = guide_legend(reverse = F, order = 1)) +
-          theme_classic()
+          theme_classic() +
+          theme(plot.title = element_text(face = "bold", size = 14))
         
         # plot model results if successful
         if (is.list(model)) {
-          maxCumFrac <- model$MaxCumFrac
           thetaA <- model$ThetaA
           pmax50 <- model$Pmax50
           sigma <- model$Sigma
           corr <- model$Correlation
           
-          modelLines <- mapply(function(aging) {
-            stat_function(
-              fun = function(x) {
-                stats::pnorm(
-                  -(aging + thetaA / x),
-                  -pmax50,
-                  sigma
-                ) * germ_cutoff
+          plt <- plt +
+            labs(title = "Cumulative germination and aging model fit") +
+            mapply(
+              function(aging) {
+                stat_function(
+                  fun = function(x) {
+                    maxFrac * pnorm(
+                      q = -(aging + thetaA / x),
+                      mean = -pmax50,
+                      sd = sigma
+                    )
+                  },
+                  aes(color = as.factor(aging))
+                )
               },
-              aes(color = as.factor(aging))
+              unique(df$AgingTime)
             )
-          },
-            unique(df$AgingTime)
-          )
-          
-          plt <- plt + modelLines
           
           # add model annotation
           plt <- addParamsToPlot(plt, list(

@@ -1,3 +1,15 @@
+/* --- PBTM Dashboard ---- */
+
+/* Modifications of existing styles */
+
+.panel-body {
+    padding: 0px;
+}
+
+.table {
+    margin-bottom: 0;
+}
+
 .skin-blue {
     background-color: #c1ccd6;
 }
@@ -33,16 +45,11 @@
     margin: 0 10px;
 }
 
-.shiny-table {
-    background: white;
-}
-
-.shiny-table th {
-    background: #f4f4f4;
-}
-
-.shiny-table tr:nth-child(even) {
-    background: #f4f4f4;
+.flex-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    justify-content: space-between;
 }
 
 
@@ -68,12 +75,41 @@
     overflow: auto;
 }
 
-/* Modifications of existing styles */
 
-.panel-body {
-    padding: 0px;
+/* Models */
+
+.checkbox-inline {
+    margin-left: 10px;
 }
 
-.table {
-    margin-bottom: 0;
+.shiny-output-error-model-results {
+    font-weight: bold;
+    font-size: 15px;
+    color: #c5050c;
+}
+
+.box-title {
+    font-weight: bold;
+    font-style: italic;
+}
+
+.well-title {
+    margin-bottom: 2px;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.last-row {
+    margin-bottom: 0px;
+}
+
+.shiny-table thead tr th {
+    border-bottom: 1px solid #bbb;
+}
+
+.data-summary {
+    text-align: center;
+    font-size: larger;
+    font-weight: bold;
+    margin-bottom: 5px;
 }

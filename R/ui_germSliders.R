@@ -1,11 +1,10 @@
-# ---- cumFracSliders ---- #
 
+#' @description a shared ui component
 #' @param ns namespace function from calling server
 
-cumFracSliders <- function(ns) {
-  box(
-    width = 6,
-    title = "Additional model contraints",
+germSlidersUI <- function(ns) {
+  namedWell(
+    title = "Germination contraints",
     sliderInput(
       inputId = ns("maxCumFrac"),
       label = "Maximum germination (%) observed",

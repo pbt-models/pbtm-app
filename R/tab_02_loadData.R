@@ -9,13 +9,6 @@ LoadDataUI <- function() {
     h3("Upload data", class = "tab-title"),
     p(em("Upload your own data here or select one of our sample datasets to get started.")),
     br(),
-    p(strong("Expected column names and descriptions:")),
-    bsCollapse(
-      bsCollapsePanel(
-        title = "Show/hide column descriptions",
-        tableOutput(ns("columnDescriptions"))
-      )
-    ),
     p(strong("Sample datasets:")),
     div(
       class = "flex-btns",
@@ -35,6 +28,13 @@ LoadDataUI <- function() {
       div(
         style = "height: min-content;",
         actionButton(ns("clearData"), "Clear loaded data")
+      )
+    ),
+    p(strong("Expected column names and descriptions:")),
+    bsCollapse(
+      bsCollapsePanel(
+        title = "Show/hide column descriptions",
+        tableOutput(ns("columnDescriptions"))
       )
     ),
     uiOutput(ns("currentDataUI"))
