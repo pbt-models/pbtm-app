@@ -243,7 +243,7 @@ AgingServer <- function(data, ready) {
           
           # add model annotation
           plt <- addParamsToPlot(plt, list(
-            paste("~~", expression(theta~Age), "==", round(thetaA, 2)),
+            sprintf("~~theta~Age==%.2f", thetaA),
             sprintf("~~Pmax[50]==%.3f", pmax50),
             sprintf("~~sigma==%.3f", sigma),
             sprintf("~~R^2==%.2f", corr)

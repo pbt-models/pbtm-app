@@ -44,7 +44,9 @@ ThermalTimeServer <- function(data, ready) {
       ## rv $ paramRanges ----
       rv <- reactiveValues(
         setParams = deframe(tibble(params, NA)),
-        paramRanges = paramRangeDefaults
+        heldParams = deframe(tibble(params, FALSE)),
+        paramRanges = paramRangeDefaults,
+        lastGoodModel = NULL
       )
       
       
@@ -112,19 +114,36 @@ ThermalTimeServer <- function(data, ready) {
         )
       })
       
+      # Save coefficients on success (in case model later fails)
+      observe({
+        if (is.list(modelResults())) rv$lastGoodModel <- modelResults()
+      })
+      
       
       
       # Event Reactives ----
       
       ## Model coefficient input observers ----
       lapply(params, function(p) {
-        id <- paste0(p, "_set")
+        id <- paste0(p, "-set")
         observeEvent(input[[id]], {
           val <- input[[id]]
           rv$setParams[[p]] <- ifelse(val != "", val, NA)
+          if (!truthy(val)) rv$heldParams[[p]] <- FALSE
         })
       })
       
+      ## hold param checkbox observers ----
+      lapply(params, function(p) {
+        id <- paste0(p, "-hold")
+        observeEvent(input[[id]], {
+          rv$heldParams[[p]] <- input[[id]]
+          updateNumericInput(
+            inputId = paste0(p, "-set"),
+            value = ifelse(input[[id]], modelResults()[[p]], "")
+          )
+        })
+      })
       
       
       # Outputs ----
@@ -165,8 +184,9 @@ ThermalTimeServer <- function(data, ready) {
           primaryBox(
             title = "Model parameters",
             fluidRow(
+              column(6, uiOutput(ns("modelResults"))),
               column(6, setParamsUI(ns, params)),
-              column(6, modelResultsUI(ns, reactive(modelResults())))
+              column(12, uiOutput(ns("modelError")))
             )
           ),
           
@@ -185,6 +205,20 @@ ThermalTimeServer <- function(data, ready) {
         n2 <- nrow(data())
         pct <- round(n1 / n2 * 100, 0)
         sprintf("Using %s / %s data points (%s%%)", n1, n2, pct)
+      })
+      
+      
+      ## modelResults ----
+      output$modelResults <- renderUI({
+        modelResultsUI(ns, reactive(rv$lastGoodModel), reactive(rv$heldParams))
+      })
+      
+      output$modelError <- renderUI({
+        if (is.list(modelResults())) return() # no error
+        div(
+          class = "model-error",
+          sprintf("Model failed under current settings: %s. Last valid model coefficients shown above.", modelResults())
+        )
       })
       
       
@@ -248,7 +282,7 @@ ThermalTimeServer <- function(data, ready) {
           # add model annotation
           plt <- addParamsToPlot(plt, list(
             sprintf("~~T[b]==%.1f", tb),
-            sprintf("~~ThetaT(50)==%.3f", thetaT50),
+            sprintf("~~theta[T][50]==%.3f", thetaT50),
             sprintf("~~sigma==%.3f", sigma),
             sprintf("~~R^2==%.2f", corr)
           )) 

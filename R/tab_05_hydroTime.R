@@ -32,7 +32,7 @@ HydroTimeServer <- function(data, ready) {
       ## paramRangeDefaults ----
       # model constraints: (lower, start, upper)
       paramRangeDefaults <- list(
-        HT = c(1, 60, 1000),
+        ThetaH = c(1, 60, 1000),
         PsiB50 = c(-5, -.8, -1e-9),
         Sigma = c(1e-4, .2, 2)
       )
@@ -95,7 +95,7 @@ HydroTimeServer <- function(data, ready) {
           tryCatch({
             model <- nls(
               formula = CumFraction ~ maxCumFrac * pnorm(
-                q = GermWP - (HT / CumTime),
+                q = GermWP - (ThetaH / CumTime),
                 mean = PsiB50,
                 sd = Sigma
               ),
@@ -225,8 +225,8 @@ HydroTimeServer <- function(data, ready) {
         
         # add model results if successful
         if (is.list(model)) {
-          ht <- model$HT
-          psiB50 <- model$PsiB50
+          thetaH <- model$ThetaH
+          psiB50 <- model$Psib50
           sigma <- model$Sigma
           corr <- model$Correlation
           
@@ -237,7 +237,7 @@ HydroTimeServer <- function(data, ready) {
                 stat_function(
                   fun = function(x) {
                     maxFrac * pnorm(
-                      q = wp - (ht / x),
+                      q = wp - (thetaH / x),
                       mean = psiB50,
                       sd = sigma
                     )
@@ -250,8 +250,8 @@ HydroTimeServer <- function(data, ready) {
           
           # add model annotation
           plt <- addParamsToPlot(plt, list(
-            sprintf("~~HT==%.2f", ht),
-            sprintf("~~Psi[b](50)==%.3f", psiB50),
+            sprintf("~~theta~H==%.2f", thetaH),
+            sprintf("~~Psi[b][50]==%.3f", psib50),
             sprintf("~~sigma==%.3f", sigma),
             sprintf("~~R^2==%.2f", corr)
           ))

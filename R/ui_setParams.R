@@ -10,7 +10,7 @@ setParamsUI <- function(ns, params) {
       class = "flex-row",
       lapply(params, function(p) {
         numericInput(
-          inputId = ns(paste0(p, "_set")),
+          inputId = ns(paste0(p, "-set")),
           label = p,
           value = NA,
           step = .1,
@@ -18,6 +18,8 @@ setParamsUI <- function(ns, params) {
         )
       })
     ),
-    em("Specify individual model coefficients, or leave blank to allow the model to find a best-fit value.")
+   em("Specify individual model coefficients, or leave blank to allow the model to find a best-fit value.")
+    # ,
+    # uiOutput(ns("runModel"))
   )
 }

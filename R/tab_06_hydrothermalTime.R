@@ -32,7 +32,7 @@ HydrothermalTimeServer <- function(data, ready) {
       ## paramRangeDefaults ----
       # model constraints: (lower, start, upper)
       paramRangeDefaults <- list(
-        HT = c(1, 800, 5000),
+        ThetaHT = c(1, 800, 5000),
         Tb = c(0, 1, 15),
         PsiB50 = c(-5, -1, 0),
         Sigma = c(.0001, .4, 10)
@@ -98,7 +98,7 @@ HydrothermalTimeServer <- function(data, ready) {
           tryCatch({
             model <- nls(
               formula = CumFraction ~ maxCumFrac * pnorm(
-                q = GermWP - (HT / ((GermTemp - Tb) * CumTime)),
+                q = GermWP - (ThetaHT / ((GermTemp - Tb) * CumTime)),
                 mean = PsiB50,
                 sd = Sigma
               ),
@@ -233,7 +233,7 @@ HydrothermalTimeServer <- function(data, ready) {
         
         # use try so it will still plot on model error
         if (is.list(model)) {
-          ht <- model$HT
+          thetaht <- model$ThetaHT
           tb <- model$Tb
           psib50 <- model$PsiB50
           sigma <- model$Sigma
@@ -249,7 +249,7 @@ HydrothermalTimeServer <- function(data, ready) {
                 stat_function(
                   fun = function(x) {
                     maxFrac * pnorm(
-                      q = wp - (ht / ((temp - tb) * x)),
+                      q = wp - (thetaht / ((temp - tb) * x)),
                       mean = psib50,
                       sd = sigma
                     )
@@ -267,7 +267,7 @@ HydrothermalTimeServer <- function(data, ready) {
           
           # add model annotation
           plt <- addParamsToPlot(plt, list(
-            sprintf("~~HT==%.2f", ht),
+            sprintf("~~theta~HT==%.2f", thetaht),
             sprintf("~~T[b]==%.2f", tb),
             sprintf("~~psi[b][50]==%.3f", psib50),
             sprintf("~~sigma==%.3f", sigma),

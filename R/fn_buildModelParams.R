@@ -12,6 +12,9 @@ buildModelParams <- function(setParams, paramRanges) {
     if (truthy(paramValue)) {
       defined[[p]] <- paramValue
       assign(p, paramValue, envir = env)
+      lower[[p]] <- paramValue
+      start[[p]] <- paramValue
+      upper[[p]] <- paramValue
     } else {
       if (exists(c(p))) remove(list = c(p), envir = env)
       ranges <- paramRanges[[p]]
