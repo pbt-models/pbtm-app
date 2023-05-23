@@ -40,8 +40,7 @@ ThermalTimeServer <- function(data, ready) {
       ## params ----
       params <- names(paramRangeDefaults)
       
-      ## rv $ setParams ----
-      ## rv $ paramRanges ----
+      ## rv ----
       rv <- reactiveValues(
         setParams = deframe(tibble(params, NA)),
         heldParams = deframe(tibble(params, FALSE)),
@@ -62,6 +61,8 @@ ThermalTimeServer <- function(data, ready) {
           input$maxCumFrac
         )
         
+        rv$lastGoodModel <- NULL
+        
         df <- data() %>%
           filter(GermTemp %in% input$germTempSelect) %>%
           filter(TrtID %in% input$trtIdSelect)
@@ -73,7 +74,8 @@ ThermalTimeServer <- function(data, ready) {
         }
         
         # filter based on cumulative fraction cutoffs
-        df %>% filter(between(CumFraction * 100, input$cumFracRange[1], input$cumFracRange[2]))
+        df %>%
+          filter(between(CumFraction * 100, input$cumFracRange[1], input$cumFracRange[2]))
       })
       
       
@@ -81,7 +83,7 @@ ThermalTimeServer <- function(data, ready) {
       # list with model results or string with error
       modelResults <- reactive({
         req(ready())
-        if (nrow(workingData()) == 0) return("No data")
+        req(nrow(workingData()) > 0)
         
         # check if a parameter is defined, or set its range constraints if not
         buildModelParams(rv$setParams, rv$paramRanges)
@@ -103,7 +105,8 @@ ThermalTimeServer <- function(data, ready) {
                 sd = Sigma
               ),
               start = start, lower = lower, upper = upper,
-              algorithm = "port"
+              algorithm = "port",
+              control = list(warnOnly = TRUE) # prevents false convergence error
             )
             
             # grab coefs from model or user-set values
@@ -129,7 +132,7 @@ ThermalTimeServer <- function(data, ready) {
         observeEvent(input[[id]], {
           val <- input[[id]]
           rv$setParams[[p]] <- ifelse(val != "", val, NA)
-          if (!truthy(val)) rv$heldParams[[p]] <- FALSE
+          rv$heldParams[[p]] <- truthy(val)
         })
       })
       
@@ -144,6 +147,7 @@ ThermalTimeServer <- function(data, ready) {
           )
         })
       })
+      
       
       
       # Outputs ----
@@ -209,17 +213,11 @@ ThermalTimeServer <- function(data, ready) {
       
       
       ## modelResults ----
-      output$modelResults <- renderUI({
-        modelResultsUI(ns, reactive(rv$lastGoodModel), reactive(rv$heldParams))
-      })
+      output$modelResults <- modelResultsUI(ns, reactive(rv$lastGoodModel), reactive(rv$heldParams))
       
-      output$modelError <- renderUI({
-        if (is.list(modelResults())) return() # no error
-        div(
-          class = "model-error",
-          sprintf("Model failed under current settings: %s. Last valid model coefficients shown above.", modelResults())
-        )
-      })
+      
+      ## modelError ----
+      output$modelError <- modelErrorUI(reactive(modelResults()))
       
       
       ## plot ----
@@ -228,7 +226,7 @@ ThermalTimeServer <- function(data, ready) {
         validate(need(nrow(workingData()) > 0, "No data selected."))
         
         df <- workingData()
-        model <- modelResults()
+        model <- rv$lastGoodModel
         maxFrac <- input$maxCumFrac / 100
 
         # generate the plot
