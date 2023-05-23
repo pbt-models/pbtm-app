@@ -197,7 +197,7 @@ ThermalTimeServer <- function(data, ready) {
           # Plot
           primaryBox(
             title = "Plot output",
-            plotOutput(ns("plot"), height = "450px")
+            plotOutput(ns("plot"), height = "auto")
           )
         )
       })
@@ -287,7 +287,11 @@ ThermalTimeServer <- function(data, ready) {
         }
 
         plt
-      })
+      },
+        height = 1000,
+        width = 1500,
+        res = 150
+      )
       
     } # end
   )

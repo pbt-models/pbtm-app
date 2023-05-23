@@ -178,7 +178,7 @@ GerminationServer <- function(data, ready) {
                 )
               )
             ),
-            plotOutput(ns("plot"), height = "450px")
+            plotOutput(ns("plot"), height = "auto")
           ),
           
           # Germination speed
@@ -356,7 +356,11 @@ GerminationServer <- function(data, ready) {
         }
         
         plt
-      })
+      },
+        height = 1000,
+        width = 1500,
+        res = 150
+      )
       
       ## germSpeedTable ----
       output$germSpeedTable <- renderDataTable({

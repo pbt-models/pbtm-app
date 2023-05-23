@@ -117,3 +117,9 @@
     font-weight: bold;
     margin-bottom: 5px;
 }
+
+.shiny-plot-output img {
+    height: 100%;
+    width: 100%;
+/*    object-fit: contain;*/
+}
