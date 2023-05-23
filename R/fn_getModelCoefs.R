@@ -8,5 +8,6 @@ getModelCoefs <- function(model) {
     as_tibble(rownames = "Param") %>%
     select(1:2) %>%
     deframe() %>%
+    round(4) %>%
     as.list()
 }

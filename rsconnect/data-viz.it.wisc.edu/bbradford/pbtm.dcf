@@ -5,10 +5,10 @@ account: bbradford
 server: data-viz.it.wisc.edu
 hostUrl: https://data-viz.it.wisc.edu/__api__
 appId: 491
-bundleId: 2960
-url: https://data-viz.it.wisc.edu/content/41684700-bc6b-4a45-beef-6bd02bb23ce9/
-when: 1684625129.03559
-lastSyncTime: 1684625129.0356
+bundleId: 2968
+url: https://data-viz.it.wisc.edu/pbtm/
+when: 1684806737.8268
+lastSyncTime: 1684806737.82681
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: .RData|.Rprofile|test.R
+ignoredFiles: .RData|.Rprofile
