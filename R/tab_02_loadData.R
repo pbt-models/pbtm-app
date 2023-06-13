@@ -79,13 +79,21 @@ LoadDataServer <- function() {
         if ((nrow(rawData()) > 0) & (length(rv$colStatus) == nCols)) {
           
           # collect user column names
-          vars <- sapply(colValidation$InputId, \(id) { input[[id]] })
+          vars <- sapply(colValidation$InputId, function(id) input[[id]] )
           names(vars) <- colValidation$Column
           vars <- vars[vars != "NA"]
           
-          rawData() %>%
+          df <- rawData() %>%
             select(any_of(vars)) %>%
             rename(any_of(vars))
+          
+          if ("TrtDesc" %in% names(df)) {
+            df <- mutate(df, TrtLabel = str_trunc(sprintf("%s: %s", TrtID, TrtDesc), 30), .after = "TrtDesc")
+          }
+          
+          print(df)
+          
+          df
         } else {
           tibble()
         }
