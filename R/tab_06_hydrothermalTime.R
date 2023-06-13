@@ -64,10 +64,17 @@ HydrothermalTimeServer <- function(data, ready) {
         
         rv$lastGoodModel <- NULL
         
-        df <- data() %>%
-          filter(GermWP %in% input$germWPSelect) %>%
-          filter(GermTemp %in% input$germTempSelect) %>%
-          filter(TrtID %in% input$trtIdSelect)
+        # filter by main vars
+        df <- data() %>% filter(
+          GermWP %in% input$germWPSelect,
+          GermTemp %in% input$germTempSelect)
+        
+        # filter by additional columns
+        if (!is.null(input$trtFilterCols)) {
+          for (col in input$trtFilterCols) {
+            df <- filter(df, .data[[col]] %in% input[[paste0("trtSelect-", col)]])
+          }
+        }
         
         # optionally remove repeated measurements at same cumulative fraction
         if (input$dataCleanSelect == "clean") {
@@ -159,6 +166,7 @@ HydrothermalTimeServer <- function(data, ready) {
         
         germWPChoices <- getColChoices(data(), "GermWP")
         germTempChoices <- getColChoices(data(), "GermTemp")
+        otherTrtCols <- setdiff(names(data()), c("GermWP", "GermTemp", "CumTime", "CumFraction"))
         
         fluidRow(
           
@@ -185,7 +193,7 @@ HydrothermalTimeServer <- function(data, ready) {
                 )
               ),
               column(6, germSlidersUI(ns)),
-              column(12, trtSelectUI(ns, reactive(data()))),
+              column(12, trtSelectUI(ns, otherTrtCols, reactive(data()))),
               column(12, wellPanel(class = "data-summary", textOutput(ns("dataSummary"))))
             )
           ),

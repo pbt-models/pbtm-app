@@ -33,6 +33,3 @@ factorCols <- filter(colValidation, Role == "Factor")$Column
 modelNames <- colValidation %>%
   select(Germination:Inhibitor) %>%
   names()
-
-
-# shiny::addResourcePath("sbs", system.file("www", package="shinyBS"))
