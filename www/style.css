@@ -35,6 +35,23 @@
     font-style: italic;
 }
 
+.panel-title {
+    font-weight: bold;
+}
+
+.panel-title a::before {
+    margin-right: 5px;
+    font-family: monospace;
+}
+
+.panel-title a[aria-expanded=false]::before {
+    content: "+";
+}
+
+.panel-title a[aria-expanded=true]::before {
+    content: "-";
+}
+
 
 /* Intro tab */
 

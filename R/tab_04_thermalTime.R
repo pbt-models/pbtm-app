@@ -63,9 +63,16 @@ ThermalTimeServer <- function(data, ready) {
         
         rv$lastGoodModel <- NULL
         
+        # filter by main vars
         df <- data() %>%
-          filter(GermTemp %in% input$germTempSelect) %>%
-          filter(TrtID %in% input$trtIdSelect)
+          filter(GermTemp %in% input$germTempSelect)
+        
+        # filter by additional columns
+        if (!is.null(input$trtFilterCols)) {
+          for (col in input$trtFilterCols) {
+            df <- filter(df, .data[[col]] %in% input[[paste0("trtSelect-", col)]])
+          }
+        }
         
         # optionally remove repeated measurements at same cumulative fraction
         if (input$dataCleanSelect == "clean") {
@@ -158,6 +165,7 @@ ThermalTimeServer <- function(data, ready) {
         validate(need(ready(), paste("Please load a dataset with required columns for thermal time analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
         
         germTempChoices <- getColChoices(data(), "GermTemp")
+        otherTrtCols <- setdiff(names(data()), c("GermTemp", "CumTime", "CumFraction"))
         
         fluidRow(
           
@@ -178,7 +186,7 @@ ThermalTimeServer <- function(data, ready) {
                 )
               ),
               column(6, germSlidersUI(ns)),
-              column(12, trtSelectUI(ns, reactive(data()))),
+              column(12, trtSelectUI(ns, otherTrtCols, reactive(data()))),
               column(12, wellPanel(class = "data-summary", textOutput(ns("dataSummary")))
               )
             )
