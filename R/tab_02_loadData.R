@@ -91,8 +91,6 @@ LoadDataServer <- function() {
             df <- mutate(df, TrtLabel = str_trunc(sprintf("%s: %s", TrtID, TrtDesc), 30), .after = "TrtDesc")
           }
           
-          print(df)
-          
           df
         } else {
           tibble()

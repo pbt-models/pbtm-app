@@ -9,7 +9,6 @@ suppressPackageStartupMessages({
   library(tidyverse)
   library(snakecase)
   library(DT)
-  library(Cairo)
 })
 
 

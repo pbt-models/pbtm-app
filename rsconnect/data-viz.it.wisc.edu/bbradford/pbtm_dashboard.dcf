@@ -1,14 +1,14 @@
-name: pbtm
-title: PBTM
+name: pbtm_dashboard
+title: PBTM Dashboard
 username: bbradford
 account: bbradford
 server: data-viz.it.wisc.edu
 hostUrl: https://data-viz.it.wisc.edu/__api__
-appId: 491
-bundleId: 2997
+appId: 509
+bundleId: 3120
 url: https://data-viz.it.wisc.edu/pbtm/
-when: 1686692210.56797
-lastSyncTime: 1686692210.56797
+when: 1690991073.2448
+lastSyncTime: 1690991073.24481
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: .RData|.Rprofile|.test.R
+ignoredFiles: test/altered-germ-data.csv|test/test.R
