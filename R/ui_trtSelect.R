@@ -65,7 +65,6 @@ trtSelectServer <- function(trtChoices) {
       # create each checkbox selection group
       lapply(names(trtChoices), function(col) {
         id <- paste0("trtSelect-", col)
-        print(id)
         output[[id]] <- renderUI({
           checkboxGroupInput(
             inputId = ns(id),

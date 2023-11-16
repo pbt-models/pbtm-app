@@ -66,31 +66,31 @@ IntroServer <- function() {
       
       ## downloadTemplate ----
       output$downloadTemplate <- downloadHandler(
-        filename = "pbtm data template.csv",
+        filename = "PBTM Data Template.csv",
         content = function(file) {
           write_csv(sampleTemplate, file)
         }
       )
       
       ## downloadGermData ----
-      output$downloadSampleGermData <- downloadHandler(
-        filename = "pbtm sample germination data.csv",
+      output$downloadGermData <- downloadHandler(
+        filename = "PBTM Sample Germination Data.csv",
         content = function(file) {
           write_csv(sampleGermData, file)
         }
       )
       
       ## downloadPrimingData ----
-      output$downloadSamplePrimingData <- downloadHandler(
-        filename = "pbtm sample priming data.csv",
+      output$downloadPrimingData <- downloadHandler(
+        filename = "PBTM Sample Priming Data.csv",
         content = function(file) {
           write_csv(samplePrimingData, file)
         }
       )
       
       ## downloadAgingData ----
-      output$downloadSampleAgingData <- downloadHandler(
-        filename = "pbtm sample aging data.csv",
+      output$downloadAgingData <- downloadHandler(
+        filename = "PBTM Sample Aging Data.csv",
         content = function(file) {
           write_csv(sampleAgingData, file)
         }
