@@ -20,5 +20,6 @@ shiny::shinyApp(ui, server)
 # renv::init()         # initiate renv if not already
 # renv::dependencies() # show project dependencies
 # renv::update()       # update project libraries
+# renv::clean()        # remove unused packages
 # renv::snapshot()     # save updated lock file to project
 
