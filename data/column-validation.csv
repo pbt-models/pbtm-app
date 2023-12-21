@@ -1,4 +1,4 @@
-﻿Column,InputId,Role,Description,LongDescription,Type,TypeDescription,Min,Max,Usage,AllModels,Germination,ThermalTime,HydroTime,HydrothermalTime,HydroPriming,HydrothermalPriming,Aging,Promoter,Inhibitor
+﻿Column,InputId,Role,Description,LongDescription,Type,TypeDescription,Min,Max,Usage,AllModels,Germination,ThermalTime,Hydrotime,HydrothermalTime,Hydropriming,HydrothermalPriming,Aging,Promoter,Inhibitor
 TrtID,TrtID,Factor,Treatment ID,Unique treatment number,,Text/Number,,,All models,T,T,T,T,T,T,T,T,T,T
 TrtDesc,TrtDesc,Factor,Treatment description,Description of the lot and treatment,,Text,,,All models,F,F,F,F,F,F,F,F,F,F
 GermTemp,GermTemp,Factor,Germination temperature,Measured germination temperature (Celcius),numeric,Number (0-100),0,100,Thermal and hydrothermal time,F,F,T,F,T,F,F,F,F,F

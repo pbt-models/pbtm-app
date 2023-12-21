@@ -105,9 +105,10 @@ AgingServer <- function(data, ready) {
           tryCatch({
             model <- nls(
               formula = CumFraction ~ maxCumFrac * pnorm(
-                q = -(AgingTime + ThetaA / CumTime),
-                mean = -Pmax50,
-                sd = Sigma
+                q = (AgingTime + ThetaA / CumTime),
+                mean = Pmax50,
+                sd = Sigma,
+                lower.tail = FALSE
               ),
               start = start, lower = lower, upper = upper,
               algorithm = "port",
@@ -272,9 +273,10 @@ AgingServer <- function(data, ready) {
                 stat_function(
                   fun = function(x) {
                     maxFrac * pnorm(
-                      q = -(aging + thetaA / x),
-                      mean = -pmax50,
-                      sd = sigma
+                      q = (aging + thetaA / x),
+                      mean = pmax50,
+                      sd = sigma,
+                      lower.tail = FALSE
                     )
                   },
                   aes(color = as.factor(aging))
@@ -286,7 +288,7 @@ AgingServer <- function(data, ready) {
           # add model annotation
           plt <- addParamsToPlot(plt, list(
             sprintf("~~theta~Age==%.2f", thetaA),
-            sprintf("~~Pmax[50]==%.3f", pmax50),
+            sprintf("~~Pmax[50]==%.2f", pmax50),
             sprintf("~~sigma==%.3f", sigma),
             sprintf("~~R^2==%.2f", corr)
           ))
