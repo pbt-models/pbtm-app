@@ -123,7 +123,7 @@ PromoterServer <- function(data, ready) {
             # grab coefs from model or user-set values
             buildModelResults(model, params, defined, CumFraction)
           },
-          error = function(cond) { paste(cond[1]) }
+            error = function(cond) { paste(cond[1]) }
           )
         )
       })
@@ -179,17 +179,17 @@ PromoterServer <- function(data, ready) {
             title = "Data selection",
             fluidRow(
               column(6,
-                     namedWell(
-                       title = "Data input options",
-                       checkboxGroupInput(
-                         inputId = ns("germPromoterDosageSelect"),
-                         label = "Included promoter dosages:",
-                         choices = germPromoterDosageChoices,
-                         selected = germPromoterDosageChoices
-                       ),
-                       dataCleanUI(ns),
-                       dataTransfUI(ns)
-                     )
+                namedWell(
+                  title = "Data input options",
+                  checkboxGroupInput(
+                    inputId = ns("germPromoterDosageSelect"),
+                    label = "Included promoter dosages:",
+                    choices = germPromoterDosageChoices,
+                    selected = germPromoterDosageChoices
+                  ),
+                  dataCleanUI(ns),
+                  dataTransfUI(ns)
+                )
               ),
               column(6, germSlidersUI(ns)),
               column(12, trtSelectUI(ns, otherTrtCols, reactive(data()))),
@@ -244,6 +244,7 @@ PromoterServer <- function(data, ready) {
         maxFrac <- input$maxCumFrac / 100
         
         # generate the plot
+        ymax <- 1
         plt <- df %>%
           ggplot(aes(
             x = CumTime,
@@ -253,9 +254,11 @@ PromoterServer <- function(data, ready) {
           geom_point(shape = 19, size = 2) +
           scale_y_continuous(
             labels = scales::percent,
-            expand = expansion(),
-            limits = c(0, 1.02)) +
-          scale_x_continuous(expand = expansion()) +
+            expand = expansion()) +
+          scale_x_continuous(
+            breaks = scales::breaks_pretty(6),
+            expand = expansion(c(0, .05))) +
+          coord_cartesian(ylim = c(0, ymax)) +
           labs(
             title = "Cumulative germination",
             caption = "Generated with the PBTM app",
@@ -306,7 +309,7 @@ PromoterServer <- function(data, ready) {
             sprintf("~~P[b](50)==%.2f", 10^pb50),
             sprintf("~~sigma==%.3f", sigma),
             sprintf("~~R^2==%.2f", corr)
-          ))
+          ), ymax)
         }
         
         plt

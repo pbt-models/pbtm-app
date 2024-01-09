@@ -125,7 +125,7 @@ InhibitorServer <- function(data, ready) {
             # grab coefs from model or user-set values
             buildModelResults(model, params, defined, CumFraction)
           },
-          error = function(cond) { paste(cond[1]) }
+            error = function(cond) { paste(cond[1]) }
           )
         )
       })
@@ -183,17 +183,17 @@ InhibitorServer <- function(data, ready) {
             title = "Data selection",
             fluidRow(
               column(6,
-                     namedWell(
-                       title = "Data input options",
-                       checkboxGroupInput(
-                         inputId = ns("germInhibitorDosageSelect"),
-                         label = "Included inhibitor dosages:",
-                         choices = germInhibitorDosageChoices,
-                         selected = germInhibitorDosageChoices
-                       ),
-                       dataCleanUI(ns),
-                       dataTransfUI(ns)
-                     )
+                namedWell(
+                  title = "Data input options",
+                  checkboxGroupInput(
+                    inputId = ns("germInhibitorDosageSelect"),
+                    label = "Included inhibitor dosages:",
+                    choices = germInhibitorDosageChoices,
+                    selected = germInhibitorDosageChoices
+                  ),
+                  dataCleanUI(ns),
+                  dataTransfUI(ns)
+                )
               ),
               column(6, germSlidersUI(ns)),
               column(12, trtSelectUI(ns, otherTrtCols, reactive(data()))),
@@ -248,6 +248,7 @@ InhibitorServer <- function(data, ready) {
         maxFrac <- input$maxCumFrac / 100
         
         # generate the plot
+        ymax <- 1
         plt <- df %>%
           ggplot(aes(
             x = CumTime,
@@ -257,9 +258,11 @@ InhibitorServer <- function(data, ready) {
           geom_point(shape = 19, size = 2) +
           scale_y_continuous(
             labels = scales::percent,
-            expand = expansion(),
-            limits = c(0, 1.02)) +
-          scale_x_continuous(expand = expansion()) +
+            expand = expansion(c(0, .05))) +
+          scale_x_continuous(
+            breaks = scales::breaks_pretty(6),
+            expand = expansion(c(0, .05))) +
+          coord_cartesian(ylim = c(0, ymax)) +
           labs(
             title = "Cumulative germination",
             caption = "Generated with the PBTM app",
@@ -311,7 +314,7 @@ InhibitorServer <- function(data, ready) {
             sprintf("I[b](50)==%.2f", 10^ib50),
             sprintf("sigma==%.3f", sigma),
             sprintf("R^2==%.2f", corr)
-          ))
+          ), ymax)
         }
         
         plt

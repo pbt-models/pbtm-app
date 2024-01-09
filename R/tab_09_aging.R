@@ -237,6 +237,7 @@ AgingServer <- function(data, ready) {
         maxFrac <- input$maxCumFrac / 100
         
         # generate the plot
+        ymax <- 1
         plt <- df %>%
           ggplot(aes(
             x = CumTime,
@@ -246,9 +247,11 @@ AgingServer <- function(data, ready) {
           geom_point(shape = 19, size = 2) +
           scale_y_continuous(
             labels = scales::percent,
-            expand = expansion(),
-            limits = c(0, 1.02)) +
-          scale_x_continuous(expand = expansion()) +
+            expand = expansion(c(0, .05))) +
+          scale_x_continuous(
+            breaks = scales::breaks_pretty(6),
+            expand = expansion(c(0, .05))) +
+          coord_cartesian(ylim = c(0, ymax)) +
           labs(
             title = "Cumulative germination",
             caption = "Generated with the PBTM app",
@@ -291,7 +294,7 @@ AgingServer <- function(data, ready) {
             sprintf("~~Pmax[50]==%.2f", pmax50),
             sprintf("~~sigma==%.3f", sigma),
             sprintf("~~R^2==%.2f", corr)
-          ))
+          ), ymax)
         }
         
         plt

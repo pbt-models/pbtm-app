@@ -7,7 +7,7 @@ HydroprimingUI <- function() {
   
   tagList(
     h3(class = "tab-title", "Hydropriming analysis"),
-    div(class = "tab-info",  "This hydropriming model assumes a germination data set with priming water potential and priming duration as treatment conditions. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under conditions, try adjusting data or model constraints."),
+    div(class = "tab-info", "This hydropriming model assumes a germination data set with priming water potential and priming duration as treatment conditions. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under conditions, try adjusting data or model constraints."),
     uiOutput(ns("content"))
   )
 }
@@ -39,9 +39,9 @@ HydroprimingServer <- function(data, ready) {
       ## paramRangeDefaults ----
       # model constraints: (lower, start, upper)
       paramRangeDefaults <- list(
-        PsiMin = c(-10,-1,-.5),
-        GRi = c(.00000001,.001,.1),
-        Slope = c(.00000001,.1,1)
+        PsiMin = c(-10, -1, -.5),
+        GRi = c(.00000001, .001, .1),
+        Slope = c(.00000001, .1, 1)
       )
       
       ## params ----
@@ -144,7 +144,7 @@ HydroprimingServer <- function(data, ready) {
           tryCatch({
             
             #Function to calculate Theta Hydro Priming
-            fθHTP <- function(PM50){(PrimingWP-PM50)*PrimingDuration}
+            fθHTP <- function(PM50){ (PrimingWP - PM50) * PrimingDuration }
             
             model <- nls(
               formula = GR ~ GRi + fθHTP(PsiMin) * Slope,
@@ -216,24 +216,23 @@ HydroprimingServer <- function(data, ready) {
             title = "Data selection",
             fluidRow(
               column(6,
-                     namedWell(
-                       title = "Data input options",
-                       checkboxGroupInput(
-                         inputId = ns("primingWPSelect"),
-                         label = "Included priming water potential levels:",
-                         choices = primingWPChoices,
-                         selected = primingWPChoices
-                       ),
-                       checkboxGroupInput(
-                         inputId = ns("primingDurationSelect"),
-                         label = "Included priming duration levels:",
-                         choices = primingDurationChoices,
-                         selected = primingDurationChoices
-                       )
-                     )
+                namedWell(
+                  title = "Data input options",
+                  checkboxGroupInput(
+                    inputId = ns("primingWPSelect"),
+                    label = "Included priming water potential levels:",
+                    choices = primingWPChoices,
+                    selected = primingWPChoices
+                  ),
+                  checkboxGroupInput(
+                    inputId = ns("primingDurationSelect"),
+                    label = "Included priming duration levels:",
+                    choices = primingDurationChoices,
+                    selected = primingDurationChoices
+                  )
+                )
               ),
-              column(6, germSpeedSliderUI(ns), 
-                     dataCleanUI(ns)),
+              column(6, germSpeedSliderUI(ns), dataCleanUI(ns)),
               column(12, trtSelectUI(ns, otherTrtCols, reactive(data()))),
               column(12, wellPanel(class = "data-summary", textOutput(ns("dataSummary"))))
             )
@@ -285,31 +284,32 @@ HydroprimingServer <- function(data, ready) {
         
         PsiMin <- model$PsiMin
         
-        #Update Theta Hydropriming values
-        df <- df %>% as_tibble() %>% mutate(
-          Theta = (PrimingWP-PsiMin)*PrimingDuration)
+        # Update Theta Hydropriming values
+        df <- df %>%
+          as_tibble() %>%
+          mutate(Theta = (PrimingWP - PsiMin) * PrimingDuration)
         
         # generate the plot
-        pltP <- df %>%
+        ymax <- max(1/df$Time, na.rm = T)
+        plt <- df %>%
           ggplot(aes(
             x = Theta,
             y = 1/Time,
             color = as.factor(PrimingWP))) +
-          #addFracToPlot(maxFrac) +
           geom_point(size = 4,
             aes(shape = as.factor(PrimingDuration))) +
           scale_y_continuous(
-            expand = expansion(),
-            limits = c(0, NA)) +
+            expand = expansion(c(0, .05))) +
           scale_x_continuous(
-            expand = expansion()) +
+            breaks = scales::breaks_pretty(6),
+            expand = expansion(c(0, .05))) +
+          coord_cartesian(ylim = c(0, ymax)) +
           labs(
             caption = "Generated with the PBTM app",
             x = "Hydropriming time",
             y = "Germination rate",
             color = "Water Potential",
-            #shape = "Temperature",
-            shape ="Duration") +
+            shape = "Duration") +
           guides(
             color = guide_legend(reverse = T, order = 1),
             linetype = "none") +
@@ -326,26 +326,25 @@ HydroprimingServer <- function(data, ready) {
           # get combinations of wp and temp
           fcts <- df %>% distinct(PrimingWP, PrimingDuration)
           
-          pltP <- pltP +
+          plt <- plt +
             labs(title = "Germination rates and hydropriming model fit") +
             geom_abline(intercept = GRi, slope = Slope, color = "blue")
           
           
           # add model annotation
-          pltP <- addParamsToPrimingPlot(pltP, list(
+          plt <- addParamsToPlot(plt, list(
             sprintf("psi[min](50)==%.2f", PsiMin),
             sprintf("GRi==%.4f", GRi),
             sprintf("~~R^2==%.2f", corr)
-          ))
+          ), ymax)
         }
         
-        pltP
+        plt
       },
-      height = 1000,
-      width = 1500,
-      res = 150
+        height = 1000,
+        width = 1500,
+        res = 150
       )
-      
       
     } # end
   )

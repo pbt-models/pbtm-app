@@ -33,7 +33,7 @@ ThermalTimeServer <- function(data, ready) {
       # model constraints: (lower, start, upper)
       paramRangeDefaults <- list(
         Tb = c(0, 6, 20),
-        ThetaT50 = c(3, 1000, 50000000000000000000),
+        ThetaT50 = c(3, 1000, 5e19),
         Sigma = c(0.0005, 1, 35)
       )
       
@@ -238,6 +238,7 @@ ThermalTimeServer <- function(data, ready) {
         maxFrac <- input$maxCumFrac / 100
 
         # generate the plot
+        ymax <- 1
         plt <- df %>%
           ggplot(aes(
             x = CumTime,
@@ -247,9 +248,11 @@ ThermalTimeServer <- function(data, ready) {
           geom_point(shape = 19, size = 2) +
           scale_y_continuous(
             labels = scales::percent,
-            expand = expansion(),
-            limits = c(0, 1.02)) +
-          scale_x_continuous(expand = expansion()) +
+            expand = expansion(c(0, .05))) +
+          scale_x_continuous(
+            breaks = scales::breaks_pretty(6),
+            expand = expansion(c(0, .05))) +
+          coord_cartesian(ylim = c(0, ymax)) +
           labs(
             title = "Cumulative germination",
             caption = "Generated with the PBTM app",
@@ -291,7 +294,7 @@ ThermalTimeServer <- function(data, ready) {
             sprintf("~~theta[T][50]==%.1f", thetaT50),
             sprintf("~~sigma==%.3f", sigma),
             sprintf("~~R^2==%.2f", corr)
-          )) 
+          ), ymax)
         }
 
         plt
