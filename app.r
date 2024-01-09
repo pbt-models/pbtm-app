@@ -22,4 +22,10 @@ shiny::shinyApp(ui, server)
 # renv::update()       # update project libraries
 # renv::clean()        # remove unused packages
 # renv::snapshot()     # save updated lock file to project
+# renv::restore()      # restore versions from lockfile
 
+
+#- Testing -#
+
+# shiny::devmode(TRUE)
+# shiny::devmode(FALSE)
