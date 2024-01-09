@@ -1,13 +1,13 @@
-# ---- Hydro Time ---- #
+# ---- Hydrotime ---- #
 
 # Static UI ----
 
-HydroTimeUI <- function() {
-  ns <- NS("hydroTime")
+HydrotimeUI <- function() {
+  ns <- NS("hydrotime")
   
   tagList(
-    h3(class = "tab-title", "Hydro time analysis"),
-    div(class = "tab-info", "The hydro time model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under conditions, try adjusting data or model constraints."),
+    h3(class = "tab-title", "Hydrotime analysis"),
+    div(class = "tab-info", "The hydrotime model assumes a data set with germination temperature as a treatment condition. If you have additional treatments in your dataset, the model will average across those treatments and you may get unreliable or unexpected model results. Note: the model may fail to converge under conditions, try adjusting data or model constraints."),
     uiOutput(ns("content"))
   )
 }
@@ -20,9 +20,9 @@ HydroTimeUI <- function() {
 #' @param `data` a `reactive()` data frame containing the loaded clean data
 #' @param `ready` a `reactive()` boolean indicating if the model is ready
 
-HydroTimeServer <- function(data, ready) {
+HydrotimeServer <- function(data, ready) {
   moduleServer(
-    id = "hydroTime",
+    id = "hydrotime",
     function(input, output, session) {
       ns <- session$ns
       
@@ -159,8 +159,8 @@ HydroTimeServer <- function(data, ready) {
 
       ## content // Main UI----
       output$content <- renderUI({
-        req_cols <- colValidation$Column[colValidation$HydroTime]
-        validate(need(ready(), paste("Please load a dataset with required columns for hydro time analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
+        req_cols <- colValidation$Column[colValidation$Hydrotime]
+        validate(need(ready(), paste("Please load a dataset with required columns for hydrotime analysis. Minimum required columns are:", paste(req_cols, collapse = ", "))))
         
         germWPChoices <- getColChoices(data(), "GermWP")
         otherTrtCols <- setdiff(names(data()), c("GermWP", "CumTime", "CumFraction"))
@@ -268,7 +268,7 @@ HydroTimeServer <- function(data, ready) {
           corr <- model$Correlation
           
           plt <- plt +
-            labs(title = "Cumulative germination and hydro time model fit") +
+            labs(title = "Cumulative germination and hydrotime model fit") +
             mapply(
               function(wp) {
                 stat_function(
@@ -288,7 +288,7 @@ HydroTimeServer <- function(data, ready) {
           # add model annotation
           plt <- addParamsToPlot(plt, list(
             sprintf("~~theta~H==%.2f", thetaH),
-            sprintf("~~Psi[b][50]==%.3f", psiB50),
+            sprintf("~~Psi[b][50]==%.2f", psiB50),
             sprintf("~~sigma==%.3f", sigma),
             sprintf("~~R^2==%.2f", corr)
           ))

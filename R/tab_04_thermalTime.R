@@ -33,8 +33,8 @@ ThermalTimeServer <- function(data, ready) {
       # model constraints: (lower, start, upper)
       paramRangeDefaults <- list(
         Tb = c(0, 6, 20),
-        ThetaT50 = c(0.5, 3, 50),
-        Sigma = c(.0001, .09, 1.5)
+        ThetaT50 = c(3, 1000, 50000000000000000000),
+        Sigma = c(0.0005, 1, 35)
       )
       
       ## params ----
@@ -107,8 +107,8 @@ ThermalTimeServer <- function(data, ready) {
           tryCatch({
             model <- nls(
               formula = CumFraction ~ maxCumFrac * pnorm(
-                q = log10(CumTime),
-                mean = ThetaT50 - log10(GermTemp - Tb),
+                q = log10((GermTemp - Tb) * CumTime),
+                mean = log10(ThetaT50),
                 sd = Sigma
               ),
               start = start, lower = lower, upper = upper,
@@ -274,8 +274,8 @@ ThermalTimeServer <- function(data, ready) {
                 stat_function(
                   fun = function(x) {
                     maxFrac * pnorm(
-                      q = log10(x),
-                      mean = thetaT50 - log10(temp - tb),
+                      q = log10((temp - tb) * x),
+                      mean = log10(thetaT50),
                       sd = sigma
                     )
                   },
@@ -287,8 +287,8 @@ ThermalTimeServer <- function(data, ready) {
           
           # add model annotation
           plt <- addParamsToPlot(plt, list(
-            sprintf("~~T[b]==%.1f", tb),
-            sprintf("~~theta[T][50]==%.3f", thetaT50),
+            sprintf("~~T[b]==%.2f", tb),
+            sprintf("~~theta[T][50]==%.1f", thetaT50),
             sprintf("~~sigma==%.3f", sigma),
             sprintf("~~R^2==%.2f", corr)
           )) 

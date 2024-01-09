@@ -23,6 +23,8 @@ sampleTemplate <- read("data/sample-template.csv")
 sampleGermData <- read("data/sample-germ-data.csv")
 samplePrimingData <- read("data/sample-priming-data.csv")
 sampleAgingData <- read("data/sample-aging-data.csv")
+samplePromoterData <- read("data/sample-promoter-data.csv")
+sampleInhibitorData <- read("data/sample-inhibitor-data.csv")
 
 
 # Local vars ----

@@ -4,26 +4,26 @@
 #' @param `params` list of params to add, including math notation
 #' @returns updated ggplot object
 
-addParamsToPlot <- function(gg, params) {
-  y <- 0.95
+addParamsToPrimingPlot <- function(gg, params) {
+  y <- 0.038
   
   gg <- gg + annotate(
     "text",
     x = -Inf,
     y = y,
-    hjust = -0.05,
+    hjust = -0.1,
     label = "Model parameters:",
     fontface = "bold"
   )
   
   for (par in params) {
-    y <- y - 0.04
-
+    y <- y - 0.002
+    
     gg <- gg + annotate(
       "text",
       x = -Inf,
       y = y,
-      hjust = -0.1,
+      hjust = -0.15,
       label = par,
       parse = TRUE
     )

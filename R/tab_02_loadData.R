@@ -14,7 +14,9 @@ LoadDataUI <- function() {
       class = "flex-btns",
       actionButton(ns("loadSampleGermData"), "Load germination sample data"),
       actionButton(ns("loadSamplePrimingData"), "Load priming sample data"),
-      actionButton(ns("loadSampleAgingData"), "Load aging sample data")
+      actionButton(ns("loadSampleAgingData"), "Load aging sample data"),
+      actionButton(ns("loadSamplePromoterData"), "Load promoter sample data"),
+      actionButton(ns("loadSampleInhibitorData"), "Load inhibitor sample data")
     ),
     br(),
     p(strong("Upload your own data (csv):")),
@@ -112,6 +114,8 @@ LoadDataServer <- function() {
       observeEvent(input$loadSampleGermData, rawData(sampleGermData))
       observeEvent(input$loadSamplePrimingData, rawData(samplePrimingData))
       observeEvent(input$loadSampleAgingData, rawData(sampleAgingData))
+      observeEvent(input$loadSamplePromoterData, rawData(samplePromoterData))
+      observeEvent(input$loadSampleInhibitorData, rawData(sampleInhibitorData))
       
       ## Load user data ----
       observeEvent(input$userData, {
