@@ -33,8 +33,8 @@ ThermalTimeServer <- function(data, ready) {
       # model constraints: (lower, start, upper)
       paramRangeDefaults <- list(
         Tb = c(0, 6, 20),
-        ThetaT50 = c(0.5, 3, 50),
-        Sigma = c(.0001, .09, 1.5)
+        ThetaT50 = c(3, 1000, 5e19),
+        Sigma = c(0.0005, 1, 35)
       )
       
       ## params ----
@@ -107,8 +107,8 @@ ThermalTimeServer <- function(data, ready) {
           tryCatch({
             model <- nls(
               formula = CumFraction ~ maxCumFrac * pnorm(
-                q = log10(CumTime),
-                mean = ThetaT50 - log10(GermTemp - Tb),
+                q = log10((GermTemp - Tb) * CumTime),
+                mean = log10(ThetaT50),
                 sd = Sigma
               ),
               start = start, lower = lower, upper = upper,
@@ -238,6 +238,7 @@ ThermalTimeServer <- function(data, ready) {
         maxFrac <- input$maxCumFrac / 100
 
         # generate the plot
+        ymax <- 1
         plt <- df %>%
           ggplot(aes(
             x = CumTime,
@@ -247,9 +248,11 @@ ThermalTimeServer <- function(data, ready) {
           geom_point(shape = 19, size = 2) +
           scale_y_continuous(
             labels = scales::percent,
-            expand = expansion(),
-            limits = c(0, 1.02)) +
-          scale_x_continuous(expand = expansion()) +
+            expand = expansion(c(0, .05))) +
+          scale_x_continuous(
+            breaks = scales::breaks_pretty(6),
+            expand = expansion(c(0, .05))) +
+          coord_cartesian(ylim = c(0, ymax)) +
           labs(
             title = "Cumulative germination",
             caption = "Generated with the PBTM app",
@@ -274,8 +277,8 @@ ThermalTimeServer <- function(data, ready) {
                 stat_function(
                   fun = function(x) {
                     maxFrac * pnorm(
-                      q = log10(x),
-                      mean = thetaT50 - log10(temp - tb),
+                      q = log10((temp - tb) * x),
+                      mean = log10(thetaT50),
                       sd = sigma
                     )
                   },
@@ -287,11 +290,11 @@ ThermalTimeServer <- function(data, ready) {
           
           # add model annotation
           plt <- addParamsToPlot(plt, list(
-            sprintf("~~T[b]==%.1f", tb),
-            sprintf("~~theta[T][50]==%.3f", thetaT50),
+            sprintf("~~T[b]==%.2f", tb),
+            sprintf("~~theta[T][50]==%.1f", thetaT50),
             sprintf("~~sigma==%.3f", sigma),
             sprintf("~~R^2==%.2f", corr)
-          )) 
+          ), ymax)
         }
 
         plt

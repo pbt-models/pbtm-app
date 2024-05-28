@@ -5,8 +5,8 @@ account: bbradford
 server: connect.doit.wisc.edu
 hostUrl: https://connect.doit.wisc.edu/__api__
 appId: 15
-bundleId: 309
+bundleId: 456
 url: https://connect.doit.wisc.edu/pbtm/
 asMultiple: FALSE
 asStatic: FALSE
-ignoredFiles: test/altered-germ-data.csv|test/test.R
+ignoredFiles: README.md|test/altered-germ-data.csv|test/test.R
