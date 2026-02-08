@@ -1,19 +1,16 @@
 # ---- Server ---- #
 
 server <- function(input, output, session) {
-  
-  
   # Values ----
-  
+
   rv <- reactiveValues(
     data = tibble(),
     colStatus = NULL,
     modelReady = list()
   )
-  
-  
+
   # Outputs ----
-  
+
   ## Reactive menu entry for loading tab ----
   output$LoadMenu <- renderMenu({
     ready <- nrow(rv$data) > 0
@@ -24,7 +21,7 @@ server <- function(input, output, session) {
       badgeColor = ifelse(ready, "green", "yellow")
     )
   })
-  
+
   ## Reactive menu entries for models ----
   lapply(modelNames, function(m) {
     output[[paste0(m, "Menu")]] <- renderMenu({
@@ -37,22 +34,21 @@ server <- function(input, output, session) {
       )
     })
   })
-  
 
   # Module Servers ----
-  
+
   IntroServer()
-  
+
   # capture return values from the load data server
   loadDataReturns <- LoadDataServer()
-  
+
   # save return values
   observe({
     rv$data <- loadDataReturns()$data
     rv$colStatus <- loadDataReturns()$colStatus
     rv$modelReady <- loadDataReturns()$modelReady
   })
-  
+
   # Call each of the model servers
   lapply(modelNames, function(m) {
     do.call(
@@ -63,5 +59,4 @@ server <- function(input, output, session) {
       )
     )
   })
-  
 }

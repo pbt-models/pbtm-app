@@ -1,4 +1,9 @@
-# ---- global ---- #
+# Population-based threshold models dashboard
+# Ben Bradford, UW-Madison
+# Pedro Bello, UC Davis
+# Kent Bradford, UC Davis
+
+# Dependencies -----
 
 suppressPackageStartupMessages({
   library(shiny)
@@ -7,10 +12,22 @@ suppressPackageStartupMessages({
   library(shinyBS)
   library(stats)
   library(tidyverse)
-  library(snakecase)
+  # library(snakecase)
   library(DT)
 })
 
+
+# Development ----
+
+# renv::init()         # initiate renv if not already
+# renv::dependencies() # show project dependencies
+# renv::update()       # update project libraries
+# renv::clean()        # remove unused packages
+# renv::snapshot()     # save updated lock file to project
+# renv::restore()      # restore versions from lockfile
+
+# shiny::devmode(TRUE)
+# shiny::devmode(FALSE)
 
 # Load data ----
 
@@ -34,3 +51,9 @@ factorCols <- filter(colValidation, Role == "Factor")$Column
 modelNames <- colValidation %>%
   select(Germination:Inhibitor) %>%
   names()
+
+
+# Source files ----
+
+list.files("src", "*.R", full.names = TRUE) |>
+  lapply(source)
