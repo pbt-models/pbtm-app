@@ -1,4 +1,3 @@
-
 #' @description a shared ui component
 #' @param ns namespace function from calling server
 
@@ -15,5 +14,3 @@ germSpeedSliderUI <- function(ns) {
     )
   )
 }
-
-

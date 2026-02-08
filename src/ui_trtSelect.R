@@ -1,17 +1,15 @@
-
 #' @description a shared ui component
 #' @param ns namespace function from calling server
 #' @param data reactive dataset from which to pull TrtID values
 
 trtSelectUI <- function(ns, trtCols, data) {
-  
   trtColChoices <- list()
   for (col in trtCols) {
     trtColChoices[[col]] = sort(unique(data()[[col]]))
   }
-  
+
   trtSelectServer(trtColChoices)
-  
+
   renderUI({
     bsCollapse(
       id = ns("trtFilterCollapse"),
@@ -42,7 +40,7 @@ trtSelectServer <- function(trtChoices) {
     id = NULL,
     function(input, output, session) {
       ns <- session$ns
-      
+
       # render the selection menus for only the trt cols picked
       output$trtFilters <- renderUI({
         style <- NULL
@@ -61,7 +59,7 @@ trtSelectServer <- function(trtChoices) {
         )
         ui
       })
-      
+
       # create each checkbox selection group
       lapply(names(trtChoices), function(col) {
         id <- paste0("trtSelect-", col)

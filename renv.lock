@@ -3691,31 +3691,6 @@
       "Maintainer": "Carson Sievert <carson@posit.co>",
       "Repository": "https://packagemanager.posit.co/cran/latest"
     },
-    "shinyBS": {
-      "Package": "shinyBS",
-      "Version": "0.63.0",
-      "Source": "Repository",
-      "Type": "Package",
-      "Title": "Extra Twitter Bootstrap Components for Shiny",
-      "Date": "2025-12-16",
-      "Authors@R": "c( person(given = \"Eric\", family = \"Bailey\", email = \"ebailey@idem.in.gov\",  role = c(\"aut\") ), person(given = \"Federico\", family = \"Marini\", email = \"marinif@uni-mainz.de\",  role = c(\"cre\", \"ctb\"), comment = c(ORCID = \"0000-0003-3252-7758\")), person(given = \"Jesse\", family = \"Koops\", email = \"Jesse.Koops@cito.nl\",  role = c(\"ctb\") ) )",
-      "Description": "Adds easy access to additional Twitter Bootstrap components to Shiny.",
-      "Imports": [
-        "shiny (>= 0.13.2)",
-        "htmltools",
-        "stats",
-        "jsonlite"
-      ],
-      "URL": "https://github.com/federicomarini/shinyBS/",
-      "BugReports": "https://github.com/federicomarini/shinyBS//issues",
-      "License": "GPL-3",
-      "RoxygenNote": "7.3.3",
-      "Encoding": "UTF-8",
-      "NeedsCompilation": "no",
-      "Author": "Eric Bailey [aut], Federico Marini [cre, ctb] (ORCID: <https://orcid.org/0000-0003-3252-7758>), Jesse Koops [ctb]",
-      "Maintainer": "Federico Marini <marinif@uni-mainz.de>",
-      "Repository": "CRAN"
-    },
     "shinydashboard": {
       "Package": "shinydashboard",
       "Version": "0.7.3",

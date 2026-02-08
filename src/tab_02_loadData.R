@@ -4,10 +4,12 @@
 
 LoadDataUI <- function() {
   ns <- NS("loadData")
-  
+
   tagList(
     h3("Upload data", class = "tab-title"),
-    p(em("Upload your own data here or select one of our sample datasets to get started.")),
+    p(em(
+      "Upload your own data here or select one of our sample datasets to get started."
+    )),
     br(),
     p(strong("Sample datasets:")),
     div(
@@ -55,50 +57,53 @@ LoadDataServer <- function() {
     id = "loadData",
     function(input, output, session) {
       ns <- session$ns
-      
-      
+
       # Reactives ----
-      
+
       # data // raw data before cleaning or assigning columns ----
       rawData <- reactiveVal(tibble())
-      
+
       rv <- reactiveValues(
         colStatus = NULL
       )
-      
+
       columnNames <- reactive({
         names(rawData())
       })
-      
+
       columnChoices <- reactive({
         setNames(
           as.list(c(NA, columnNames())),
           c("Not specified", columnNames())
         )
       })
-      
+
       cleanData <- reactive({
         if ((nrow(rawData()) > 0) & (length(rv$colStatus) == nCols)) {
-          
           # collect user column names
-          vars <- sapply(colValidation$InputId, function(id) input[[id]] )
+          vars <- sapply(colValidation$InputId, function(id) input[[id]])
           names(vars) <- colValidation$Column
           vars <- vars[vars != "NA"]
-          
+
           df <- rawData() %>%
             select(any_of(vars)) %>%
             rename(any_of(vars))
-          
+
           if ("TrtDesc" %in% names(df)) {
-            df <- mutate(df, TrtLabel = str_trunc(sprintf("%s: %s", TrtID, TrtDesc), 30), .after = "TrtDesc")
+            df <- mutate(
+              df,
+              TrtLabel = str_trunc(sprintf("%s: %s", TrtID, TrtDesc), 30),
+              .after = "TrtDesc"
+            )
           }
-          
+
           df
         } else {
           tibble()
         }
-      }) %>% bindEvent(rv$colStatus)
-      
+      }) %>%
+        bindEvent(rv$colStatus)
+
       modelReady <- reactive({
         ready <- lapply(modelNames, function(m) {
           checkModelReady(colValidation[[m]], rv$colStatus)
@@ -107,42 +112,41 @@ LoadDataServer <- function() {
         ready
       })
 
-      
       # Button handlers ----
-      
+
       ## Load sample data ----
       observeEvent(input$loadSampleGermData, rawData(sampleGermData))
       observeEvent(input$loadSamplePrimingData, rawData(samplePrimingData))
       observeEvent(input$loadSampleAgingData, rawData(sampleAgingData))
       observeEvent(input$loadSamplePromoterData, rawData(samplePromoterData))
       observeEvent(input$loadSampleInhibitorData, rawData(sampleInhibitorData))
-      
+
       ## Load user data ----
       observeEvent(input$userData, {
         try({
           df <- read_csv(
             input$userData$datapath,
             col_types = cols(),
-            progress = F) %>%
+            progress = F
+          ) %>%
             distinct()
           if (nrow(df) > 0) rawData(df)
         })
       })
-      
+
       ## Clear data button ----
       observeEvent(input$clearData, {
         rawData(tibble())
         rv$colStatus <- NULL
         reset("userData") # reset file input
       })
-      
-      
+
       # Outputs ----
-      
+
       ## currentDataUI // Data display and validation when data loaded ----
       output$currentDataUI <- renderUI({
         validate(need(nrow(rawData()) > 0, "Please load a dataset."))
-        
+
         tagList(
           h3("Currently loaded data:"),
           bsCollapse(
@@ -157,7 +161,9 @@ LoadDataServer <- function() {
             )
           ),
           h3("Match column names to expected roles:"),
-          p(em("If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range.")),
+          p(em(
+            "If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range."
+          )),
           div(
             class = "validation-container",
             lapply(1:nCols, function(i) {
@@ -182,27 +188,27 @@ LoadDataServer <- function() {
           )
         )
       })
-      
+
       ## columnDescriptions // table showing column descriptions ----
-      output$columnDescriptions <- renderTable({
-        colValidation %>%
-          select(
-            `Default name` = Column,
-            Description = LongDescription,
-            `Data type` = TypeDescription,
-            Usage
-          )
-      },
+      output$columnDescriptions <- renderTable(
+        {
+          colValidation %>%
+            select(
+              `Default name` = Column,
+              Description = LongDescription,
+              `Data type` = TypeDescription,
+              Usage
+            )
+        },
         spacing = "s"
       )
-      
+
       ## currentDataTable // data as it was uploaded----
       output$currentDataTable <- renderDataTable(rawData())
-      
+
       ## cleanDataTable // Shows data passed to models after column matching ----
       output$cleanDataTable <- renderDataTable(cleanData())
-      
-      
+
       ## colSelect[i] // Renders the selectInput boxes for each column ----
       lapply(1:nCols, function(i) {
         output[[paste0("colSelect", i)]] <- renderUI({
@@ -214,20 +220,18 @@ LoadDataServer <- function() {
           )
         })
       })
-      
-      
+
       ## colValidate[i] // Validation messages for each column ----
       lapply(1:nCols, function(i) {
-        
         outCol <- paste0("colValidate", i)
         inputId <- colValidation$InputId[i]
         expectedType <- colValidation$Type[i]
         minValue <- colValidation$Min[i]
         maxValue <- colValidation$Max[i]
-        
+
         output[[outCol]] <- renderUI({
           req(input[[inputId]])
-          
+
           if (input[[inputId]] == "NA") {
             rv$colStatus[i] <- FALSE
             span("No column specified.", style = "color: orange")
@@ -239,8 +243,7 @@ LoadDataServer <- function() {
           }
         })
       })
-      
-      
+
       # Return values ----
 
       return(reactive(list(
@@ -248,7 +251,6 @@ LoadDataServer <- function() {
         colStatus = rv$colStatus,
         modelReady = modelReady()
       )))
-  
     } # end
   )
 }

@@ -1,4 +1,3 @@
-
 #' @description a shared ui component
 #' @param ns namespace function from calling server
 #' @param params vector of param names
@@ -18,7 +17,9 @@ setParamsUI <- function(ns, params) {
         )
       })
     ),
-   em("Specify individual model coefficients, or leave blank to allow the model to find a best-fit value.")
+    em(
+      "Specify individual model coefficients, or leave blank to allow the model to find a best-fit value."
+    )
     # ,
     # uiOutput(ns("runModel"))
   )

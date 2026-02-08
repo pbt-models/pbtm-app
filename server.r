@@ -27,7 +27,7 @@ server <- function(input, output, session) {
     output[[paste0(m, "Menu")]] <- renderMenu({
       ready <- truthy(rv$modelReady[[m]])
       menuItem(
-        to_any_case(m, case = "sentence"),
+        snakecase::to_any_case(m, case = "sentence"),
         tabName = paste0(m, "Tab"),
         badgeLabel = ifelse(ready, "OK", "X"),
         badgeColor = ifelse(ready, "green", "red")
