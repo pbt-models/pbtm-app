@@ -11,27 +11,34 @@ server <- function(input, output, session) {
 
   # Outputs ----
 
-  ## Reactive menu entry for loading tab ----
-  output$LoadMenu <- renderMenu({
+  ## Badge for loading tab ----
+  output$LoadBadge <- renderUI({
     ready <- nrow(rv$data) > 0
-    menuItem(
-      "Upload data",
-      tabName = "LoadDataTab",
-      badgeLabel = ifelse(ready, "OK", "!"),
-      badgeColor = ifelse(ready, "green", "yellow")
-    )
+    if (ready) {
+      span(class = "badge bg-success", "OK")
+    } else {
+      span(class = "badge bg-warning", "!")
+    }
   })
 
-  ## Reactive menu entries for models ----
+  ## Badges for model tabs ----
   lapply(modelNames, function(m) {
-    output[[paste0(m, "Menu")]] <- renderMenu({
+    output[[paste0(m, "Badge")]] <- renderUI({
       ready <- truthy(rv$modelReady[[m]])
-      menuItem(
-        snakecase::to_any_case(m, case = "sentence"),
-        tabName = paste0(m, "Tab"),
-        badgeLabel = ifelse(ready, "OK", "X"),
-        badgeColor = ifelse(ready, "green", "red")
-      )
+      if (ready) {
+        span(class = "badge bg-success", "OK")
+      } else {
+        span(class = "badge bg-danger", "X")
+      }
+    })
+  })
+
+  ## Sidebar navigation ----
+  observeEvent(input$nav_IntroTab, nav_select("mainNav", "IntroTab"))
+  observeEvent(input$nav_LoadDataTab, nav_select("mainNav", "LoadDataTab"))
+  lapply(modelNames, function(m) {
+    observeEvent(input[[paste0("nav_", m, "Tab")]], {
+      nav_select("mainNav", paste0(m, "Tab"))
     })
   })
 

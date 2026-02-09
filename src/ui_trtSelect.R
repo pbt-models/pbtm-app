@@ -11,9 +11,9 @@ trtSelectUI <- function(ns, trtCols, data) {
   trtSelectServer(trtColChoices)
 
   renderUI({
-    bsCollapse(
+    accordion(
       id = ns("trtFilterCollapse"),
-      bsCollapsePanel(
+      accordion_panel(
         title = "Additional treatment filters",
         value = "panel",
         div(
@@ -26,7 +26,8 @@ trtSelectUI <- function(ns, trtCols, data) {
           ),
           uiOutput(ns("trtFilters"))
         )
-      )
+      ),
+      open = FALSE
     )
   })
 }
@@ -43,20 +44,17 @@ trtSelectServer <- function(trtChoices) {
 
       # render the selection menus for only the trt cols picked
       output$trtFilters <- renderUI({
-        style <- NULL
+        collapseId <- ns("trtFilterCollapse")
+        selector <- paste0("#", collapseId, " .accordion-item")
         if (is.null(input$trtFilterCols)) {
-          ui <- style <- NULL
+          ui <- NULL
+          shinyjs::removeCssClass(selector = selector, class = "border-warning")
         } else {
           ui <- lapply(input$trtFilterCols, function(col) {
             uiOutput(ns(paste0("trtSelect-", col)))
           })
-          style <- "warning"
+          shinyjs::addCssClass(selector = selector, class = "border-warning")
         }
-        updateCollapse(
-          session = session,
-          id = "trtFilterCollapse",
-          style = list("panel" = style)
-        )
         ui
       })
 

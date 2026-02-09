@@ -8,9 +8,7 @@
 suppressPackageStartupMessages({
   library(shiny)
   library(shinyjs)
-  library(shinydashboard)
-  library(shinyBS)
-  # library(bslib)
+  library(bslib)
   library(stats)
   library(tidyverse)
   library(DT)
@@ -294,7 +292,7 @@ buildModelResults <- function(model, params, defined, CumFraction) {
 namedWell <- function(..., title = NULL) {
   div(
     div(class = "well-title", title),
-    div(class = "well", ...)
+    div(class = "p-3 bg-light border rounded", ...)
   )
 }
 
@@ -303,13 +301,12 @@ namedWell <- function(..., title = NULL) {
 #' @param width grid width of the box (1-12)
 #' @param title box title
 primaryBox <- function(..., width = 12, title = NULL) {
-  box(
-    ...,
-    width = width,
-    title = title,
-    status = "primary",
-    solidHeader = TRUE,
-    collapsible = TRUE
+  column(
+    width,
+    card(
+      card_header(title, class = "bg-primary text-white fw-bold fst-italic"),
+      card_body(...)
+    )
   )
 }
 

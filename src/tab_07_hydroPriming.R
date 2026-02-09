@@ -259,7 +259,7 @@ HydroprimingServer <- function(data, ready) {
               column(12, trtSelectUI(ns, otherTrtCols, reactive(data()))),
               column(
                 12,
-                wellPanel(class = "data-summary", textOutput(ns("dataSummary")))
+                div(class = "p-3 bg-light border rounded data-summary", textOutput(ns("dataSummary")))
               )
             )
           ),

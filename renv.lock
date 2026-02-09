@@ -3691,32 +3691,6 @@
       "Maintainer": "Carson Sievert <carson@posit.co>",
       "Repository": "https://packagemanager.posit.co/cran/latest"
     },
-    "shinydashboard": {
-      "Package": "shinydashboard",
-      "Version": "0.7.3",
-      "Source": "Repository",
-      "Title": "Create Dashboards with 'Shiny'",
-      "Authors@R": "c( person(\"Winston\", \"Chang\", , \"winston@posit.co\", role = c(\"aut\", \"cre\")), person(\"Barbara\", \"Borges Ribeiro\", role = \"aut\"), person(, \"Posit Software, PBC\", role = \"cph\"), person(, \"Almasaeed Studio\", role = c(\"ctb\", \"cph\"), comment = \"AdminLTE theme for Bootstrap\"), person(, \"Adobe Systems Incorporated\", role = c(\"ctb\", \"cph\"), comment = \"Source Sans Pro font\") )",
-      "Description": "Create dashboards with 'Shiny'. This package provides a theme on top of 'Shiny', making it easy to create attractive dashboards.",
-      "License": "MIT + file LICENSE",
-      "URL": "https://rstudio.github.io/shinydashboard/, https://github.com/rstudio/shinydashboard",
-      "BugReports": "https://github.com/rstudio/shinydashboard/issues",
-      "Depends": [
-        "R (>= 3.0)"
-      ],
-      "Imports": [
-        "htmltools (>= 0.2.6)",
-        "promises",
-        "shiny (>= 1.0.0)",
-        "utils"
-      ],
-      "Encoding": "UTF-8",
-      "RoxygenNote": "7.3.2",
-      "NeedsCompilation": "no",
-      "Author": "Winston Chang [aut, cre], Barbara Borges Ribeiro [aut], Posit Software, PBC [cph], Almasaeed Studio [ctb, cph] (AdminLTE theme for Bootstrap), Adobe Systems Incorporated [ctb, cph] (Source Sans Pro font)",
-      "Maintainer": "Winston Chang <winston@posit.co>",
-      "Repository": "https://packagemanager.posit.co/cran/latest"
-    },
     "shinyjs": {
       "Package": "shinyjs",
       "Version": "2.1.1",

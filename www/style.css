@@ -1,27 +1,15 @@
 /* --- PBTM Dashboard ---- */
 
-/* Modifications of existing styles */
-
-.panel-body {
-    padding: 0px;
-}
+/* General */
 
 .table {
     margin-bottom: 0;
-}
-
-.skin-blue {
-    background-color: #c1ccd6;
 }
 
 .wrapper {
     max-width: 1024px;
     margin-left: auto;
     margin-right: auto;
-}
-
-.content-wrapper {
-    border-bottom: 2px solid lightgrey;
 }
 
 .tab-title {
@@ -35,21 +23,18 @@
     font-style: italic;
 }
 
-.panel-title {
-    font-weight: bold;
+
+/* Sidebar navigation */
+
+.nav-link-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0;
 }
 
-.panel-title a::before {
-    margin-right: 5px;
-    font-family: monospace;
-}
-
-.panel-title a[aria-expanded=false]::before {
-    content: "+";
-}
-
-.panel-title a[aria-expanded=true]::before {
-    content: "-";
+.border-warning {
+    border: 2px solid #ffc107 !important;
 }
 
 
@@ -107,11 +92,6 @@
     font-weight: bold;
     font-size: 15px;
     color: #c5050c;
-}
-
-.box-title {
-    font-weight: bold;
-    font-style: italic;
 }
 
 .well-title {

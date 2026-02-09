@@ -35,11 +35,12 @@ LoadDataUI <- function() {
       )
     ),
     p(strong("Expected column names and descriptions:")),
-    bsCollapse(
-      bsCollapsePanel(
+    accordion(
+      accordion_panel(
         title = "Show/hide column descriptions",
         tableOutput(ns("columnDescriptions"))
-      )
+      ),
+      open = FALSE
     ),
     uiOutput(ns("currentDataUI"))
   )
@@ -89,7 +90,7 @@ LoadDataServer <- function() {
             select(any_of(vars)) %>%
             rename(any_of(vars))
 
-          if ("TrtDesc" %in% names(df)) {
+          if (all(c("TrtID", "TrtDesc") %in% names(df))) {
             df <- mutate(
               df,
               TrtLabel = str_trunc(sprintf("%s: %s", TrtID, TrtDesc), 30),
@@ -149,16 +150,16 @@ LoadDataServer <- function() {
 
         tagList(
           h3("Currently loaded data:"),
-          bsCollapse(
-            open = "tab",
-            bsCollapsePanel(
+          accordion(
+            accordion_panel(
               title = "Show/hide data table",
               value = "tab",
               div(
                 class = "tbl-container margin-10",
                 dataTableOutput(ns("currentDataTable"))
               )
-            )
+            ),
+            open = "tab"
           ),
           h3("Match column names to expected roles:"),
           p(em(
@@ -168,23 +169,23 @@ LoadDataServer <- function() {
             class = "validation-container",
             lapply(1:nCols, function(i) {
               div(
-                class = "well validation-box",
+                class = "p-3 bg-light border rounded validation-box",
                 uiOutput(paste0(ns("colSelect"), i)),
                 uiOutput(paste0(ns("colValidate"), i))
               )
             })
           ),
           h3("Final clean dataset for models:"),
-          bsCollapse(
-            open = "tab",
-            bsCollapsePanel(
+          accordion(
+            accordion_panel(
               title = "Show/hide data table",
               value = "tab",
               div(
                 class = "tbl-container margin-10",
                 dataTableOutput(ns("cleanDataTable"))
               )
-            )
+            ),
+            open = "tab"
           )
         )
       })
