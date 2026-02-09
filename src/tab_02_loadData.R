@@ -230,16 +230,27 @@ LoadDataServer <- function() {
         minValue <- colValidation$Min[i]
         maxValue <- colValidation$Max[i]
 
-        output[[outCol]] <- renderUI({
+        # Create an observer to handle validation change
+        observe({
           req(input[[inputId]])
-
           if (input[[inputId]] == "NA") {
             rv$colStatus[i] <- FALSE
-            span("No column specified.", style = "color: orange")
           } else {
             col <- rawData()[[input[[inputId]]]]
             validation <- validateCol(col, expectedType, minValue, maxValue)
             rv$colStatus[i] <- validation$valid
+          }
+        })
+
+        # Set up outputs
+        output[[outCol]] <- renderUI({
+          req(input[[inputId]])
+
+          if (input[[inputId]] == "NA") {
+            span("No column specified.", style = "color: orange")
+          } else {
+            col <- rawData()[[input[[inputId]]]]
+            validation <- validateCol(col, expectedType, minValue, maxValue)
             validation$ui
           }
         })
