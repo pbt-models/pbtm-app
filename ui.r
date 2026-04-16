@@ -1,68 +1,14 @@
 # ---- UI ---- #
 
-# create tab panels with the UI call for each tab
-tabPanels <- lapply(
-  c("Intro", "LoadData", modelNames),
-  \(m) nav_panel_hidden(value = paste0(m, "Tab"), exec(paste0(m, "UI")))
-)
-
-# footer
-footer <- div(
-  align = "center",
-  class = "wrapper",
-  style = "font-size: small; color: grey; background-color: white;",
-  br(),
-  br(),
-  p(
-    "App developed by",
-    a("Ben Bradford", href = "https://github.com/bzbradford"),
-    "and",
-    a("Pedro Bello", href = "https://github.com/pedrobello")
-  ),
-  p(
-    "Based on the",
-    a("PBTM R package", href = "https://github.com/pedrobello/pbtm"),
-    "developed by",
-    a("Pedro Bello", href = "https://github.com/pedrobello"),
-    "and",
-    a("Ben Bradford", href = "https://github.com/bzbradford")
-  ),
-  p(
-    "Seed germination models developed by",
-    a(
-      "Kent Bradford",
-      href = "https://www.plantsciences.ucdavis.edu/people/kent-bradford"
-    ),
-    "and",
-    a(
-      "Pedro Bello",
-      href = "https://www.plantsciences.ucdavis.edu/people/pedro-bello"
-    )
-  ),
-  p(a("Source code", href = "https://github.com/pbt-models/pbtm-app")),
-  br()
-)
-
-# build ui
-ui <- page_sidebar(
+ui <- page(
   title = "PBTM Dashboard",
   fillable = FALSE,
-  theme = bs_theme(version = 5, primary = "#3c8dbc"),
-  sidebar = sidebar(
-    width = 250,
-    actionLink("nav_IntroTab", "Introduction"),
-    div(
-      class = "nav-link-container",
-      actionLink("nav_LoadDataTab", "Upload data"),
-      uiOutput("LoadBadge", inline = TRUE)
-    ),
-    lapply(modelNames, function(m) {
-      div(
-        class = "nav-link-container",
-        actionLink(paste0("nav_", m, "Tab"), snakecase::to_any_case(m, case = "sentence")),
-        uiOutput(paste0(m, "Badge"), inline = TRUE)
-      )
-    })
+  class = "main",
+  theme = bs_theme(
+    version = 5,
+    primary = "#3c8dbc",
+    "body-bg" = "#ecf0f5",
+    "card-border-color" = "#d2d6de"
   ),
   tags$head(
     tags$meta(charset = "UTF-8"),
@@ -79,6 +25,86 @@ ui <- page_sidebar(
     includeCSS("www/style.css")
   ),
   useShinyjs(),
-  do.call(navset_hidden, c(list(id = "mainNav"), tabPanels)),
-  footer
+
+  # navbar
+  tags$nav(
+    class = "navbar navbar-dark bg-primary",
+    tags$span(class = "navbar-brand mb-0 ms-2", "PBTM Dashboard")
+  ),
+
+  # sidebar
+  layout_sidebar(
+    sidebar = sidebar(
+      width = 250,
+      bg = "#222d32",
+      fg = "#b8c7ce",
+
+      # intro
+      div(
+        class = "nav-link-container",
+        # no badge for introduction
+        span(class = "nav-badge"),
+        actionLink("nav_IntroTab", "Introduction")
+      ),
+
+      # upload
+      div(
+        class = "nav-link-container",
+        span(class = "nav-badge", uiOutput("LoadBadge", inline = TRUE)),
+        actionLink("nav_LoadDataTab", "Upload data")
+      ),
+
+      # models
+      lapply(modelNames, function(m) {
+        div(
+          class = "nav-link-container",
+          span(
+            class = "nav-badge",
+            uiOutput(paste0(m, "Badge"), inline = TRUE)
+          ),
+          actionLink(
+            paste0("nav_", m, "Tab"),
+            snakecase::to_any_case(m, case = "sentence")
+          )
+        )
+      })
+    ),
+
+    # initialize main content area
+    # create tab panels with the UI call for each tab
+    do.call(
+      navset_hidden,
+      c(
+        list(id = "mainNav"),
+        lapply(
+          c("Intro", "LoadData", modelNames),
+          \(m) nav_panel_hidden(value = paste0(m, "Tab"), exec(paste0(m, "UI")))
+        )
+      )
+    )
+  ),
+
+  # footer
+  div(
+    align = "center",
+    class = "main",
+    style = "font-size: small; color: grey; background-color: #222d32; margin: 0; padding: 1rem;",
+    div(
+      "App developed by",
+      a("Ben Bradford", href = "https://github.com/bzbradford"),
+      "and",
+      a("Pedro Bello", href = "https://github.com/pedrobello"),
+      "Based on the",
+      a("PBTM R package", href = "https://github.com/pbt-models/pbtm"),
+      br(),
+      "Seed germination models developed by",
+      a(
+        "Kent Bradford",
+        href = "https://www.plantsciences.ucdavis.edu/people/kent-bradford"
+      ),
+      "and Pedro Bello",
+      br(),
+      a("Source code", href = "https://github.com/pbt-models/pbtm-app")
+    ),
+  )
 )

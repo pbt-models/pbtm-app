@@ -1,0 +1,20 @@
+# Aging Time
+
+The general pattern of seed aging begins with an initial plateau period of variable length during which the final viability remains essentially constant but the time to germination increases steadily. Eventually, the viability declines in a sigmoidal pattern and times to germination increase more rapidly. This pattern indicates that all seeds do not age at the same rate or die at the same time. Rather, seeds in a seed lot have a range of potential lifetimes that match well to a normal distribution, as demonstrated by the importance of standard deviation (*σ*) in the Ellis–Roberts equation describing the loss of viability with aging time (Ellis and Roberts, 1981; Ellis, 2022). Observing this pattern, Bradford et al. (1993) developed a population-based threshold model utilizing the increasing delays in germination speed to predict the sigmoid decline in seed viability:
+
+*theta_age = (p_max(g) – p) * t_c*
+
+where *theta_age* is the aging time constant, *p_max(g)* is the normal distribution of maximum lifetimes of seeds in the population, and *t_p* is the storage period or duration. An advantage to this approach is that the eventual loss of viability curve can be predicted by determining germination time courses of seeds aged for much shorter periods, before viability is lost. A relatively short series of storage times (at warmer temperatures and/or at somewhat higher moisture contents) can be calibrated to storage under much better conditions (low moisture content and low temperatures), such as for extended germplasm storage (Bradford and Bello, 2023). It can also be used to predict when abnormal seedlings will begin to appear due to irreparable damage from extended dry storage (Bradford et al., 1993; Bradford and Bello, 2022). Thus, for a given species, the duration of seed germination tests can be selected to be scored at a time when normal seedling percentages begin to decline, prior to complete loss of viability. 
+
+The data required for the Aging Time analysis are germination time courses under standard conditions of seed samples from a seed lot that have been aged for different periods of time. Fitting the equation above to this data gives the sigmoid distribution of the viability curve (*p_max(g)*), which is determined by the parameters Pmax50 and Sigma in the Model Results, and the aging time constant ThetaA. The ThetaA (*theta_age*) values will be in units of storage periods under the test conditions. If these are accelerated aging conditions, the results will need to be calibrated and scaled against the temperature and moisture content conditions under which the seeds will be stored. 
+
+> **[Editorial note]:** We should add the option to plot the viability curve (pmax(g)) based upon the fitted PBT parameters. This will make more sense and be more useful by showing the mean and standard deviation of the viability curve, while the theta value is adjusting the t50 of the germination curves. This is also useful, but most seed aging work focuses on the loss of viability curve. It would be best to be able to shift back and forth between these.
+
+## References
+
+- Bradford, K.J., Bello, P. (2022) Applying population-based threshold models to quantify and improve seed quality attributes. In J Buitink, O Leprince, eds, Advances in Seed Science and Technology for More Sustainable Crop Production. Burleigh Dodds Science Publishing, Cambridge, UK
+
+- Bradford, K.J., Bello, P. (2023) Understanding seed behavior: populations of individuals. Acta Hortic. 1365(1): 1–16. 10.17660/ActaHortic.2023.1365.1
+- Bradford, K.J., et al. (1993) A population-based threshold model describing the relationship between germination rates and seed deterioration. J. Exp. Bot. 44(264): 1225–1234. 10.1093/jxb/44.7.1225
+- Ellis, R.H. (2022) Seed ageing, survival and the improved seed viability equation; forty years on. Seed Science and Technology 50(2): 1–20. 10.15258/sst.2022.50.1.s.01
+- Ellis, R.H., Roberts, E.H. (1981) The quantification of aging and survival in orthodox seeds. Seed Science and Technology 9(2): 373–409.
