@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Project Overview
 
 PBTM Dashboard — an R Shiny web app for population-based threshold models of seed germination. Users upload germination data, validate columns, then fit nonlinear least-squares models (thermal time, hydrotime, etc.) and visualize results.
@@ -30,7 +28,7 @@ There is no test suite or linter configured.
 
 **Model names** are derived from `data/column-validation.csv` column headers (Germination through Inhibitor). This CSV also drives column validation rules and per-model column requirements.
 
-**Shared UI components** (`src/ui_*.R`): Reusable UI builders that take a `ns` (namespace function) parameter and are called within model tab `renderUI` blocks. Key ones:
+**Shared UI components** (`global.R`): Reusable UI builders that take a `ns` (namespace function) parameter and are called within model tab `renderUI` blocks. Key ones:
 - `germSlidersUI` — max germination and fraction range sliders
 - `setParamsUI` — optional coefficient inputs
 - `modelResultsUI` — displays fitted coefficients with hold checkboxes
@@ -55,4 +53,3 @@ There is no test suite or linter configured.
 - **Badges:** Rendered via `renderUI` returning `span(class = "badge bg-{success|warning|danger}")`.
 - **Global helpers:** `truthy()` for content-aware truthiness checks, `parseSpeeds()` for germination speed input parsing, `getColChoices()` for labeled factor levels.
 - **Package management:** `renv` — use `renv::snapshot()` after adding/updating packages.
-- **Deployment:** shinyapps.io (via `rsconnect`).
