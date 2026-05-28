@@ -7,6 +7,11 @@ IntroUI <- function() {
 
   tagList(
     h2("Seed germination modeling app", class = "tab-title"),
+    docPanel(
+      "md/introduction.md",
+      title = "Full introduction & references",
+      open = FALSE
+    ),
     h3("Introduction to the population-based models"),
     p(
       "This app in an interactive easy-to-use implementation of the functions found in the PBTM R package (currently under development). Population-based threshold (PBT) models describe and predict seed germination performance under most conditions (Bradford and Bello 2022). These models are fueled by germination rate data collected after seed imbibition and under varying (measured) levels of the conditions of interest. The models use a nonlinear least squares function (Bates and Watts, 1988; Bates and Chambers, 1992) for each model by comparing the raw data and respective treatments directly with the curves predicted by the selected model and minimizing the error."

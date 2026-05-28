@@ -56,14 +56,15 @@ server <- function(input, output, session) {
     rv$modelReady <- loadDataReturns()$modelReady
   })
 
-  # Call each of the model servers
+  # Call each of the model servers. Models with a spec run through the factory
+  # (modelServer); Germination keeps its bespoke GerminationServer.
   lapply(modelNames, function(m) {
-    do.call(
-      paste0(m, "Server"),
-      list(
-        data = reactive(rv$data),
-        ready = reactive(truthy(rv$modelReady[[m]]))
-      )
-    )
+    dataReactive <- reactive(rv$data)
+    readyReactive <- reactive(truthy(rv$modelReady[[m]]))
+    if (m %in% names(modelSpecs)) {
+      modelServer(spec = modelSpecs[[m]], data = dataReactive, ready = readyReactive)
+    } else {
+      do.call(paste0(m, "Server"), list(data = dataReactive, ready = readyReactive))
+    }
   })
 }

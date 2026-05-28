@@ -71,14 +71,19 @@ ui <- page(
     ),
 
     # initialize main content area
-    # create tab panels with the UI call for each tab
+    # create tab panels with the UI call for each tab. Models with a spec are
+    # built by the factory (modelUI); Intro / LoadData / Germination keep their
+    # bespoke {Name}UI() functions.
     do.call(
       navset_hidden,
       c(
         list(id = "mainNav"),
         lapply(
           c("Intro", "LoadData", modelNames),
-          \(m) nav_panel_hidden(value = paste0(m, "Tab"), exec(paste0(m, "UI")))
+          \(m) nav_panel_hidden(
+            value = paste0(m, "Tab"),
+            if (m %in% names(modelSpecs)) modelUI(modelSpecs[[m]]) else exec(paste0(m, "UI"))
+          )
         )
       )
     )

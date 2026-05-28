@@ -18,33 +18,37 @@ There is no test suite or linter configured.
 
 ## Architecture
 
-**Entry points:** `global.r` → `ui.r` → `server.r`. All files in `src/` are auto-sourced by `global.r` via `list.files("src", "*.R", full.names = TRUE) |> lapply(source)`.
+**Entry points:** `global.r` → `ui.r` → `server.r`. `global.R` sources `src/` in an explicit order: the core library files (`helpers.R`, `fit.R`, `ui-components.R`, `plot-helpers.R`) first, then everything else (`model-specs.R`, `model-module.R`, and the `tab_01/02/03` modules) automatically.
 
 **UI framework:** bslib (Bootstrap 5) with `page_sidebar()` + `navset_hidden()`. Navigation uses `actionLink` in the sidebar with `observeEvent` handlers calling `nav_select("mainNav", tabId)`.
 
-**Module pattern:** Each tab defines a `{Name}UI()` function and `{Name}Server()` function in the same file. Model tabs follow the naming convention `tab_NN_modelName.R`. The UI and server are wired dynamically in `ui.r` and `server.r`:
-- UI: `exec(paste0(m, "UI"))` creates each tab panel
-- Server: `do.call(paste0(m, "Server"), list(data = ..., ready = ...))` calls each model server
+**Two module styles:**
+- **Bespoke tabs** — Intro, Load data, and Germination each define `{Name}UI()`/`{Name}Server()` in `src/tab_01/02/03_*.R`. These are genuinely different from each other and from the nls models.
+- **Config-driven model factory** — the 8 nls models (thermal time, hydrotime, hydrothermal time, aging, promoter, inhibitor, hydropriming, hydrothermal priming) are **not** separate files. Each is a *spec* in `src/model-specs.R`; `src/model-module.R` provides `modelUI(spec)` and `modelServer(spec, data, ready)` that generate the tab from the spec. To change a model, edit its spec; to add one, add a spec.
 
-**Model names** are derived from `data/column-validation.csv` column headers (Germination through Inhibitor). This CSV also drives column validation rules and per-model column requirements.
+**Wiring** (`ui.r`/`server.r`): iterate `c("Intro","LoadData", modelNames)`; if the name is in `modelSpecs` use the factory (`modelUI`/`modelServer`), otherwise call the bespoke `{Name}UI`/`{Name}Server`. `modelServer`'s first formal is `id` (defaults to `spec$id`) so `shiny::testServer` recognises it as a module server — **call it by name in production** (`modelServer(spec = ..., ...)`).
 
-**Shared UI components** (`global.R`): Reusable UI builders that take a `ns` (namespace function) parameter and are called within model tab `renderUI` blocks. Key ones:
-- `germSlidersUI` — max germination and fraction range sliders
-- `setParamsUI` — optional coefficient inputs
-- `modelResultsUI` — displays fitted coefficients with hold checkboxes
-- `modelErrorUI` — shows error when model fails to converge
-- `trtSelectUI`/`trtSelectServer` — additional treatment filtering
-- `dataCleanUI`, `dataTransfUI`, `germSpeedSliderUI`
+**Model names / specs** are derived from `data/column-validation.csv` column headers (Germination through Inhibitor). This CSV drives column validation, per-model column requirements, and the spec list names (`modelSpecs[[modelCol]]`).
+
+**Model families** (`spec$family`):
+- `"cdf"` — thermal/hydro/hydrothermal time, aging, promoter, inhibitor. Fit `CumFraction ~ maxFrac * pnorm(z)` directly; plot cumulative germination vs. time with one fitted curve per factor level. Promoter/inhibitor add a log/none dosage transform; aging/inhibitor use `lower.tail = FALSE`.
+- `"rate"` — hydropriming, hydrothermal priming. First reduce to a germination-rate table (`addFracDiff` + `interpolateGermSpeed`), then fit `GR ~ linear(theta)`; plot GR vs. theta with an abline.
+
+**Single source of truth:** each spec's `predict(data, p, maxFrac, transform)` is reused by the nls fit, the fitted-curve overlay (`buildCdfCurveData`), and the pseudo-R². No formula is written more than once.
+
+**Fitting core** (`src/fit.R`): pure functions, no `parent.frame()` mutation.
+1. `resolveParams(setParams, paramRanges)` → `list(lower, start, upper, fixed)`; a user-pinned param has `lower == start == upper`.
+2. `fitModel(pred, data, resolved, response)` → builds a generic `nls` (`algorithm = "port"`, `warnOnly`) from a model's `predict`; returns a results list **or an error string** (the modelResults contract: list = success, string = error).
+3. `buildResults()` → coefficients (pinned values win) plus `PseudoR2 = cor(obs, pred)^2` (displayed as "Pseudo-R²").
+4. `rv$lastGoodModel` caches the last successful fit; on failure the table/plot keep showing it and `modelErrorUI` notes the coefficients are the last valid ones (no auto-clear on data change).
+
+**Shared UI components** (`src/ui-components.R`): `ns`-taking builders called inside `renderUI`: `germSlidersUI`, `germSpeedSliderUI`, `setParamsUI`, `modelResultsUI` (takes `paramNames` to decide which rows get hold-checkboxes), `modelErrorUI`, `trtSelectUI`/`trtSelectServer`, `dataCleanUI`, `dataTransfUI`, `namedWell`, `primaryBox`.
+
+**Plot helpers** (`src/plot-helpers.R`): `buildCdfCurveData` (predicted curves as real data over a grid — `geom_line`, not `stat_function`, so they survive `ggplotly`), `buildCdfPlot`, `buildRatePlot`, `addFracToPlot`, `addParamsToPlot` (static-only plotmath annotations).
 
 **Data flow:** `LoadDataServer()` returns a reactive list with `data`, `colStatus`, and `modelReady`. These are stored in a top-level `reactiveValues` in `server.r` and passed to each model server as `data` and `ready` reactives.
 
-**Model execution pattern** (consistent across all model tabs):
-1. `paramRangeDefaults` — defines (lower, start, upper) bounds for NLS parameters
-2. `workingData` reactive — filters data by treatment selections and fraction range
-3. `buildModelParams()` — separates user-fixed vs. free parameters
-4. `nls()` with `algorithm = "port"` — fits the model
-5. `buildModelResults()` — extracts coefficients and R²
-6. `rv$lastGoodModel` — caches last successful fit for display when model fails
+**Tests** (`tests/`, run with `Rscript`): `equivalence.R` (generic fit reproduces the original literal nls formulas on every sample dataset), `runtime.R` (all 8 plots build via `ggplot_build`), `reactive.R` (factory reactive flow via `testServer`). No browser needed.
 
 ## Key Conventions
 
