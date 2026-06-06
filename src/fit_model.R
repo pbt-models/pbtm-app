@@ -4,13 +4,15 @@
 # in, list out, so each piece is unit-testable.
 
 #' @description gets the coefficient estimates from an nls model
+#' @details Uses coef() rather than summary(model)$coefficients: we only need the
+#'   point estimates, and summary.nls() computes standard errors from the Hessian,
+#'   which fails with a "zero pivot" error for mixture models whose Hessian is
+#'   singular even when the fit itself converged. coef() returns the same
+#'   estimates for ordinary single fits.
 #' @param model the nls model
 #' @returns a named list
 getModelCoefs <- function(model) {
-  summary(model)$coefficients |>
-    as_tibble(rownames = "Param") |>
-    select(1:2) |>
-    deframe() |>
+  coef(model) |>
     round(6) |>
     as.list()
 }

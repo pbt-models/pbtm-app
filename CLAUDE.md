@@ -34,7 +34,9 @@ There is no test suite or linter configured.
 - `"cdf"` — thermal/hydro/hydrothermal time, aging, promoter, inhibitor. Fit `CumFraction ~ maxFrac * pnorm(z)` directly; plot cumulative germination vs. time with one fitted curve per factor level. Promoter/inhibitor add a log/none dosage transform; aging/inhibitor use `lower.tail = FALSE`.
 - `"rate"` — hydropriming, hydrothermal priming. First reduce to a germination-rate table (`addFracDiff` + `interpolateGermSpeed`), then fit `GR ~ linear(theta)`; plot GR vs. theta with an abline.
 
-**Single source of truth:** each spec's `predict(data, p, maxFrac, transform)` is reused by the nls fit, the fitted-curve overlay (`buildCdfCurveData`), and the pseudo-R². No formula is written more than once.
+**Single source of truth:** each spec's `predict(data, p, maxFrac, transform)` is reused by the nls fit, the fitted-curve overlay (`buildCdfCurveData`), the pseudo-R², and the subpopulation mixture. No formula is written more than once.
+
+**Subpopulations** (`src/fit-mixture.R`, CDF specs only, `spec$subpop = TRUE`): a generic mixture-of-distributions layer. `mixturePredict` is a weighted sum of `spec$predict` over k components (each with its own param copy); weights use stick-breaking (`w1..w{k-1}` each bounded in (0,1)). `fitMixture` multi-starts and keeps the best AIC; `detectSubpops` compares k=1..3. The factory exposes a per-tab "Subpopulations: 1/2/3/Auto" control; k=1 is the ordinary single fit. `spec$subpopParam` names the threshold parameter the fitter spreads components along. Note: these mixtures are often **equifinal** (see `md/subpopulations.md`) — the tool improves fit and flags multiplicity but does not guarantee unique parameter recovery. `getModelCoefs` uses `coef()` (not `summary()$coefficients`) so singular mixture Hessians don't break coefficient extraction.
 
 **Fitting core** (`src/fit.R`): pure functions, no `parent.frame()` mutation.
 1. `resolveParams(setParams, paramRanges)` → `list(lower, start, upper, fixed)`; a user-pinned param has `lower == start == upper`.

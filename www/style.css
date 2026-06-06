@@ -1,8 +1,10 @@
 /* --- PBTM Dashboard ---- */
 
 :root {
-    /* --bslib-spacer: 0; */
     --bslib-mb-spacer: 0;
+    --pbtm-sidebar-bg: #222d32;
+    --pbtm-sidebar-fg: #cdd7dd;
+    --pbtm-section-gap: 1.25rem;
 }
 
 /* General */
@@ -18,37 +20,30 @@
 }
 
 .tab-title {
-    margin-top: 0px;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    margin-top: 0;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.15);
 }
 
 .tab-info {
     margin-top: 1em;
-    margin-bottom: 1.5em;
+    margin-bottom: 1.25em;
     font-style: italic;
+    color: #4a4f54;
 }
 
-
-/* App layout — constrain width and tighten spacing */
-
-/* body > .container-fluid {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0;
-} */
-
-/* Reduce default row gutter */
+/* Consistent row gutters */
 .row {
-    --bs-gutter-x: 15px;
-    --bs-gutter-y: 10px;
+    --bs-gutter-x: 1rem;
+    --bs-gutter-y: 0.75rem;
 }
 
 
-/* Navbar / header bar */
+/* Navbar / header bar — inherits the Bootstrap primary (no hardcoded color) */
 
 .navbar {
-    background-color: #3c8dbc !important;
-    padding: 8px 15px !important;
+    padding: 0.5rem 1rem !important;
 }
 
 .navbar .navbar-brand {
@@ -65,17 +60,14 @@
 }
 
 .bslib-sidebar-layout>.sidebar>.sidebar-content {
-    gap: 0.5rem;
-    /* padding-left: 1rem;
-    padding-right: 0; */
+    gap: 0.4rem;
 }
 
 .nav-link-container {
     display: grid;
     grid-template-columns: 28px 1fr;
     align-items: center;
-    /* border-bottom: 1px solid rgba(255, 255, 255, 0.05); */
-    padding-left: 1rem;
+    padding-left: 0.5rem;
 }
 
 .nav-link-container .nav-badge {
@@ -86,15 +78,17 @@
 
 .nav-link-container .action-link {
     display: block;
-    padding: 8px 10px;
-    color: #b8c7ce;
+    padding: 0.5rem 0.625rem;
+    color: var(--pbtm-sidebar-fg);
     text-decoration: none;
+    border-radius: 4px;
     transition: background-color 0.15s, color 0.15s;
 }
 
-.nav-link-container .action-link:hover {
+.nav-link-container .action-link:hover,
+.nav-link-container .action-link:focus {
     color: #fff;
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.12);
 }
 
 .border-warning {
@@ -102,37 +96,84 @@
 }
 
 
-/* Cards — tighter and with subtle shadow like shinydashboard boxes */
+/* Cards — subtle shadow, consistent spacing */
 
 .card {
-    margin-bottom: 15px;
+    margin-bottom: var(--pbtm-section-gap);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
-    border-radius: 3px;
 }
 
 .card-header.bg-primary {
-    border-radius: 3px 3px 0 0;
+    /* card-header already uses the theme primary; ensure legible white text */
+    color: #fff;
 }
 
 .card-body {
-    padding: 15px;
+    padding: 1rem;
 }
 
 
-/* Intro tab */
+/* Buttons / button rows */
 
 .flex-btns {
     display: flex;
     flex-wrap: wrap;
-    gap: 5px;
-    margin: 0 10px;
+    gap: 0.5rem;
+    margin: 0.25rem 0 0.5rem;
 }
 
 .flex-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 5px;
+    gap: 0.5rem;
     justify-content: space-between;
+}
+
+
+/* Documentation accordion panels */
+
+.doc-accordion {
+    margin-bottom: var(--pbtm-section-gap);
+}
+
+.doc-content {
+    line-height: 1.55;
+    max-width: 70ch;
+}
+
+.doc-content h1,
+.doc-content h2,
+.doc-content h3 {
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.doc-content h1:first-child,
+.doc-content h2:first-child {
+    margin-top: 0;
+}
+
+.doc-content p {
+    margin-bottom: 0.75rem;
+}
+
+.doc-content ul {
+    margin-bottom: 0.75rem;
+}
+
+.doc-content code {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+}
+
+.doc-content pre {
+    background: rgba(0, 0, 0, 0.05);
+    padding: 0.75rem;
+    border-radius: 4px;
+    overflow-x: auto;
 }
 
 
@@ -141,17 +182,17 @@
 .validation-container {
     display: flex;
     flex-wrap: wrap;
+    gap: 0.5rem;
 }
 
 .validation-box {
     flex: 1;
     vertical-align: top;
     min-width: 15em;
-    margin: 5px;
 }
 
 .margin-10 {
-    margin: 10px;
+    margin: 0.625rem;
 }
 
 .tbl-container {
@@ -162,27 +203,30 @@
 /* Models */
 
 .checkbox-inline {
-    margin-left: 10px;
+    margin-left: 0.625rem;
 }
 
 .model-error {
-    border: 1px solid red;
+    border: 1px solid #c5050c;
     border-radius: 4px;
-    background: rgba(255, 0, 0, .1);
-    padding: 10px;
+    background: rgba(197, 5, 12, 0.08);
+    padding: 0.75rem;
+    margin-top: 0.5rem;
     font-weight: bold;
     font-size: 15px;
-    color: #c5050c;
+    color: #8a0308;
 }
 
 .well-title {
-    margin-bottom: 2px;
+    margin-bottom: 0.25rem;
     font-weight: bold;
-    font-size: 16px;
+    font-size: 1rem;
 }
 
-.last-row {
-    margin-bottom: 0px;
+/* spacing between stacked well panels */
+.well-title:not(:first-child),
+.p-3.bg-light+.well-title {
+    margin-top: 0.75rem;
 }
 
 .shiny-table thead tr th {
@@ -191,13 +235,35 @@
 
 .data-summary {
     text-align: center;
-    font-size: larger;
+    font-size: 1.05rem;
     font-weight: bold;
-    margin-bottom: 5px;
+    margin-bottom: 0.3rem;
 }
 
+/* Static / interactive plot toggle */
+.plot-mode-toggle {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.5rem;
+}
+
+.plot-mode-toggle .shiny-options-group {
+    margin-top: 0;
+}
+
+/* Keep plots from being stretched out of aspect ratio */
 .shiny-plot-output img {
-    height: 100%;
-    width: 100%;
-    /*    object-fit: contain;*/
+    max-width: 100%;
+    height: auto;
+}
+
+/* Footer — light links on the dark band for adequate contrast */
+.app-footer a {
+    color: #9ecbe8;
+    text-decoration: underline;
+}
+
+.app-footer a:hover,
+.app-footer a:focus {
+    color: #cfe6f5;
 }

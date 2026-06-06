@@ -9,9 +9,14 @@
 #' @param path path to a .md file
 #' @returns an HTML tag (or NULL if the file is missing)
 renderMd <- function(path) {
-  if (is.null(path) || !file.exists(path)) return(NULL)
+  if (is.null(path) || !file.exists(path)) {
+    return(NULL)
+  }
   if (is.null(.docCache[[path]])) {
-    txt <- paste(readLines(path, warn = FALSE, encoding = "UTF-8"), collapse = "\n")
+    txt <- paste(
+      readLines(path, warn = FALSE, encoding = "UTF-8"),
+      collapse = "\n"
+    )
     .docCache[[path]] <- shiny::markdown(txt)
   }
   .docCache[[path]]
@@ -24,7 +29,9 @@ renderMd <- function(path) {
 #' @returns a bslib accordion, or NULL if the file is missing
 docPanel <- function(path, title = "About this analysis", open = FALSE) {
   html <- renderMd(path)
-  if (is.null(html)) return(NULL)
+  if (is.null(html)) {
+    return(NULL)
+  }
   accordion(
     accordion_panel(
       title = title,

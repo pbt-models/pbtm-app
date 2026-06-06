@@ -62,9 +62,16 @@ server <- function(input, output, session) {
     dataReactive <- reactive(rv$data)
     readyReactive <- reactive(truthy(rv$modelReady[[m]]))
     if (m %in% names(modelSpecs)) {
-      modelServer(spec = modelSpecs[[m]], data = dataReactive, ready = readyReactive)
+      modelServer(
+        spec = modelSpecs[[m]],
+        data = dataReactive,
+        ready = readyReactive
+      )
     } else {
-      do.call(paste0(m, "Server"), list(data = dataReactive, ready = readyReactive))
+      do.call(
+        paste0(m, "Server"),
+        list(data = dataReactive, ready = readyReactive)
+      )
     }
   })
 }

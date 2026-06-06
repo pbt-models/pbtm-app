@@ -3,7 +3,7 @@
 # Pedro Bello, UC Davis
 # Kent Bradford, UC Davis
 
-# Dependencies -----
+# Dependencies ----
 
 suppressPackageStartupMessages({
   library(shiny)
@@ -12,28 +12,32 @@ suppressPackageStartupMessages({
   library(stats)
   library(tidyverse)
   library(DT)
+  library(plotly)
 })
 
 
 # Development ----
 
-# renv::init()         # initiate renv if not already
-# renv::dependencies() # show project dependencies
-# renv::update()       # update project libraries
-# renv::clean()        # remove unused packages
-# renv::snapshot()     # save updated lock file to project
-# renv::restore()      # restore versions from lockfile
-
-# shiny::devmode(TRUE)
-# shiny::devmode(FALSE)
-
-# Load data ----
-
-read <- function(file) {
-  read_csv(file, col_types = cols(), progress = F)
+if (FALSE) {
+  renv::init() # initiate renv if not already
+  renv::dependencies() # show project dependencies
+  renv::update() # update project libraries
+  renv::clean() # remove unused packages
+  renv::snapshot() # save updated lock file to project
+  renv::restore() # restore versions from lockfile
 }
 
+
+# Setup ------------------------------------------------------------------------
+
+read <- function(file) {
+  read_csv(file, col_types = cols(), progress = FALSE)
+}
+
+# column validation requirements
 colValidation <- read("data/column-validation.csv")
+
+# sample data
 sampleTemplate <- read("data/sample-template.csv")
 sampleGermData <- read("data/sample-germ-data.csv")
 samplePrimingData <- read("data/sample-priming-data.csv")
@@ -41,35 +45,158 @@ sampleAgingData <- read("data/sample-aging-data.csv")
 samplePromoterData <- read("data/sample-promoter-data.csv")
 sampleInhibitorData <- read("data/sample-inhibitor-data.csv")
 
-
-# Local vars ----
-
+# global vars
 nCols <- nrow(colValidation)
 factorCols <- filter(colValidation, Role == "Factor")$Column
 modelNames <- colValidation |>
-  select(Germination:Inhibitor) |>
+  select(Germination:last_col()) |>
   names()
+
+
+# Helpers ----------------------------------------------------------------------
+
+#' @description checks many types of objects and determines if they're truthy
+#' @details Tests for real content, not logical truth. 0 is truthy (valid value).
+#' @param x a value to be evaluated as `TRUE` or `FALSE`
+#' @returns T/F
+truthy <- function(x) {
+  # non-values
+  if (is.null(x) || inherits(x, "try-error")) {
+    return(FALSE)
+  }
+  if (is.function(x)) {
+    return(TRUE)
+  }
+  if (length(x) == 0) {
+    return(FALSE)
+  }
+
+  # container types
+  if (is.data.frame(x)) {
+    return(nrow(x) > 0)
+  }
+  if (!is.atomic(x)) {
+    return(TRUE)
+  }
+
+  # atomic: all-NA is false
+  if (all(is.na(x))) {
+    return(FALSE)
+  }
+
+  # type-specific checks
+  switch(
+    typeof(x),
+    character = any(!is.na(x) & nzchar(x) & x != "NA"),
+    logical = any(x, na.rm = TRUE),
+    TRUE
+  )
+}
+
+
+# Germination speed ------------------------------------------------------------
+
+# Shared by the germination tab and the rate-based models (hydro / hydrothermal
+# priming), which previously each inlined this near-identical pipeline.
+
+#' @description parses the comma-separated germ speed input, returns an ordered vector of numbers
+#' @param x a string to parse
+#' @returns a vector of parsed numbers from the string
+parseSpeeds <- function(x) {
+  parsed <- NULL
+  suppressWarnings(
+    try({
+      vals <- strsplit(x, ",") |>
+        unlist() |>
+        parse_number() |>
+        as.integer() |>
+        unique() |>
+        sort()
+      vals <- vals[vals > 0]
+      vals <- vals[vals <= 100]
+      parsed <- vals
+    })
+  )
+  return(parsed)
+}
+
+
+#' @description adds a per-group incremental fraction (FracDiff) column
+#' @param df data frame with CumTime, CumFraction
+#' @param groups character vector of grouping columns
+#' @returns df with FracDiff added, ungrouped
+addFracDiff <- function(df, groups) {
+  df %>%
+    group_by(across(all_of(groups))) %>%
+    arrange(across(all_of(groups)), CumTime, CumFraction) %>%
+    mutate(FracDiff = CumFraction - lag(CumFraction, default = 0)) %>%
+    ungroup()
+}
+
+
+#' @description rescales cumulative germination per group and interpolates the
+#'   time to reach each target fraction (the germination-speed table)
+#' @param df data frame that already has FracDiff (see addFracDiff)
+#' @param groups character vector of grouping columns
+#' @param fracs numeric vector of target germination percentages (0-100)
+#' @returns long tibble with one row per group x target fraction: Frac, Time
+interpolateGermSpeed <- function(df, groups, fracs) {
+  df %>%
+    mutate(MaxCumFrac = max(CumFraction), .by = all_of(groups)) %>%
+    arrange(CumTime) %>%
+    summarise(
+      MaxCumFrac = max(MaxCumFrac),
+      FracDiff = sum(FracDiff),
+      .by = c(all_of(groups), CumTime)
+    ) %>%
+    mutate(
+      CumFraction = cumsum(FracDiff) / sum(FracDiff) * MaxCumFrac,
+      .by = all_of(groups)
+    ) %>%
+    group_by(across(all_of(groups))) %>%
+    arrange(CumTime) %>%
+    reframe({
+      approx(
+        CumFraction,
+        CumTime,
+        xout = fracs / 100,
+        ties = "ordered",
+        rule = 2
+      ) %>%
+        setNames(c("Frac", "Time")) %>%
+        as_tibble() %>%
+        drop_na()
+    })
+}
+
+# Basic UI blocks --------------------------------------------------------------
+
+#' @description creates a well panel with a title above
+#' @param ... items to include in the well panel
+#' @param title text to place above the well panel
+namedWell <- function(..., title = NULL) {
+  div(
+    div(class = "well-title", title),
+    div(class = "p-3 bg-light border rounded", ...)
+  )
+}
+
+#' @description creates a dashboard box with some common options
+#' @param ... items to place in the box
+#' @param width grid width of the box (1-12)
+#' @param title box title
+primaryBox <- function(..., width = 12, title = NULL) {
+  column(
+    width,
+    card(
+      card_header(title, class = "bg-primary text-white fw-bold fst-italic"),
+      card_body(...)
+    )
+  )
+}
 
 
 # Source files ----
 
-# Core library files are sourced first; their functions are referenced by the
-# tab modules and the model factory. Sourcing only defines functions, so order
-# affects definition not execution — but keeping it explicit documents intent
-# and guards against name resolution surprises. Any other src/*.R files (tab
-# modules, future additions) are sourced afterward automatically.
-
-coreSrcFiles <- c(
-  "helpers.R",        # truthy, parseSpeeds, validateCol, getColChoices, checkModelReady
-  "fit.R",            # model fitting core
-  "ui-components.R",  # shared UI builders
-  "plot-helpers.R"    # ggplot helpers
-)
-
-for (f in coreSrcFiles) source(file.path("src", f))
-
-remainingSrcFiles <- setdiff(
-  list.files("src", pattern = "\\.R$", full.names = TRUE),
-  file.path("src", coreSrcFiles)
-)
-lapply(remainingSrcFiles, source)
+list.files("src", pattern = "\\.R$", recursive = TRUE, full.names = TRUE) |>
+  lapply(source)

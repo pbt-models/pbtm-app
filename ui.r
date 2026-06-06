@@ -6,9 +6,12 @@ ui <- page(
   class = "main",
   theme = bs_theme(
     version = 5,
-    primary = "#3c8dbc",
-    "body-bg" = "#ecf0f5",
-    "card-border-color" = "#d2d6de"
+    # primary chosen for WCAG-AA contrast (~6:1) with white card-header text;
+    # the old #3c8dbc was only ~2.9:1
+    primary = "#15679c",
+    "body-bg" = "#eef2f6",
+    "card-border-color" = "#d2d6de",
+    "border-radius" = "0.375rem"
   ),
   tags$head(
     tags$meta(charset = "UTF-8"),
@@ -37,7 +40,7 @@ ui <- page(
     sidebar = sidebar(
       width = 250,
       bg = "#222d32",
-      fg = "#b8c7ce",
+      fg = "#cdd7dd",
 
       # intro
       div(
@@ -80,10 +83,16 @@ ui <- page(
         list(id = "mainNav"),
         lapply(
           c("Intro", "LoadData", modelNames),
-          \(m) nav_panel_hidden(
-            value = paste0(m, "Tab"),
-            if (m %in% names(modelSpecs)) modelUI(modelSpecs[[m]]) else exec(paste0(m, "UI"))
-          )
+          \(m) {
+            nav_panel_hidden(
+              value = paste0(m, "Tab"),
+              if (m %in% names(modelSpecs)) {
+                modelUI(modelSpecs[[m]])
+              } else {
+                exec(paste0(m, "UI"))
+              }
+            )
+          }
         )
       )
     )
@@ -92,8 +101,8 @@ ui <- page(
   # footer
   div(
     align = "center",
-    class = "main",
-    style = "font-size: small; color: grey; background-color: #222d32; margin: 0; padding: 1rem;",
+    class = "main app-footer",
+    style = "font-size: small; color: #b8c7ce; background-color: #222d32; margin: 0; padding: 1rem;",
     div(
       "App developed by",
       a("Ben Bradford", href = "https://github.com/bzbradford"),

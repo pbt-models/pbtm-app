@@ -25,9 +25,11 @@ GerminationUI <- function() {
 #' @param `data` a `reactive()` data frame containing the loaded clean data
 #' @param `ready` a `reactive()` boolean indicating if the model is ready
 
-GerminationServer <- function(data, ready) {
+# `id` is the first formal (defaulting to "germination") so shiny::testServer
+# can drive this module; production calls it by name (data = , ready = ).
+GerminationServer <- function(id = "germination", data, ready) {
   moduleServer(
-    id = "germination",
+    id = id,
     function(input, output, session) {
       ns <- session$ns
 
@@ -201,7 +203,17 @@ GerminationServer <- function(data, ready) {
                 )
               )
             ),
-            plotOutput(ns("plot"), height = "auto")
+            div(
+              class = "plot-mode-toggle",
+              radioButtons(
+                ns("plotMode"),
+                label = NULL,
+                choices = c("Static" = "static", "Interactive" = "interactive"),
+                selected = "static",
+                inline = TRUE
+              )
+            ),
+            uiOutput(ns("plotArea"))
           ),
 
           # Germination speed
@@ -255,7 +267,7 @@ GerminationServer <- function(data, ready) {
       })
 
       ## plot // germination curves ----
-      output$plot <- renderPlot(
+      germPlot <- reactive({
         {
           req(ready())
 
@@ -389,11 +401,25 @@ GerminationServer <- function(data, ready) {
           }
 
           plt
-        },
+        }
+      })
+
+      output$plotArea <- renderUI({
+        if (identical(input$plotMode, "interactive")) {
+          plotlyOutput(ns("plotly"), height = "600px")
+        } else {
+          plotOutput(ns("plot"), height = "auto")
+        }
+      })
+
+      output$plot <- renderPlot(
+        germPlot(),
         height = 1000,
         width = 1500,
         res = 150
       )
+
+      output$plotly <- renderPlotly(ggplotly(germPlot()))
 
       ## germSpeedTable ----
       output$germSpeedTable <- renderDataTable(
