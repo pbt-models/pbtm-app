@@ -223,12 +223,15 @@ modelUI <- function(spec) {
   ns <- NS(spec$id)
   tagList(
     h3(class = "tab-title", paste(spec$label, "analysis")),
-    div(class = "tab-info", spec$tabInfo),
-    docPanel(
-      spec$doc,
-      title = paste("About the", tolower(spec$label), "model")
+    div(
+      class = "tab-info",
+      spec$tabInfo,
+      build_modal_link(
+        spec$doc,
+        paste("About the", tolower(spec$label), "model")
+      )
     ),
-    uiOutput(ns("content"))
+    uiOutput(ns("content"), style = "margin-top: 1rem;")
   )
 }
 

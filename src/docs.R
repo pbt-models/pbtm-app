@@ -22,23 +22,40 @@ renderMd <- function(path) {
   .docCache[[path]]
 }
 
-#' @description a collapsible documentation panel for a tab
-#' @param path path to the source markdown file
-#' @param title accordion header text
-#' @param open whether the panel starts expanded
-#' @returns a bslib accordion, or NULL if the file is missing
-docPanel <- function(path, title = "About this analysis", open = FALSE) {
-  html <- renderMd(path)
+#' Builds the 'More information' link that pops up the modal
+#' @param md path to the markdown file with more information
+#' @param title optional title attribute for the link
+#' @returns HTML
+build_modal_link <- function(md, title = "More information") {
+  if (is.null(md)) {
+    return()
+  }
+  onclick <- sprintf(
+    "Shiny.setInputValue('show_modal', {md: '%s'}, { priority: 'event' });",
+    md
+  )
+  shiny::HTML(
+    sprintf(
+      "<b><a style='cursor:pointer' title='%s' onclick=\"%s\">More information.</a></b>",
+      title,
+      onclick
+    )
+  )
+}
+
+#' Shows a markdown file in a modal popup
+#' @param md markdown file to display
+#' @param title optional modal title
+show_modal <- function(md) {
+  html <- renderMd(md)
   if (is.null(html)) {
     return(NULL)
   }
-  accordion(
-    accordion_panel(
-      title = title,
-      value = "doc",
-      div(class = "doc-content", html)
-    ),
-    open = if (open) "doc" else FALSE,
-    class = "doc-accordion"
+  m <- modalDialog(
+    html,
+    footer = modalButton("Close"),
+    easyClose = TRUE,
+    size = "xl"
   )
+  showModal(m)
 }

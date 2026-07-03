@@ -98,46 +98,89 @@ checkModelReady <- function(requirements, statuses) {
 
 # Static UI ----
 
-LoadDataUI <- function() {
-  ns <- NS("loadData")
+loadDataUI <- function() {
+  ns <- NS("load_data")
 
   tagList(
-    h3("Upload data", class = "tab-title"),
-    p(em(
-      "Upload your own data here or select one of our sample datasets to get started."
-    )),
-    br(),
-    p(strong("Sample datasets:")),
-    div(
-      class = "flex-btns",
-      actionButton(ns("loadSampleGermData"), "Load germination sample data"),
-      actionButton(ns("loadSamplePrimingData"), "Load priming sample data"),
-      actionButton(ns("loadSampleAgingData"), "Load aging sample data"),
-      actionButton(ns("loadSamplePromoterData"), "Load promoter sample data"),
-      actionButton(ns("loadSampleInhibitorData"), "Load inhibitor sample data")
+    h2("Upload your data"),
+
+    p(
+      "Proper data preparation is required to avoid issues when working with this site or the PBTM package. The use of these data templates is not required, but if you use different column names you will have to match them to the expected names after uploading your data. Columns that specify treatment information (e.g. TrtID, GermWP) need to have the value of that treatment repeated for each member of the treatment. Each row (observation) also needs to have a value for CumTime (cumulative elapsed time) and CumFraction (fraction germinated as of that time point, ranges from 0 to 1)."
     ),
-    br(),
-    p(strong("Upload your own data (csv):")),
-    div(
-      class = "flex-btns",
-      fileInput(
-        inputId = ns("userData"),
-        label = NULL,
-        accept = c(".csv")
+
+    navset_card_pill(
+      nav_panel(
+        title = "Load data",
+
+        div(
+          h3("Upload your own data (csv):"),
+          div(
+            class = "flex-btns",
+            fileInput(
+              inputId = ns("userData"),
+              label = NULL,
+              accept = c(".csv")
+            ),
+            div(
+              style = "height: min-content;",
+              actionButton(ns("clearData"), "Clear loaded data")
+            )
+          )
+        )
       ),
-      div(
-        style = "height: min-content;",
-        actionButton(ns("clearData"), "Clear loaded data")
+
+      nav_panel(
+        title = "Example datasets",
+        div(
+          h3("Load example datasets:"),
+          div(
+            class = "flex-btns",
+            local({
+              btns <- list(
+                "load_germ" = "Germination data",
+                "load_priming" = "Priming data",
+                "load_aging" = "Aging data",
+                "load_promoter" = "Promoter data",
+                "load_inhibitor" = "Inhibitor data"
+              )
+              btn <- function(id, label) {
+                actionButton(
+                  inputId = ns(id),
+                  label = label,
+                  icon = icon("arrow-up"),
+                  class = "btn-sm btn-default"
+                )
+              }
+              lapply(names(btns), function(nm) {
+                btn(nm, btns[[nm]])
+              })
+            })
+          )
+        ),
+      ),
+
+      nav_panel(
+        title = "Templates and instructions",
+        div(
+          h3("Data templates:"),
+          div(
+            class = "flex-btns",
+            downloadButton(ns("downloadTemplate"), "Empty data template"),
+            downloadButton(
+              ns("downloadGermData"),
+              "Sample germination dataset"
+            ),
+            downloadButton(ns("downloadPrimingData"), "Sample priming dataset"),
+            downloadButton(ns("downloadAgingData"), "Sample aging dataset")
+          )
+        ),
+        div(
+          h3("Expected column names and descriptions:"),
+          tableOutput(ns("columnDescriptions"))
+        )
       )
     ),
-    p(strong("Expected column names and descriptions:")),
-    accordion(
-      accordion_panel(
-        title = "Show/hide column descriptions",
-        tableOutput(ns("columnDescriptions"))
-      ),
-      open = FALSE
-    ),
+
     uiOutput(ns("currentDataUI"))
   )
 }
@@ -149,23 +192,22 @@ LoadDataUI <- function() {
 #' @references samplePrimingData
 #' @references sampleAgingData
 
-LoadDataServer <- function() {
+loadDataServer <- function() {
   moduleServer(
-    id = "loadData",
+    id = "load_data",
     function(input, output, session) {
       ns <- session$ns
 
       # Reactives ----
 
       # data // raw data before cleaning or assigning columns ----
-      rawData <- reactiveVal(tibble())
-
       rv <- reactiveValues(
-        colStatus = NULL
+        raw_data = tibble(),
+        col_status = NULL
       )
 
       columnNames <- reactive({
-        names(rawData())
+        names(rv$raw_data)
       })
 
       columnChoices <- reactive({
@@ -176,14 +218,14 @@ LoadDataServer <- function() {
       })
 
       cleanData <- reactive({
-        if ((nrow(rawData()) > 0) & (length(rv$colStatus) == nCols)) {
+        if ((nrow(rv$raw_data) > 0) & (length(rv$col_status) == nCols)) {
           # collect user column names
           vars <- sapply(colValidation$InputId, function(id) input[[id]])
           names(vars) <- colValidation$Column
           vars <- vars[vars != "NA"]
 
-          df <- rawData() %>%
-            select(any_of(vars)) %>%
+          df <- rv$raw_data |>
+            select(any_of(vars)) |>
             rename(any_of(vars))
 
           if (all(c("TrtID", "TrtDesc") %in% names(df))) {
@@ -198,12 +240,12 @@ LoadDataServer <- function() {
         } else {
           tibble()
         }
-      }) %>%
-        bindEvent(rv$colStatus)
+      }) |>
+        bindEvent(rv$col_status)
 
       modelReady <- reactive({
         ready <- lapply(modelNames, function(m) {
-          checkModelReady(colValidation[[m]], rv$colStatus)
+          checkModelReady(colValidation[[m]], rv$col_status)
         })
         names(ready) <- modelNames
         ready
@@ -212,11 +254,21 @@ LoadDataServer <- function() {
       # Button handlers ----
 
       ## Load sample data ----
-      observeEvent(input$loadSampleGermData, rawData(sampleGermData))
-      observeEvent(input$loadSamplePrimingData, rawData(samplePrimingData))
-      observeEvent(input$loadSampleAgingData, rawData(sampleAgingData))
-      observeEvent(input$loadSamplePromoterData, rawData(samplePromoterData))
-      observeEvent(input$loadSampleInhibitorData, rawData(sampleInhibitorData))
+      observeEvent(input$load_germ, {
+        rv$raw_data <- sampleGermData
+      })
+      observeEvent(input$load_priming, {
+        rv$raw_data <- samplePrimingData
+      })
+      observeEvent(input$load_aging, {
+        rv$raw_data <- sampleAgingData
+      })
+      observeEvent(input$load_promoter, {
+        rv$raw_data <- samplePromoterData
+      })
+      observeEvent(input$load_inhibitor, {
+        rv$raw_data <- sampleInhibitorData
+      })
 
       ## Load user data ----
       observeEvent(input$userData, {
@@ -225,24 +277,58 @@ LoadDataServer <- function() {
             input$userData$datapath,
             col_types = cols(),
             progress = F
-          ) %>%
+          ) |>
             distinct()
-          if (nrow(df) > 0) rawData(df)
+          if (nrow(df) > 0) rv$raw_data <- df
         })
       })
 
       ## Clear data button ----
       observeEvent(input$clearData, {
-        rawData(tibble())
-        rv$colStatus <- NULL
+        rv$raw_data <- tibble()
+        rv$col_status <- NULL
         reset("userData") # reset file input
       })
+
+      # Download handlers ----
+
+      ## downloadTemplate ----
+      output$downloadTemplate <- downloadHandler(
+        filename = "PBTM Data Template.csv",
+        content = function(file) {
+          write_csv(sampleTemplate, file)
+        }
+      )
+
+      ## downloadGermData ----
+      output$downloadGermData <- downloadHandler(
+        filename = "PBTM Sample Germination Data.csv",
+        content = function(file) {
+          write_csv(sampleGermData, file)
+        }
+      )
+
+      ## downloadPrimingData ----
+      output$downloadPrimingData <- downloadHandler(
+        filename = "PBTM Sample Priming Data.csv",
+        content = function(file) {
+          write_csv(samplePrimingData, file)
+        }
+      )
+
+      ## downloadAgingData ----
+      output$downloadAgingData <- downloadHandler(
+        filename = "PBTM Sample Aging Data.csv",
+        content = function(file) {
+          write_csv(sampleAgingData, file)
+        }
+      )
 
       # Outputs ----
 
       ## currentDataUI // Data display and validation when data loaded ----
       output$currentDataUI <- renderUI({
-        validate(need(nrow(rawData()) > 0, "Please load a dataset."))
+        validate(need(nrow(rv$raw_data) > 0, "Please load a dataset."))
 
         tagList(
           h3("Currently loaded data:"),
@@ -289,7 +375,7 @@ LoadDataServer <- function() {
       ## columnDescriptions // table showing column descriptions ----
       output$columnDescriptions <- renderTable(
         {
-          colValidation %>%
+          colValidation |>
             select(
               `Default name` = Column,
               Description = LongDescription,
@@ -301,7 +387,7 @@ LoadDataServer <- function() {
       )
 
       ## currentDataTable // data as it was uploaded----
-      output$currentDataTable <- renderDataTable(rawData())
+      output$currentDataTable <- renderDataTable(rv$raw_data)
 
       ## cleanDataTable // Shows data passed to models after column matching ----
       output$cleanDataTable <- renderDataTable(cleanData())
@@ -330,11 +416,11 @@ LoadDataServer <- function() {
         observe({
           req(input[[inputId]])
           if (input[[inputId]] == "NA") {
-            rv$colStatus[i] <- FALSE
+            rv$col_status[i] <- FALSE
           } else {
-            col <- rawData()[[input[[inputId]]]]
+            col <- rv$raw_data[[input[[inputId]]]]
             validation <- validateCol(col, expectedType, minValue, maxValue)
-            rv$colStatus[i] <- validation$valid
+            rv$col_status[i] <- validation$valid
           }
         })
 
@@ -345,7 +431,7 @@ LoadDataServer <- function() {
           if (input[[inputId]] == "NA") {
             span("No column specified.", style = "color: orange")
           } else {
-            col <- rawData()[[input[[inputId]]]]
+            col <- rv$raw_data[[input[[inputId]]]]
             validation <- validateCol(col, expectedType, minValue, maxValue)
             validation$ui
           }

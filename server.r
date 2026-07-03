@@ -34,20 +34,21 @@ server <- function(input, output, session) {
   })
 
   ## Sidebar navigation ----
-  observeEvent(input$nav_IntroTab, nav_select("mainNav", "IntroTab"))
-  observeEvent(input$nav_LoadDataTab, nav_select("mainNav", "LoadDataTab"))
-  lapply(modelNames, function(m) {
-    observeEvent(input[[paste0("nav_", m, "Tab")]], {
-      nav_select("mainNav", paste0(m, "Tab"))
-    })
-  })
+  lapply(
+    c("loadData", modelNames),
+    function(m) {
+      observeEvent(input[[paste0("nav_", m, "Tab")]], {
+        nav_select("mainNav", paste0("nav_", m, "Tab"))
+      })
+    }
+  )
 
   # Module Servers ----
 
-  IntroServer()
+  # IntroServer()
 
   # capture return values from the load data server
-  loadDataReturns <- LoadDataServer()
+  loadDataReturns <- loadDataServer()
 
   # save return values
   observe({
@@ -73,5 +74,11 @@ server <- function(input, output, session) {
         list(data = dataReactive, ready = readyReactive)
       )
     }
+  })
+
+  ## Modal handler ----
+  observe({
+    m <- req(input$show_modal)
+    show_modal(md = m$md)
   })
 }
