@@ -101,65 +101,17 @@ checkModelReady <- function(requirements, statuses) {
 loadDataUI <- function() {
   ns <- NS("load_data")
 
-  tagList(
-    h2("Upload your data"),
+  layout_columns(
+    col_widths = 12,
 
-    p(
-      "Proper data preparation is required to avoid issues when working with this site or the PBTM package. The use of these data templates is not required, but if you use different column names you will have to match them to the expected names after uploading your data. Columns that specify treatment information (e.g. TrtID, GermWP) need to have the value of that treatment repeated for each member of the treatment. Each row (observation) also needs to have a value for CumTime (cumulative elapsed time) and CumFraction (fraction germinated as of that time point, ranges from 0 to 1)."
+    tabHeader(
+      title = "Upload data",
+      subtitle = "Proper data preparation is required to avoid issues when working with this site or the PBTM package. The use of these data templates is not required, but if you use different column names you will have to match them to the expected names after uploading your data. Columns that specify treatment information (e.g. TrtID, GermWP) need to have the value of that treatment repeated for each member of the treatment. Each row (observation) also needs to have a value for CumTime (cumulative elapsed time) and CumFraction (fraction germinated as of that time point, ranges from 0 to 1)."
     ),
 
-    navset_card_pill(
-      nav_panel(
-        title = "Load data",
-
-        div(
-          h3("Upload your own data (csv):"),
-          div(
-            class = "flex-btns",
-            fileInput(
-              inputId = ns("userData"),
-              label = NULL,
-              accept = c(".csv")
-            ),
-            div(
-              style = "height: min-content;",
-              actionButton(ns("clearData"), "Clear loaded data")
-            )
-          )
-        )
-      ),
-
-      nav_panel(
-        title = "Example datasets",
-        div(
-          h3("Load example datasets:"),
-          div(
-            class = "flex-btns",
-            local({
-              btns <- list(
-                "load_germ" = "Germination data",
-                "load_priming" = "Priming data",
-                "load_aging" = "Aging data",
-                "load_promoter" = "Promoter data",
-                "load_inhibitor" = "Inhibitor data"
-              )
-              btn <- function(id, label) {
-                actionButton(
-                  inputId = ns(id),
-                  label = label,
-                  icon = icon("arrow-up"),
-                  class = "btn-sm btn-default"
-                )
-              }
-              lapply(names(btns), function(nm) {
-                btn(nm, btns[[nm]])
-              })
-            })
-          )
-        ),
-      ),
-
-      nav_panel(
+    accordion(
+      open = FALSE,
+      accordion_panel(
         title = "Templates and instructions",
         div(
           h3("Data templates:"),
@@ -181,7 +133,53 @@ loadDataUI <- function() {
       )
     ),
 
-    uiOutput(ns("currentDataUI"))
+    div(
+      h3("Load example datasets:"),
+      div(
+        class = "flex-btns",
+        local({
+          btns <- list(
+            "load_germ" = "Germination data",
+            "load_priming" = "Priming data",
+            "load_aging" = "Aging data",
+            "load_promoter" = "Promoter data",
+            "load_inhibitor" = "Inhibitor data"
+          )
+          btn <- function(id, label) {
+            actionButton(
+              inputId = ns(id),
+              label = label,
+              icon = icon("arrow-up"),
+              class = "btn-default"
+            )
+          }
+          lapply(names(btns), function(nm) {
+            btn(nm, btns[[nm]])
+          })
+        })
+      ),
+    ),
+
+    div(
+      h3("Upload your own data (csv):"),
+      div(
+        class = "flex-btns",
+        fileInput(
+          inputId = ns("userData"),
+          label = NULL,
+          accept = c(".csv")
+        ),
+        div(
+          style = "height: min-content;",
+          actionButton(ns("clearData"), "Clear loaded data")
+        )
+      ),
+    ),
+
+    div(
+      h3("Currently loaded data:"),
+      uiOutput(ns("currentDataUI")),
+    ),
   )
 }
 
@@ -330,44 +328,47 @@ loadDataServer <- function() {
       output$currentDataUI <- renderUI({
         validate(need(nrow(rv$raw_data) > 0, "Please load a dataset."))
 
-        tagList(
-          h3("Currently loaded data:"),
-          accordion(
-            accordion_panel(
-              title = "Show/hide data table",
-              value = "tab",
-              div(
-                class = "tbl-container margin-10",
-                dataTableOutput(ns("currentDataTable"))
-              )
-            ),
-            open = "tab"
+        layout_columns(
+          col_widths = 12,
+
+          # show loaded raw data
+          panelCard(
+            title = "Uploaded data",
+            div(
+              class = "tbl-container",
+              dataTableOutput(ns("currentDataTable"))
+            )
           ),
-          h3("Match column names to expected roles:"),
-          p(em(
-            "If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range."
-          )),
+
+          # column selectors and validation messages
           div(
-            class = "validation-container",
-            lapply(1:nCols, function(i) {
-              div(
-                class = "p-3 bg-light border rounded validation-box",
-                uiOutput(paste0(ns("colSelect"), i)),
-                uiOutput(paste0(ns("colValidate"), i))
-              )
-            })
+            h3("Match column names to expected roles:"),
+            p(em(
+              "If you used the same column names as the default data template, they will be automatically matched below. Otherwise, cast your column names into the appropriate data types. Warning messages will appear if your data doesn't match the expected type or range."
+            )),
+            div(
+              class = "validation-container",
+              lapply(1:nCols, function(i) {
+                div(
+                  id = ns(paste0("valBox", i)),
+                  class = "p-3 bg-light border rounded validation-box",
+                  uiOutput(paste0(ns("colSelect"), i)),
+                  uiOutput(paste0(ns("colValidate"), i))
+                )
+              })
+            ),
           ),
-          h3("Final clean dataset for models:"),
-          accordion(
-            accordion_panel(
-              title = "Show/hide data table",
-              value = "tab",
+
+          # show clean data
+          div(
+            h3("Final clean dataset for models:"),
+            panelCard(
+              title = "Clean dataset for models",
               div(
-                class = "tbl-container margin-10",
+                class = "tbl-container",
                 dataTableOutput(ns("cleanDataTable"))
               )
-            ),
-            open = "tab"
+            )
           )
         )
       })
@@ -415,12 +416,22 @@ loadDataServer <- function() {
         # Create an observer to handle validation change
         observe({
           req(input[[inputId]])
+          boxSel <- paste0("#", ns(paste0("valBox", i)))
+          shinyjs::removeCssClass(
+            selector = boxSel,
+            class = "val-ok val-warn val-error"
+          )
           if (input[[inputId]] == "NA") {
             rv$col_status[i] <- FALSE
+            shinyjs::addCssClass(selector = boxSel, class = "val-warn")
           } else {
             col <- rv$raw_data[[input[[inputId]]]]
             validation <- validateCol(col, expectedType, minValue, maxValue)
             rv$col_status[i] <- validation$valid
+            shinyjs::addCssClass(
+              selector = boxSel,
+              class = if (validation$valid) "val-ok" else "val-error"
+            )
           }
         })
 

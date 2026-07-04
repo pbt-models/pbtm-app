@@ -48,7 +48,7 @@ dataTransfUI <- function(ns) {
 #' @description a shared ui component
 #' @param ns namespace function from calling server
 germSlidersUI <- function(ns) {
-  namedWell(
+  controlSection(
     title = "Germination constraints",
     sliderInput(
       inputId = ns("maxCumFrac"),
@@ -71,7 +71,7 @@ germSlidersUI <- function(ns) {
 #' @description a shared ui component
 #' @param ns namespace function from calling server
 germSpeedSliderUI <- function(ns) {
-  namedWell(
+  controlSection(
     title = "Germination speed options",
     sliderInput(
       inputId = ns("germSpeedBasis"),
@@ -194,7 +194,7 @@ mixtureResultsWell <- function(spec, res, k, aicTable = NULL) {
 #' @param ns namespace function from calling server
 #' @param params vector of param names
 setParamsUI <- function(ns, params) {
-  namedWell(
+  controlSection(
     title = "Specify model coefficients (optional)",
     div(
       class = "flex-row",
@@ -221,17 +221,15 @@ setParamsUI <- function(ns, params) {
 #' @param spec a model spec
 modelUI <- function(spec) {
   ns <- NS(spec$id)
-  tagList(
-    h3(class = "tab-title", paste(spec$label, "analysis")),
-    div(
-      class = "tab-info",
-      spec$tabInfo,
-      build_modal_link(
-        spec$doc,
-        paste("About the", tolower(spec$label), "model")
-      )
+  layout_columns(
+    col_widths = 12,
+    tabHeader(
+      title = paste(spec$label, "analysis"),
+      subtitle = spec$tabInfo,
+      doc = spec$doc,
+      doc_label = paste("About the", tolower(spec$label), "model")
     ),
-    uiOutput(ns("content"), style = "margin-top: 1rem;")
+    uiOutput(ns("content"))
   )
 }
 
@@ -431,7 +429,7 @@ modelServer <- function(id = spec$id, spec, data, ready) {
           ready(),
           paste(
             "Please load a dataset with the required columns for",
-            spec$label,
+            tolower(spec$label),
             "analysis. Minimum required columns are:",
             paste(reqCols, collapse = ", ")
           )
@@ -467,67 +465,61 @@ modelServer <- function(id = spec$id, spec, data, ready) {
           germSpeedSliderUI(ns)
         }
 
-        fluidRow(
-          primaryBox(
-            title = "Data selection",
-            fluidRow(
-              column(6, namedWell(title = "Data input options", dataOpts)),
-              column(6, rightCol),
-              column(12, trtSelectUI(ns, otherTrtCols, reactive(data()))),
-              column(
-                12,
-                div(
-                  class = "p-3 bg-light border rounded data-summary",
-                  textOutput(ns("dataSummary"))
-                )
-              )
-            )
-          ),
-          primaryBox(
-            title = "Model parameters",
-            fluidRow(
-              if (isTRUE(spec$subpop)) {
-                column(
-                  12,
-                  namedWell(
-                    title = "Subpopulations",
-                    radioButtons(
-                      ns("nSubpop"),
-                      label = "Fit a mixture of distinct seed subpopulations:",
-                      choices = c(
-                        "1 (single)" = "1",
-                        "2" = "2",
-                        "3" = "3",
-                        "Auto-detect" = "auto"
-                      ),
-                      selected = "1",
-                      inline = TRUE
-                    ),
-                    em(
-                      "Auto-detect fits 1–3 subpopulations and selects the best by AIC. With >1 subpopulation, the optional coefficients below are not used."
-                    )
-                  )
-                )
-              },
-              column(6, uiOutput(ns("modelResults"))),
-              column(6, setParamsUI(ns, params)),
-              column(12, uiOutput(ns("modelError")))
-            )
-          ),
-          primaryBox(
-            title = "Plot output",
-            div(
-              class = "plot-mode-toggle",
-              radioButtons(
-                ns("plotMode"),
-                label = NULL,
-                choices = c("Static" = "static", "Interactive" = "interactive"),
-                selected = "static",
-                inline = TRUE
-              )
+        subpopSection <- if (isTRUE(spec$subpop)) {
+          controlSection(
+            title = "Subpopulations",
+            radioButtons(
+              ns("nSubpop"),
+              label = "Fit a mixture of distinct seed subpopulations:",
+              choices = c(
+                "1 (single)" = "1",
+                "2" = "2",
+                "3" = "3",
+                "Auto-detect" = "auto"
+              ),
+              selected = "1",
+              inline = TRUE
             ),
-            uiOutput(ns("plotArea"))
+            em(
+              "Auto-detect fits 1–3 subpopulations and selects the best by AIC. With >1 subpopulation, the optional coefficients below are not used."
+            )
           )
+        }
+
+        layout_sidebar(
+          sidebar = sidebar(
+            title = "Analysis controls",
+            width = 360,
+            open = "open",
+            accordion(
+              open = c("Data", "Parameters"),
+              accordion_panel(
+                "Data",
+                icon = icon("table"),
+                controlSection(title = "Data input options", dataOpts),
+                rightCol,
+                trtSelectUI(ns, otherTrtCols, reactive(data()))
+              ),
+              accordion_panel(
+                "Parameters",
+                icon = icon("sliders"),
+                if (isTRUE(spec$subpop)) subpopSection,
+                setParamsUI(ns, params)
+              )
+            )
+          ),
+          div(
+            class = "data-summary p-2 mb-3 bg-light border rounded",
+            textOutput(ns("dataSummary"))
+          ),
+          panelCard(
+            title = "Model fit",
+            tools = plotModeToggle(ns),
+            full_screen = TRUE,
+            uiOutput(ns("plotArea"))
+          ),
+          uiOutput(ns("modelResults")),
+          uiOutput(ns("modelError"))
         )
       })
 
@@ -582,7 +574,7 @@ modelServer <- function(id = spec$id, spec, data, ready) {
         if (identical(input$plotMode, "interactive")) {
           plotlyOutput(ns("plotly"), height = "600px")
         } else {
-          plotOutput(ns("plot"), height = "auto")
+          plotOutput(ns("plot"), height = "560px")
         }
       })
 
@@ -592,9 +584,7 @@ modelServer <- function(id = spec$id, spec, data, ready) {
           validate(need(nrow(workingData()) > 0, "No data selected."))
           buildPlot(FALSE)
         },
-        height = 1000,
-        width = 1500,
-        res = 150
+        res = 100
       )
 
       output$plotly <- renderPlotly({

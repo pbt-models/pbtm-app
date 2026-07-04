@@ -12,23 +12,23 @@ server <- function(input, output, session) {
   # Outputs ----
 
   ## Badge for loading tab ----
-  output$LoadBadge <- renderUI({
+  output$badge_loadData <- renderUI({
     ready <- nrow(rv$data) > 0
     if (ready) {
-      span(class = "badge bg-success", "OK")
+      span(class = "badge bg-success", icon("check"))
     } else {
-      span(class = "badge bg-warning", "!")
+      span(class = "badge bg-warning", icon("exclamation"))
     }
   })
 
   ## Badges for model tabs ----
   lapply(modelNames, function(m) {
-    output[[paste0(m, "Badge")]] <- renderUI({
+    output[[paste0("badge_", m)]] <- renderUI({
       ready <- truthy(rv$modelReady[[m]])
       if (ready) {
-        span(class = "badge bg-success", "OK")
+        span(class = "badge bg-success", icon("check"))
       } else {
-        span(class = "badge bg-danger", "X")
+        span(class = "badge bg-danger", icon("times"))
       }
     })
   })

@@ -1,12 +1,24 @@
 /* --- PBTM Dashboard ---- */
 
 :root {
-  /* --bg-page: #c8dbff; */
-  --bg-page: hsl(210, 40%, 95%);
-  --bg-nav: hsl(210, 40%, 70%);
-  --bg-main: white;
+  --page-width: 1200px;
+
+  --bg-header: hsl(210, 40%, 50%);
+  --bg-nav: hsl(210, 40%, 90%);
+  --bg-page: hsl(210, 40%, 92.5%);
+  --bg-main: hsl(210, 40%, 97.5%);
   --bg-footer: hsl(210, 40%, 80%);
+
+  /* Spacing scale */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
 }
+
+
+/* Primary layout */
 
 body {
   min-height: 100vh;
@@ -15,85 +27,84 @@ body {
   background: var(--bg-page);
 }
 
-h1 {
-  font-size: 1.5rem;
-}
-
-h2 {
-  font-size: 1.3rem;
-}
-
-h3 {
-  font-size: 1.2rem;
-}
-
-h4 {
-  font-size: 1.1rem;
-}
-
-h1,
-h2,
-h3,
-h4 {
-  /* margin-top: 1rem; */
-  font-weight: 600;
-}
-
-/* h1:first-child,
-h2:first-child,
-h3:first-child,
-h4:first-child {
-  margin-top: unset;
-} */
-
-/* set content max width */
-main,
-header>div,
-footer>div {
-  max-width: 1000px;
-  margin: auto;
-}
-
-header {
+#header {
   width: 100%;
-  padding: 0.5rem 1rem;
-  background: var(--bg-nav);
 }
 
-header h1 {
+.header-content {
+  max-width: var(--page-width);
+  margin: auto;
+  padding: 0.5rem 1rem;
+  background: var(--bg-header);
+}
+
+.header-content h1 {
+  font-size: 1.5rem;
   font-weight: bold;
   color: white;
   margin: unset;
 }
 
-header a {
+.header-content a {
   color: inherit;
 }
 
-.header-content {
-  width: 100%;
-  display: inline-flex;
-  justify-content: space-between;
+main {
+  max-width: var(--page-width);
+  margin: auto;
+  flex: 1;
+  background: var(--bg-main);
 }
 
-main {
-  background: var(--bg-main);
-  padding: 1rem;
-  flex: 1;
+#mainNav {
+  background: var(--bg-nav);
+  padding: 0.5rem;
+}
+
+.nav-badge {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+}
+
+.badge {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 0.75rem;
 }
 
 .tab-pane {
-  padding: 1rem 0;
+  padding: 1rem;
 }
 
-footer {
+#footer {
   width: 100%;
-  background: var(--bg-footer);
+}
+
+.footer-content {
+  max-width: var(--page-width);
+  margin: auto;
   padding: 1rem 0;
   font-size: small;
   text-align: center;
-  /* color: #b8c7ce; */
+  background: var(--bg-footer);
 }
+
+
+/* Sidebar layout */
+
+.bslib-sidebar-layout .sidebar-title {
+  text-transform: uppercase;
+  /* font-weight: bold; */
+  margin-bottom: 0;
+}
+
+
+/* styles */
 
 .flex-btns {
   display: flex;
@@ -114,10 +125,20 @@ footer {
   flex: 1;
   vertical-align: top;
   min-width: 15em;
+  border-left-width: 4px;
+  border-left-color: var(--bs-secondary-bg, #ccc);
 }
 
-.margin-10 {
-  margin: 0.625rem;
+.validation-box.val-ok {
+  border-left-color: var(--bs-success);
+}
+
+.validation-box.val-warn {
+  border-left-color: var(--bs-warning);
+}
+
+.validation-box.val-error {
+  border-left-color: var(--bs-danger);
 }
 
 .tbl-container {
@@ -126,10 +147,6 @@ footer {
 
 
 /* Models */
-
-.checkbox-inline {
-  margin-left: 0.625rem;
-}
 
 .model-error {
   border: 1px solid #c5050c;
@@ -170,6 +187,32 @@ footer {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 0.5rem;
+}
+
+/* Phase 2 container helpers: panelCard / controlSection / tabHeader */
+
+.panel-card-title {
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+
+.control-section+.control-section {
+  margin-top: var(--space-md);
+  border-top: 1px solid rgba(0, 0, 0, .06);
+  padding-top: var(--space-md);
+}
+
+.control-section-title {
+  font-weight: 600;
+  font-size: .85rem;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--bs-secondary-color);
+  margin-bottom: var(--space-sm);
+}
+
+.tab-header-subtitle {
+  color: var(--bs-secondary-color);
 }
 
 .plot-mode-toggle .shiny-options-group {

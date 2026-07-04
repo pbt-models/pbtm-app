@@ -181,16 +181,69 @@ namedWell <- function(..., title = NULL) {
   )
 }
 
-#' @description creates a dashboard box with some common options
-#' @param ... items to place in the box
-#' @param width grid width of the box (1-12)
-#' @param title box title
-primaryBox <- function(..., width = 12, title = NULL) {
-  column(
-    width,
-    card(
-      card_header(title, class = "bg-primary text-white fw-bold fst-italic"),
-      card_body(...)
+#' Quiet top-level card. `tools` renders right-aligned in the header (e.g. a toggle).
+panelCard <- function(..., title = NULL, tools = NULL, full_screen = FALSE) {
+  card(
+    full_screen = full_screen,
+    if (!is.null(title)) {
+      card_header(
+        class = "d-flex justify-content-between align-items-center",
+        span(class = "panel-card-title", title),
+        tools
+      )
+    },
+    card_body(...)
+  )
+}
+
+#' @description a flat labeled block for grouping controls (replaces nested
+#'   grey wells inside a sidebar)
+#' @param ... items to include in the section
+#' @param title text to place above the section
+controlSection <- function(..., title = NULL) {
+  div(
+    class = "control-section",
+    if (!is.null(title)) div(class = "control-section-title", title),
+    ...
+  )
+}
+
+#' @description consistent tab title + subtitle + optional "About" modal link
+#' @param title tab title
+#' @param subtitle optional one-line subtitle
+#' @param doc optional path to a markdown file shown via `build_modal_link()`
+#' @param doc_label link text for the "About" modal link
+tabHeader <- function(
+  title,
+  subtitle = NULL,
+  doc = NULL,
+  doc_label = "More information"
+) {
+  div(
+    class = "tab-header",
+    h2(class = "tab-header-title", title),
+    if (!is.null(subtitle)) {
+      div(
+        class = "tab-header-subtitle",
+        subtitle,
+        if (!is.null(doc)) build_modal_link(doc, doc_label)
+      )
+    }
+  )
+}
+
+#' @description Static/Interactive plot-mode toggle, extracted so it can live
+#'   in a panelCard() header via the `tools` argument
+#' @param ns module namespace function
+plotModeToggle <- function(ns) {
+  div(
+    class = "plot-mode-toggle",
+    radioButtons(
+      ns("plotMode"),
+      label = NULL,
+      choices = c("Static" = "static", "Interactive" = "interactive"),
+      selected = "static",
+      inline = TRUE
     )
   )
 }
