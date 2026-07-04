@@ -1,67 +1,84 @@
 # ---- Server ---- #
 
 server <- function(input, output, session) {
-  
-  
   # Values ----
-  
+
   rv <- reactiveValues(
     data = tibble(),
     colStatus = NULL,
     modelReady = list()
   )
-  
-  
+
   # Outputs ----
-  
-  ## Reactive menu entry for loading tab ----
-  output$LoadMenu <- renderMenu({
+
+  ## Badge for loading tab ----
+  output$badge_loadData <- renderUI({
     ready <- nrow(rv$data) > 0
-    menuItem(
-      "Upload data",
-      tabName = "LoadDataTab",
-      badgeLabel = ifelse(ready, "OK", "!"),
-      badgeColor = ifelse(ready, "green", "yellow")
-    )
+    if (ready) {
+      span(class = "badge bg-success", icon("check"))
+    } else {
+      span(class = "badge bg-warning", icon("exclamation"))
+    }
   })
-  
-  ## Reactive menu entries for models ----
+
+  ## Badges for model tabs ----
   lapply(modelNames, function(m) {
-    output[[paste0(m, "Menu")]] <- renderMenu({
+    output[[paste0("badge_", m)]] <- renderUI({
       ready <- truthy(rv$modelReady[[m]])
-      menuItem(
-        to_any_case(m, case = "sentence"),
-        tabName = paste0(m, "Tab"),
-        badgeLabel = ifelse(ready, "OK", "X"),
-        badgeColor = ifelse(ready, "green", "red")
-      )
+      if (ready) {
+        span(class = "badge bg-success", icon("check"))
+      } else {
+        span(class = "badge bg-danger", icon("times"))
+      }
     })
   })
-  
+
+  ## Sidebar navigation ----
+  lapply(
+    c("loadData", modelNames),
+    function(m) {
+      observeEvent(input[[paste0("nav_", m, "Tab")]], {
+        nav_select("mainNav", paste0("nav_", m, "Tab"))
+      })
+    }
+  )
 
   # Module Servers ----
-  
-  IntroServer()
-  
+
+  # IntroServer()
+
   # capture return values from the load data server
-  loadDataReturns <- LoadDataServer()
-  
+  loadDataReturns <- loadDataServer()
+
   # save return values
   observe({
     rv$data <- loadDataReturns()$data
     rv$colStatus <- loadDataReturns()$colStatus
     rv$modelReady <- loadDataReturns()$modelReady
   })
-  
-  # Call each of the model servers
+
+  # Call each of the model servers. Models with a spec run through the factory
+  # (modelServer); Germination keeps its bespoke GerminationServer.
   lapply(modelNames, function(m) {
-    do.call(
-      paste0(m, "Server"),
-      list(
-        data = reactive(rv$data),
-        ready = reactive(truthy(rv$modelReady[[m]]))
+    dataReactive <- reactive(rv$data)
+    readyReactive <- reactive(truthy(rv$modelReady[[m]]))
+    if (m %in% names(modelSpecs)) {
+      modelServer(
+        spec = modelSpecs[[m]],
+        data = dataReactive,
+        ready = readyReactive
       )
-    )
+    } else {
+      do.call(
+        paste0(m, "Server"),
+        list(data = dataReactive, ready = readyReactive)
+      )
+    }
   })
-  
+
+  ## Modal handler ----
+  observe({
+    m <- req(input$show_modal)
+    show_modal(md = m$md)
+  })
 }

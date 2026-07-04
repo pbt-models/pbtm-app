@@ -1,4 +1,3 @@
-
 # Germination test ----
 
 sampleGermData
@@ -7,11 +6,14 @@ sampleGermData
 test <- sampleGermData %>%
   group_by_at(trtNames) %>%
   summarise(
-    as_tibble(approx(CumFraction, CumTime, xout = seq(0, 1, by = 0.25), ties = "ordered")),
+    as_tibble(approx(
+      CumFraction,
+      CumTime,
+      xout = seq(0, 1, by = 0.25),
+      ties = "ordered"
+    )),
     .groups = "drop"
-    )
-
-
+  )
 
 
 trts <- c()
@@ -22,7 +24,7 @@ trts <- c("GermWP", "GermTemp")
 # plot rescaling
 
 sampleGermData %>%
-  mutate(across(all_of(trts), ~as.factor(.x))) %>%
+  mutate(across(all_of(trts), ~ as.factor(.x))) %>%
   ggplot(aes(
     x = CumTime,
     y = CumFraction,
@@ -44,20 +46,25 @@ df <- sampleGermData %>%
 df %>%
   mutate(
     MaxCumFrac = max(CumFraction),
-    .by = all_of(trts)) %>%
+    .by = all_of(trts)
+  ) %>%
   arrange(CumTime) %>%
   summarise(
     MaxCumFrac = max(MaxCumFrac),
     FracDiff = sum(FracDiff),
-    .by = c(all_of(trts), CumTime)) %>%
-  mutate(CumFraction = cumsum(FracDiff) / sum(FracDiff) * MaxCumFrac, .by = all_of(trts))
+    .by = c(all_of(trts), CumTime)
+  ) %>%
+  mutate(
+    CumFraction = cumsum(FracDiff) / sum(FracDiff) * MaxCumFrac,
+    .by = all_of(trts)
+  )
 
 ggplot(aes(
-    x = CumTime,
-    y = CumFraction,
-    group = TrtID,
-    color = GermWP
-  )) +
+  x = CumTime,
+  y = CumFraction,
+  group = TrtID,
+  color = GermWP
+)) +
   geom_line() +
   geom_point(size = 2)
 
@@ -69,7 +76,13 @@ sampleGermData %>%
   arrange(CumTime) %>%
   reframe(
     {
-      df <- approx(CumFraction, CumTime, xout = seq(0, 1, by = 0.25), ties = "ordered", rule = 2)
+      df <- approx(
+        CumFraction,
+        CumTime,
+        xout = seq(0, 1, by = 0.25),
+        ties = "ordered",
+        rule = 2
+      )
       names(df) <- c("Frac", "Time")
       df <- as_tibble(df)
       drop_na(df)
@@ -77,14 +90,14 @@ sampleGermData %>%
   ) %>%
   mutate(
     Frac = paste0("T", str_pad(Frac * 100, 2, pad = "0")),
-    Time = sprintf("%.2f", Time)) %>%
+    Time = sprintf("%.2f", Time)
+  ) %>%
   pivot_wider(
     names_from = "Frac",
     values_from = "Time"
   ) %>%
   mutate(across(everything(), ~ as.character(.x)))
 
-  
 
 # number of levels
 
@@ -94,8 +107,6 @@ sampleGermData %>%
   unlist() %>%
   enframe() %>%
   mutate(label = paste0(name, " (n=", value, ")"))
-  
-
 
 
 # models
@@ -140,35 +151,38 @@ Sigma <- 0.4
 lower$Sigma <- upper$Sigma <- start$Sigma <- NULL
 
 model <- stats::nls(
-  CumFrac ~ maxCumFrac * stats::pnorm(
-    GermWP - (HT / ((GermTemp - Tb) * CumTime)),
-    Psib50,
-    Sigma,
-    log = FALSE),
+  CumFrac ~ maxCumFrac *
+    stats::pnorm(
+      GermWP - (HT / ((GermTemp - Tb) * CumTime)),
+      Psib50,
+      Sigma,
+      log = FALSE
+    ),
   start = start,
   lower = lower,
   upper = upper,
-  algorithm = "port")
+  algorithm = "port"
+)
 
 model <- stats::nls(
-  germ ~ maxCumFrac * stats::pnorm(
-    wp - (HT / ((temp - Tb) * time)),
-    Psib50,
-    Sigma,
-    log = FALSE),
-  algorithm = "port")
+  germ ~ maxCumFrac *
+    stats::pnorm(
+      wp - (HT / ((temp - Tb) * time)),
+      Psib50,
+      Sigma,
+      log = FALSE
+    ),
+  algorithm = "port"
+)
 
 model
 
-stats::cor(germ, stats::predict(model)) ^ 2
-
+stats::cor(germ, stats::predict(model))^2
 
 
 summary(model)$coefficients %>%
   as_tibble(rownames = "Parameter")
 
 
-
-coefs <- as.list(m[,"Estimate"])
+coefs <- as.list(m[, "Estimate"])
 coefs$HT
-
