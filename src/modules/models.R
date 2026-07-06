@@ -26,8 +26,8 @@ dataCleanUI <- function(ns) {
     inputId = ns("dataCleanSelect"),
     label = "Select data cleaning:",
     choices = list(
-      "Original" = "original",
-      "Cleaned (remove duplicates)" = "clean"
+      "Cleaned (remove duplicates)" = "clean",
+      "Original" = "original"
     )
   )
 }
@@ -111,36 +111,38 @@ modelErrorUI <- function(results) {
 #' @param paramNames fittable parameter names (these rows get a hold checkbox)
 singleResultsWell <- function(ns, res, held, paramNames) {
   labelFor <- function(p) if (p == "PseudoR2") "Pseudo-R²" else p
-  namedWell(
-    title = "Model results",
-    renderTable(
-      {
-        res %>%
-          enframe() %>%
-          filter(name %in% c(paramNames, "PseudoR2")) %>%
-          unnest(value) %>%
-          mutate(
-            Hold = lapply(name, function(p) {
-              if (p %in% paramNames) {
-                HTML(sprintf(
-                  "<input type='checkbox' %s onclick=\"Shiny.setInputValue('%s-hold', this.checked, {priority: 'event'})\">",
-                  ifelse(isTRUE(held[[p]]), "checked", ""),
-                  ns(p)
-                ))
-              } else {
-                ""
-              }
-            }),
-            name = vapply(name, labelFor, character(1))
-          ) %>%
-          rename(Parameter = name, Value = value)
-      },
-      digits = 4,
-      width = "100%",
-      striped = FALSE,
-      hover = TRUE,
-      sanitize.text.function = function(x) x,
-      align = "llc"
+  card(
+    card_header("Model results"),
+    card_body(
+      renderTable(
+        {
+          res %>%
+            enframe() %>%
+            filter(name %in% c(paramNames, "PseudoR2")) %>%
+            unnest(value) %>%
+            mutate(
+              Hold = lapply(name, function(p) {
+                if (p %in% paramNames) {
+                  HTML(sprintf(
+                    "<input type='checkbox' %s onclick=\"Shiny.setInputValue('%s-hold', this.checked, {priority: 'event'})\">",
+                    ifelse(isTRUE(held[[p]]), "checked", ""),
+                    ns(p)
+                  ))
+                } else {
+                  ""
+                }
+              }),
+              name = vapply(name, labelFor, character(1))
+            ) %>%
+            rename(Parameter = name, Value = value)
+        },
+        digits = 4,
+        width = "100%",
+        striped = FALSE,
+        hover = TRUE,
+        sanitize.text.function = function(x) x,
+        align = "llc"
+      )
     )
   )
 }
@@ -160,30 +162,36 @@ mixtureResultsWell <- function(spec, res, k, aicTable = NULL) {
       bind_cols(as_tibble(setNames(vals, spec$paramNames))) %>%
       mutate(Weight = round(w[j], 3))
   })
+
   tagList(
-    namedWell(
-      title = sprintf("Subpopulation coefficients (k = %d)", k),
-      renderTable(comp, digits = 4, width = "100%", hover = TRUE),
-      div(
-        class = "mt-2 text-muted",
-        sprintf("Pseudo-R² = %.3f    AIC = %.1f", res$PseudoR2, res$AIC)
+    card(
+      card_header(sprintf("Subpopulation coefficients (k = %d)", k)),
+      card_body(
+        renderTable(comp, digits = 4, width = "100%", hover = TRUE),
+        div(
+          class = "mt-2 text-muted",
+          sprintf("Pseudo-R² = %.3f    AIC = %.1f", res$PseudoR2, res$AIC)
+        )
       )
     ),
     if (!is.null(aicTable)) {
-      namedWell(
-        title = "Subpopulation count comparison (lower AIC is better)",
-        renderTable(
-          aicTable %>%
-            transmute(
-              `Subpops (k)` = k,
-              Parameters = npar,
-              `Pseudo-R²` = round(PseudoR2, 3),
-              AIC = round(AIC, 1),
-              `ΔAIC` = round(dAIC, 1)
-            ),
-          digits = 2,
-          width = "100%",
-          hover = TRUE
+      card(
+        card_header("Subpopulation count comparison (lower AIC is better)"),
+        card_body(
+          renderTable(
+            aicTable |>
+              mutate(
+                `Subpops (k)` = k,
+                Parameters = npar,
+                `Pseudo-R²` = round(PseudoR2, 3),
+                AIC = round(AIC, 1),
+                `ΔAIC` = round(dAIC, 1),
+                .keep = "none"
+              ),
+            digits = 2,
+            width = "100%",
+            hover = TRUE
+          )
         )
       )
     }
@@ -195,7 +203,11 @@ mixtureResultsWell <- function(spec, res, k, aicTable = NULL) {
 #' @param params vector of param names
 setParamsUI <- function(ns, params) {
   controlSection(
-    title = "Specify model coefficients (optional)",
+    p(
+      em(
+        "Specify individual model coefficients, or leave blank to allow the model to find a best-fit value."
+      )
+    ),
     div(
       class = "flex-row",
       lapply(params, function(p) {
@@ -207,9 +219,6 @@ setParamsUI <- function(ns, params) {
           width = "30%"
         )
       })
-    ),
-    em(
-      "Specify individual model coefficients, or leave blank to allow the model to find a best-fit value."
     )
   )
 }
@@ -223,12 +232,13 @@ modelUI <- function(spec) {
   ns <- NS(spec$id)
   layout_columns(
     col_widths = 12,
-    tabHeader(
-      title = paste(spec$label, "analysis"),
-      subtitle = spec$tabInfo,
-      doc = spec$doc,
-      doc_label = paste("About the", tolower(spec$label), "model")
-    ),
+    # tabHeader(
+    #   title = paste(spec$label, "analysis"),
+    #   subtitle = spec$tabInfo,
+    #   doc = spec$doc,
+    #   doc_label = paste("About the", tolower(spec$label), "model")
+    # ),
+    renderMd(spec$doc),
     uiOutput(ns("content"))
   )
 }
@@ -452,6 +462,7 @@ modelServer <- function(id = spec$id, spec, data, ready) {
             )
           })
         )
+
         if (spec$family == "cdf") {
           dataOpts <- tagList(dataOpts, dataCleanUI(ns))
           if (!is.null(spec$transformCol)) {
@@ -481,18 +492,19 @@ modelServer <- function(id = spec$id, spec, data, ready) {
               inline = TRUE
             ),
             em(
-              "Auto-detect fits 1–3 subpopulations and selects the best by AIC. With >1 subpopulation, the optional coefficients below are not used."
+              "Auto-detect fits 1-3 subpopulations and selects the best by AIC. With >1 subpopulation, the optional coefficients below are not used."
             )
           )
         }
 
         layout_sidebar(
+          fillable = FALSE,
           sidebar = sidebar(
             title = "Analysis controls",
             width = 360,
             open = "open",
             accordion(
-              open = c("Data", "Parameters"),
+              open = c("Data", "Parameters", "Subpopulations"),
               accordion_panel(
                 "Data",
                 icon = icon("table"),
@@ -503,9 +515,15 @@ modelServer <- function(id = spec$id, spec, data, ready) {
               accordion_panel(
                 "Parameters",
                 icon = icon("sliders"),
-                if (isTRUE(spec$subpop)) subpopSection,
                 setParamsUI(ns, params)
-              )
+              ),
+              if (isTRUE(spec$subpop)) {
+                accordion_panel(
+                  "Subpopulations",
+                  icon = icon("buffer"),
+                  subpopSection
+                )
+              }
             )
           ),
           div(

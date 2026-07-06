@@ -5,6 +5,7 @@
 
 # Dependencies ----
 
+rm(list = ls())
 suppressPackageStartupMessages({
   library(shiny)
   library(shinyjs)
@@ -13,12 +14,15 @@ suppressPackageStartupMessages({
   library(tidyverse)
   library(DT)
   library(plotly)
+  library(reactable)
 })
 
 
 # Development ----
 
 if (FALSE) {
+  shiny::runApp() + shiny::devmode()
+
   renv::init() # initiate renv if not already
   renv::dependencies() # show project dependencies
   renv::update() # update project libraries
@@ -26,6 +30,8 @@ if (FALSE) {
   renv::snapshot() # save updated lock file to project
   renv::restore() # restore versions from lockfile
 }
+
+options(shiny.fullstacktrace = FALSE)
 
 
 # Setup ------------------------------------------------------------------------
@@ -38,12 +44,78 @@ read <- function(file) {
 colValidation <- read("data/column-validation.csv")
 
 # sample data
-sampleTemplate <- read("data/sample-template.csv")
-sampleGermData <- read("data/sample-germ-data.csv")
-samplePrimingData <- read("data/sample-priming-data.csv")
-sampleAgingData <- read("data/sample-aging-data.csv")
-samplePromoterData <- read("data/sample-promoter-data.csv")
-sampleInhibitorData <- read("data/sample-inhibitor-data.csv")
+# sample_csv <- lst(
+#   template = read("data/template.csv"),
+#   hydrothermal_time = read("data/PBTM Sample Hydrothermal Time Data.csv"),
+#   thermal_time = hydrothermal_time |>
+#     filter(GermWP == 0) |>
+#     select(-GermWP),
+#   germination = thermal_time,
+#   hydrotime = hydrothermal_time |>
+#     filter(GermTemp == 20) |>
+#     select(-GermTemp),
+#   thermal_time_subpop = read(
+#     "data/PBTM Sample Thermal Time Subpopulation Data.csv"
+#   ),
+#   hydrothermal_time = read("data/PBTM Sample Hydrothermal Time Data.csv"),
+#   hydrotime = read("data/PBTM Sample Hydrotime Data.csv"),
+#   hydrothermal_priming = read("data/PBTM Sample Hydrothermal Priming Data.csv"),
+#   hydropriming = read("data/PBTM Sample Hydrothermal Priming Data.csv")
+# )
+
+sample_template <- read("data/template.csv")
+sample_data <- list(
+  germination = list(
+    title = "Sample germination data",
+    info = "This tomato dataset can be used to explore the germination model and characterize the time to different germination fractions under each of the treatment conditions.",
+    data = read("data/PBTM Sample Germination Data.csv")
+  ),
+  thermal_time = list(
+    title = "Thermal time data",
+    info = "This tomato dataset can be used to explore the thermal time model and characterize the population behavior of the seeds under different temperature regimes.",
+    data = read("data/PBTM Sample Thermal Time Data.csv")
+  ),
+  thermal_time_subpop = list(
+    title = "Thermal time data (subpopulations)",
+    info = "This dataset for thermal time analysis has two mixed subpopulations to demonstrate the use of the subpopulation solver.",
+    data = read("data/PBTM Sample Thermal Time Subpopulation Data.csv")
+  ),
+  hydrotime = list(
+    title = "Hydrotime data",
+    info = "This tomato dataset can be used to explore the hydrotime model and characterize the population behavior of the seeds under different water potential regimes.",
+    data = read("data/PBTM Sample Hydrotime Data.csv")
+  ),
+  hydrothermal_time = list(
+    title = "Hydrothermal time data",
+    info = "This dataset tracks tomato seed germination under three temperature regimes (15, 20, 25°C) and three water potential conditions (0, -0.25, -0.5 MPa). It may also be used for germination, thermal time, and hydrotime models when filtered.",
+    data = read("data/PBTM Sample Hydrothermal Time Data.csv")
+  ),
+  hydropriming = list(
+    title = "Hydropriming data",
+    info = "This dataset shows the effect of priming seeds for different amounts of time at several different water potentials. Primed seeds may germinate faster than unprimed seeds.",
+    data = read("data/PBTM Sample Hydropriming Data.csv")
+  ),
+  hydrothermal_priming = list(
+    title = "Hydrothermal priming data",
+    info = "This dataset evaluates germination speed after seeds were primed at different water potentials, temperatures, and for different priming durations.",
+    data = read("data/PBTM Sample Hydrothermal Priming Data.csv")
+  ),
+  aging = list(
+    title = "Aging data",
+    info = "Seeds of different ages may exhibit different germination responses. This dataset of lettuce seeds allows exploration of the aging model.",
+    data = read("data/PBTM Sample Aging Data.csv")
+  ),
+  promoter = list(
+    title = "Promoter data",
+    info = "Germination speeds may be increased by the application of specific hormones. This tomato dataset shows dose response to the application of gibberellin (GA).",
+    data = read("data/PBTM Sample Promoter Data.csv")
+  ),
+  inhibitor = list(
+    title = "Inhibitor data",
+    info = "Germination may be inhibited by exposure to specific chemicals. This dataset shows dose response to the application of abscisic acid (ABA).",
+    data = read("data/PBTM Sample Inhibitor Data.csv")
+  )
+)
 
 # global vars
 nCols <- nrow(colValidation)
@@ -54,6 +126,12 @@ modelNames <- colValidation |>
 
 
 # Helpers ----------------------------------------------------------------------
+
+# message and print an object to the console for testing
+echo <- function(x) {
+  message(deparse(substitute(x)), " <", paste(class(x), collapse = ", "), ">")
+  print(x)
+}
 
 #' @description checks many types of objects and determines if they're truthy
 #' @details Tests for real content, not logical truth. 0 is truthy (valid value).
@@ -73,7 +151,7 @@ truthy <- function(x) {
 
   # container types
   if (is.data.frame(x)) {
-    return(nrow(x) > 0)
+    return(nrow(x) > 0 & ncol(x) > 0)
   }
   if (!is.atomic(x)) {
     return(TRUE)
@@ -177,7 +255,7 @@ interpolateGermSpeed <- function(df, groups, fracs) {
 namedWell <- function(..., title = NULL) {
   div(
     div(class = "well-title", title),
-    div(class = "p-3 bg-light border rounded", ...)
+    div(class = "p-3 border rounded", ...)
   )
 }
 

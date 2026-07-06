@@ -18,6 +18,29 @@
 }
 
 
+/* Rescale heading sizes */
+
+h1 {
+  font-size: 1.5rem;
+}
+
+h2 {
+  font-size: 1.4rem;
+}
+
+h3 {
+  font-size: 1.3rem;
+}
+
+h4 {
+  font-size: 1.2rem;
+}
+
+h5 {
+  font-size: 1.1rem;
+}
+
+
 /* Primary layout */
 
 body {
@@ -234,4 +257,25 @@ main {
 .app-footer a:hover,
 .app-footer a:focus {
   color: #cfe6f5;
+}
+
+/* Reactable table width fix */
+.auto-width-table .rt-table {
+  table-layout: auto !important;
+  width: auto !important;
+}
+
+.auto-width-table .rt-td,
+.auto-width-table .rt-th {
+  white-space: nowrap;
+}
+
+.shiny-output-error {
+  font-weight: bold;
+  color: #c5050c;
+}
+
+.shiny-output-error:before {
+  content: "⚠";
+  margin-right: 0.25em;
 }

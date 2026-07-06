@@ -43,7 +43,7 @@ ui <- page(
       class = "header-content",
       div(
         style = "display: inline-flex; align-items: center; gap: 1rem; justify-content: space-between; width: 100%;",
-        h1("PBTM Dashboard"),
+        h1("Population-Based Threshold Models"),
         a(
           icon("github"),
           title = "Source code",

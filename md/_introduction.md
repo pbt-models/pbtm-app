@@ -1,6 +1,4 @@
-# Population-based Threshold Modeling App
-
-## Introduction to population-based threshold (PBT) models
+# Introduction to population-based threshold (PBT) models
 
 This app is an interactive and easy-to-use implementation of the functions needed to analyze data using population-based threshold (PBT) models. In general, this involves identifying a normal distribution of the thresholds of individuals in the population to respond to a specific factor. Based upon these sensitivity thresholds, factors elicit responses from the fraction of the population whose thresholds are exceeded by the factor concentration. As the factor level increases, additional individuals are recruited to respond as their thresholds are exceeded. At the same time, the response rate (speed) increases in proportion to the amount by which the factor level exceeds an individual’s threshold. This results in a family of response time courses with characteristic shapes that indicate the interaction of the factor level and the response threshold distribution on the timing (kinetics) and maximum of the response. From dose-response time courses of the population, which are common across biology, the parameters of the threshold distribution (mean and standard deviation) and the time constant (determining the kinetic response) can be derived. Using those parameters, the responses of the population to any factor concentration can be predicted or compared across treatments.
 
