@@ -6,7 +6,6 @@ server <- function(input, output, session) {
   rv <- reactiveValues(
     raw_data = tibble(),
     data = tibble(),
-    col_status = NULL,
     model_ready = list()
   )
 
@@ -40,21 +39,17 @@ server <- function(input, output, session) {
 
   # Call each of the model servers. Models with a spec run through the factory
   # (modelServer); Germination keeps its bespoke GerminationServer.
-  lapply(modelNames, function(m) {
-    dataReactive <- reactive(rv$data)
-    readyReactive <- reactive(truthy(rv$model_ready[[m]]))
-    if (m %in% names(modelSpecs)) {
-      modelServer(
-        spec = modelSpecs[[m]],
-        data = dataReactive,
-        ready = readyReactive
-      )
-    } else {
-      do.call(
-        paste0(m, "Server"),
-        list(data = dataReactive, ready = readyReactive)
-      )
-    }
+  GerminationServer(
+    data = reactive(rv$data),
+    ready = reactive(truthy(rv$model_ready$Germination))
+  )
+
+  lapply(names(modelSpecs), function(id) {
+    modelServer(
+      spec = modelSpecs[[id]],
+      data = reactive(rv$data),
+      ready = reactive(truthy(rv$model_ready[[id]]))
+    )
   })
 
   ## Modal handler ----

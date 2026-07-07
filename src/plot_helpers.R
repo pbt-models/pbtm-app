@@ -180,7 +180,6 @@ buildCdfPlot <- function(
     coord_cartesian(ylim = c(0, 1)) +
     labs(
       title = "Cumulative germination",
-      caption = "Generated with the PBTM app",
       x = "Time",
       y = "Cumulative fraction germinated (%)",
       color = cfg$colorLab,
@@ -292,7 +291,6 @@ buildRatePlot <- function(spec, df, model, interactive = FALSE) {
     ) +
     coord_cartesian(ylim = c(0, ymax)) +
     labs(
-      caption = "Generated with the PBTM app",
       x = cfg$xlab,
       y = "Germination rate",
       color = cfg$colorLab,

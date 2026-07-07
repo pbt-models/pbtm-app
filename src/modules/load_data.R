@@ -40,13 +40,18 @@ validateCol <- function(col, expectedType, minValue, maxValue) {
     info <- append(
       info,
       list(
-        paste0("Range: ", round(min(col), 2), " 🡒 ", round(max(col), 2)),
+        paste0(
+          "Range: ",
+          round(min(col, na.rm = TRUE), 2),
+          " 🡒 ",
+          round(max(col, na.rm = TRUE), 2)
+        ),
         br()
       )
     )
 
     # min check
-    if (!is.na(minValue) & min(col) < minValue) {
+    if (!is.na(minValue) & min(col, na.rm = TRUE) < minValue) {
       msg <- append(
         msg,
         list(
@@ -57,7 +62,7 @@ validateCol <- function(col, expectedType, minValue, maxValue) {
     }
 
     # max check
-    if (!is.na(maxValue) & max(col) > maxValue) {
+    if (!is.na(maxValue) & max(col, na.rm = TRUE) > maxValue) {
       msg <- append(
         msg,
         list(
@@ -212,13 +217,6 @@ loadDataServer <- function(rv) {
 
       # Reactives ----
 
-      # # data // raw data before cleaning or assigning columns ----
-      # rv$raw_data <- tibble()
-      # # rv <- reactiveValues(
-      # #   raw_data = tibble(),
-      # #   col_status = NULL
-      # # )
-
       columnNames <- reactive({
         names(rv$raw_data)
       })
@@ -230,10 +228,60 @@ loadDataServer <- function(rv) {
         )
       })
 
+      # whether any data is loaded at all - only flips on empty <-> non-empty,
+      # used to avoid rebuilding the whole validation panel on every data swap
+      hasData <- reactive({
+        nrow(rv$raw_data) > 0
+      })
+
+      # every column's current selection, read together in one place so
+      # downstream reactives never see a mix of old and new selections
+      colSelections <- reactive({
+        sapply(colValidation$InputId, function(id) {
+          val <- input[[id]]
+          if (is.null(val)) "NA" else val
+        })
+      })
+
+      # validation result for every column, derived fresh from the current
+      # data + selections in one atomic step. A selection that doesn't match
+      # any column in rv$raw_data (e.g. transiently, right after new data
+      # loads and before the column selectors have caught up) is treated as
+      # not-yet-valid rather than read as NULL and erroring
+      colValidations <- reactive({
+        raw <- rv$raw_data
+        sels <- colSelections()
+
+        lapply(seq_len(nCols), function(i) {
+          sel <- sels[[i]]
+          if (sel == "NA") {
+            list(
+              status = "warn",
+              valid = FALSE,
+              ui = span("No column specified.", style = "color: orange")
+            )
+          } else if (!(sel %in% names(raw))) {
+            list(status = "warn", valid = FALSE, ui = NULL)
+          } else {
+            validation <- validateCol(
+              raw[[sel]],
+              colValidation$Type[i],
+              colValidation$Min[i],
+              colValidation$Max[i]
+            )
+            list(
+              status = if (validation$valid) "ok" else "error",
+              valid = validation$valid,
+              ui = validation$ui
+            )
+          }
+        })
+      })
+
       cleanData <- reactive({
-        if ((nrow(rv$raw_data) > 0) & (length(rv$col_status) == nCols)) {
+        if (nrow(rv$raw_data) > 0) {
           # collect user column names
-          vars <- sapply(colValidation$InputId, function(id) input[[id]])
+          vars <- colSelections()
           names(vars) <- colValidation$Column
           vars <- vars[vars != "NA"]
 
@@ -255,9 +303,6 @@ loadDataServer <- function(rv) {
         }
       })
 
-      # |>
-      #   bindEvent(rv$col_status)
-
       ## Set clean data for models ----
       observe({
         rv$data <- if (truthy(cleanData())) {
@@ -268,8 +313,9 @@ loadDataServer <- function(rv) {
       })
 
       observe({
+        status <- sapply(colValidations(), `[[`, "valid")
         ready <- lapply(modelNames, function(m) {
-          checkModelReady(colValidation[[m]], rv$col_status)
+          checkModelReady(colValidation[[m]], status)
         })
         names(ready) <- modelNames
 
@@ -282,7 +328,7 @@ loadDataServer <- function(rv) {
 
       ## currentDataUI // Data display and validation when data loaded ----
       output$currentDataUI <- renderUI({
-        validate(need(nrow(rv$raw_data) > 0, "Please load a dataset."))
+        validate(need(hasData(), "Please load a dataset."))
 
         layout_columns(
           col_widths = 12,
@@ -324,7 +370,8 @@ loadDataServer <- function(rv) {
             )
           )
         )
-      })
+      }) |>
+        bindEvent(hasData())
 
       # Tab 1: Data format ----
 
@@ -385,7 +432,6 @@ loadDataServer <- function(rv) {
       ## Clear data button ----
       observeEvent(input$clear_data, {
         rv$raw_data <- tibble()
-        rv$col_status <- NULL
         reset("user_data") # reset file input
       })
 
@@ -408,47 +454,28 @@ loadDataServer <- function(rv) {
         })
       })
 
-      ## colValidate[i] // Validation messages for each column ----
-      lapply(1:nCols, function(i) {
-        outCol <- paste0("colValidate", i)
-        inputId <- colValidation$InputId[i]
-        expectedType <- colValidation$Type[i]
-        minValue <- colValidation$Min[i]
-        maxValue <- colValidation$Max[i]
+      ## colValidate[i] // Validation messages and CSS status for each column ----
 
-        # Create an observer to handle validation change
-        observe({
-          req(input[[inputId]])
+      # single observer keeps all valBox CSS classes in sync with
+      # colValidations(), which is always computed as a whole
+      observe({
+        validations <- colValidations()
+        for (i in seq_len(nCols)) {
           boxSel <- paste0("#", ns(paste0("valBox", i)))
           shinyjs::removeCssClass(
             selector = boxSel,
             class = "val-ok val-warn val-error"
           )
-          if (input[[inputId]] == "NA") {
-            rv$col_status[i] <- FALSE
-            shinyjs::addCssClass(selector = boxSel, class = "val-warn")
-          } else {
-            col <- rv$raw_data[[input[[inputId]]]]
-            validation <- validateCol(col, expectedType, minValue, maxValue)
-            rv$col_status[i] <- validation$valid
-            shinyjs::addCssClass(
-              selector = boxSel,
-              class = if (validation$valid) "val-ok" else "val-error"
-            )
-          }
-        })
+          shinyjs::addCssClass(
+            selector = boxSel,
+            class = paste0("val-", validations[[i]]$status)
+          )
+        }
+      })
 
-        # Set up outputs
-        output[[outCol]] <- renderUI({
-          req(input[[inputId]])
-
-          if (input[[inputId]] == "NA") {
-            span("No column specified.", style = "color: orange")
-          } else {
-            col <- rv$raw_data[[input[[inputId]]]]
-            validation <- validateCol(col, expectedType, minValue, maxValue)
-            validation$ui
-          }
+      lapply(1:nCols, function(i) {
+        output[[paste0("colValidate", i)]] <- renderUI({
+          colValidations()[[i]]$ui
         })
       })
 
@@ -474,14 +501,6 @@ loadDataServer <- function(rv) {
         filename = "PBTM Data.csv",
         content = function(file) write_csv(cleanData(), file)
       )
-
-      # Return values ----
-
-      # return(reactive(list(
-      #   data = cleanData(),
-      #   colStatus = rv$colStatus,
-      #   modelReady = modelReady()
-      # )))
     } # end
   )
 }

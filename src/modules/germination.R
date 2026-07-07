@@ -346,7 +346,6 @@ GerminationServer <- function(id = "germination", data, ready) {
             ) +
             labs(
               title = "Cumulative germination",
-              caption = "Generated with the PBTM app",
               x = "Time",
               y = "Cumulative (%)"
             ) +

@@ -445,7 +445,7 @@ modelServer <- function(id = spec$id, spec, data, ready) {
 
       ## main content
       output$content <- renderUI({
-        reqCols <- colValidation$Column[colValidation[[spec$modelCol]]]
+        reqCols <- colValidation$Column[colValidation[[spec$id]]]
         validate(need(
           ready(),
           paste(

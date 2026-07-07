@@ -4,7 +4,7 @@ The rate and percentage of germination of a seed lot can be affected by various 
 
 `theta_GA = (log[GA] – log[GA_b(g)]) * t_g`
 
-where `theta_GA` is the GA sensitivity time constant, `GA` is the GA concentration applied, `GA_b(g)` is the base GA concentration (minimum to elicit a germination response) for seed fraction `g` and `t_g` is the time to germination of fraction `g` of the seed population (Ni and Bradford, 1993; Bradford and Bello, 2022). The **Data Input Options** allow specifying whether the promoter dosages are linear or logarithmic.
+where `theta_GA` is the GA sensitivity time constant, `GA` is the GA concentration applied, `GA_b(g)` is the base GA concentration (minimum to elicit a germination response) for seed fraction `g` and `t_g` is the time to germination of fraction `g` of the seed population (Ni and Bradford, 1993; Bradford and Bello, 2022). The Data Input Options allow specifying whether the promoter dosages are linear or logarithmic.
 
 The parameters calculated are:
 

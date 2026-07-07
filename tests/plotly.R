@@ -1,6 +1,10 @@
 # Check ggplotly conversion works for a CDF and a rate plot (interactive mode).
 suppressPackageStartupMessages(source("global.R"))
 
+sampleThermData <- sample_data$thermal_time$data
+sampleHydroThermData <- sample_data$hydrothermal_time$data
+samplePrimingData <- sample_data$hydropriming$data
+
 fitSpec <- function(spec, df, maxFrac = 1, transform = identity) {
   resolved <- resolveParams(
     setNames(as.list(rep(NA, length(spec$params))), spec$paramNames),
@@ -34,8 +38,8 @@ chk(
   "ThermalTime ggplotly",
   buildCdfPlot(
     spec,
-    sampleGermData,
-    fitSpec(spec, sampleGermData),
+    sampleThermData,
+    fitSpec(spec, sampleThermData),
     1,
     identity,
     interactive = TRUE
@@ -46,8 +50,8 @@ chk(
   "HydrothermalTime ggplotly",
   buildCdfPlot(
     spec,
-    sampleGermData,
-    fitSpec(spec, sampleGermData),
+    sampleHydroThermData,
+    fitSpec(spec, sampleHydroThermData),
     1,
     identity,
     interactive = TRUE

@@ -17,6 +17,7 @@ files = [
     "/src",
     "/ui.R",
     "/www",
+    "/server.r",
 ]
 validate = true
 product_type = "connect"

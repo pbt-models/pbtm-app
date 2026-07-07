@@ -2,7 +2,7 @@
 "$schema" = "https://cdn.posit.co/publisher/schemas/posit-publishing-record-schema-v3.json"
 server_type = "connect"
 server_url = "https://connect.doit.wisc.edu"
-client_version = "2.9.4"
+client_version = "2.9.5"
 created_at = "2026-07-06T03:31:41.176Z"
 type = "r-shiny"
 configuration_name = "PBTM Dashboard v2-1VSV"
@@ -10,9 +10,9 @@ id = "56b815a8-1b4b-4d94-b834-7556c8233352"
 dashboard_url = "https://connect.doit.wisc.edu/connect/#/apps/56b815a8-1b4b-4d94-b834-7556c8233352"
 direct_url = "https://connect.doit.wisc.edu/content/56b815a8-1b4b-4d94-b834-7556c8233352/"
 logs_url = "https://connect.doit.wisc.edu/connect/#/apps/56b815a8-1b4b-4d94-b834-7556c8233352/logs"
-deployed_at = "2026-07-06T03:33:03.182Z"
-bundle_id = "5046"
-bundle_url = "https://connect.doit.wisc.edu/__api__/v1/content/56b815a8-1b4b-4d94-b834-7556c8233352/bundles/5046/download"
+deployed_at = "2026-07-07T18:47:15.190Z"
+bundle_id = "5048"
+bundle_url = "https://connect.doit.wisc.edu/__api__/v1/content/56b815a8-1b4b-4d94-b834-7556c8233352/bundles/5048/download"
 files = [
     ".posit/publish/PBTM Dashboard v2-1VSV.toml",
     ".posit/publish/deployments/deployment-6E08.toml",
@@ -30,24 +30,23 @@ files = [
     "data/column-validation.csv",
     "data/template.csv",
     "global.R",
+    "md/1-germination.md",
+    "md/10-subpopulations.md",
+    "md/2-thermal-time.md",
+    "md/3-hydrotime.md",
+    "md/4-hydrothermal-time.md",
+    "md/5-hydropriming-time.md",
+    "md/6-hydrothermal-priming-time.md",
+    "md/7-aging-time.md",
+    "md/8-promoters.md",
+    "md/9-inhibitors.md",
     "md/_introduction.md",
     "md/_references.md",
-    "md/aging-time.md",
-    "md/germination.md",
-    "md/hydropriming-time.md",
-    "md/hydrothermal-priming-time.md",
-    "md/hydrothermal-time.md",
-    "md/hydrotime.md",
-    "md/inhibitors.md",
-    "md/promoters.md",
-    "md/subpopulations.md",
-    "md/thermal_time.md",
     "renv.lock",
     "renv/.gitignore",
     "renv/activate.R",
     "renv/settings.json",
-    "server.R",
-    "src/docs.R",
+    "server.r",
     "src/fit_model.R",
     "src/fit_subpop.R",
     "src/model_specs.R",
@@ -67,6 +66,7 @@ files = [
     "www/favicons.html",
     "www/google-analytics.html",
     "www/mstile-150x150.png",
+    "www/script.js",
     "www/site.webmanifest",
     "www/style.css",
 ]
@@ -88,6 +88,7 @@ files = [
     "/src",
     "/ui.R",
     "/www",
+    "/server.r",
 ]
 validate = true
 product_type = "connect"
