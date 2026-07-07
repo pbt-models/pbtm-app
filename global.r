@@ -20,6 +20,8 @@ suppressPackageStartupMessages({
 
 # Development ----
 
+options(shiny.fullstacktrace = FALSE)
+
 if (FALSE) {
   shiny::runApp() + shiny::devmode()
 
@@ -30,8 +32,6 @@ if (FALSE) {
   renv::snapshot() # save updated lock file to project
   renv::restore() # restore versions from lockfile
 }
-
-options(shiny.fullstacktrace = FALSE)
 
 
 # Setup ------------------------------------------------------------------------
@@ -44,25 +44,6 @@ read <- function(file) {
 colValidation <- read("data/column-validation.csv")
 
 # sample data
-# sample_csv <- lst(
-#   template = read("data/template.csv"),
-#   hydrothermal_time = read("data/PBTM Sample Hydrothermal Time Data.csv"),
-#   thermal_time = hydrothermal_time |>
-#     filter(GermWP == 0) |>
-#     select(-GermWP),
-#   germination = thermal_time,
-#   hydrotime = hydrothermal_time |>
-#     filter(GermTemp == 20) |>
-#     select(-GermTemp),
-#   thermal_time_subpop = read(
-#     "data/PBTM Sample Thermal Time Subpopulation Data.csv"
-#   ),
-#   hydrothermal_time = read("data/PBTM Sample Hydrothermal Time Data.csv"),
-#   hydrotime = read("data/PBTM Sample Hydrotime Data.csv"),
-#   hydrothermal_priming = read("data/PBTM Sample Hydrothermal Priming Data.csv"),
-#   hydropriming = read("data/PBTM Sample Hydrothermal Priming Data.csv")
-# )
-
 sample_template <- read("data/template.csv")
 sample_data <- list(
   germination = list(
@@ -169,6 +150,85 @@ truthy <- function(x) {
     logical = any(x, na.rm = TRUE),
     TRUE
   )
+}
+
+# Documentation ----------------------------------------------------------------
+
+.docCache <- new.env(parent = emptyenv())
+
+#' @description read and render a markdown file to cached HTML
+#' @param path path to a .md file
+#' @returns an HTML tag (or NULL if the file is missing)
+renderMd <- function(path) {
+  if (is.null(path) || !file.exists(path)) {
+    stop("renderMd: file not found: ", path)
+  }
+
+  if (is.null(.docCache[[path]])) {
+    txt <- paste(
+      readLines(path, warn = FALSE, encoding = "UTF-8"),
+      collapse = "\n"
+    )
+    .docCache[[path]] <- shiny::markdown(txt)
+  }
+  .docCache[[path]]
+}
+
+# model docs
+md_list <- c(
+  germination = "md/1-germination.md",
+  thermal_time = "md/2-thermal-time.md",
+  hydrotime = "md/3-hydrotime.md",
+  hydrothermal_time = "md/4-hydrothermal-time.md",
+  hydropriming = "md/5-hydropriming-time.md",
+  hydrothermal_priming = "md/6-hydrothermal-priming-time.md",
+  aging = "md/7-aging-time.md",
+  promoters = "md/8-promoters.md",
+  inhibitors = "md/9-inhibitors.md",
+  subpopulations = "md/10-subpopulations.md"
+)
+
+# this should also throw if the md doesn't exist
+model_docs <- lapply(md_list, function(md) {
+  renderMd(md)
+})
+
+#' Builds the 'More information' link that pops up the modal
+#' @param md path to the markdown file with more information
+#' @param title optional title attribute for the link
+#' @returns HTML
+build_modal_link <- function(md, title = "More information") {
+  if (is.null(md)) {
+    return()
+  }
+  onclick <- sprintf(
+    "Shiny.setInputValue('show_modal', {md: '%s'}, { priority: 'event' });",
+    md
+  )
+  shiny::HTML(
+    sprintf(
+      "<b><a style='cursor:pointer' title='%s' onclick=\"%s\">More information.</a></b>",
+      title,
+      onclick
+    )
+  )
+}
+
+#' Shows a markdown file in a modal popup
+#' @param md markdown file to display
+#' @param title optional modal title
+show_modal <- function(md) {
+  html <- renderMd(md)
+  if (is.null(html)) {
+    return(NULL)
+  }
+  m <- modalDialog(
+    html,
+    footer = modalButton("Close"),
+    easyClose = TRUE,
+    size = "xl"
+  )
+  showModal(m)
 }
 
 

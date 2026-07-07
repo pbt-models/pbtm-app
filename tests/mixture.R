@@ -11,8 +11,8 @@ spec <- modelSpecs$Hydrotime
 # true mixture: two subpopulations differing in PsiB50
 trueW <- 0.6
 comp <- list(
-  list(ThetaH = 60, PsiB50 = -0.5, Sigma = 0.2),
-  list(ThetaH = 60, PsiB50 = -1.5, Sigma = 0.2)
+  list(theta_h = 60, psi_b50 = -0.5, sigma = 0.2),
+  list(theta_h = 60, psi_b50 = -1.5, sigma = 0.2)
 )
 grid <- expand.grid(
   GermWP = c(0, -0.3, -0.6, -0.9, -1.2),

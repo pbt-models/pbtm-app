@@ -10,12 +10,12 @@ In addition, PBT models have many potential additional applications across biolo
 
 Population-based threshold (PBT) models describe and predict seed germination performance under most conditions (Bradford and Bello, 2022). These models are fueled by germination timing data collected after seed imbibition of water at a range of levels of the conditions of interest. The models use a nonlinear least squares function (Bates and Watts, 1988; Bates and Chambers, 1992) for each model by comparing the raw data and respective treatments directly with the curves predicted by the selected model and minimizing the error. By simultaneously analyzing data from multiple factor levels or dosages, the approach identifies the common parameters of the population: the mean and standard deviation of the sensitivity threshold distribution and the time constant indicating the speed of the responses.
 
-## Data preparation
+## Data Preparation
 
 Analyses begin by preparing Excel files with labeled columns indicating the key features of the data, such as the temperature, water potential, hormone concentration, etc. From the Upload Data tab, you can download a template file showing the available factors as column headings. Data can be entered into the relevant columns, leaving the others blank. Proper data preparation is required to avoid issues when working with this PBTM package. Use of these data templates is not required, but if you use different column names you will have to match them to the expected names after uploading your data.
 
 Columns that specify treatment information (e.g., TrtID, GermWP) need to have the value of that treatment repeated in the row for each member of that treatment. Each row (observation) also needs to have a value for CumTime (cumulative elapsed time) and CumFraction (decimal fraction of the total seed population germinated as of that time point; ranges from 0 to 1). The treatment identification (TrtID) and treatment description (TrtDesc) columns allow specification of different treatment types or levels for user identification purposes. The factor columns are described in more detail in the table, and the types of values expected are indicated.
 
-## Upload Data
+## Getting Started
 
-Upload your own data here or select one of the sample datasets to get started. Several types of sample datasets are provided that you can click to upload, or you can use Browse to select your own file. Once a data file is uploaded, the list on the left of the screen will indicate (green check) which of the models can be applied with that data. If none are indicated, check the data file to be sure that the expected type of data is loaded in the columns.
+Upload your own data or select one of the sample datasets to get started. Several types of sample datasets are provided that you can click to upload, or you can use Browse to select your own file. Once a data file is uploaded, the model list at the top of the screen will indicate (green check) which of the models can be applied with that data. If none are indicated, check the data file to be sure that the expected type of data is loaded in the columns.

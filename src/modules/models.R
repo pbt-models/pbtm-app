@@ -116,11 +116,13 @@ singleResultsWell <- function(ns, res, held, paramNames) {
     card_body(
       renderTable(
         {
-          res %>%
-            enframe() %>%
-            filter(name %in% c(paramNames, "PseudoR2")) %>%
-            unnest(value) %>%
+          res |>
+            enframe() |>
+            filter(name %in% c(paramNames, "PseudoR2")) |>
+            unnest(value) |>
             mutate(
+              name = vapply(name, labelFor, character(1)),
+              value = as.character(signif(value, 4)),
               Hold = lapply(name, function(p) {
                 if (p %in% paramNames) {
                   HTML(sprintf(
@@ -132,16 +134,15 @@ singleResultsWell <- function(ns, res, held, paramNames) {
                   ""
                 }
               }),
-              name = vapply(name, labelFor, character(1))
-            ) %>%
-            rename(Parameter = name, Value = value)
+            ) |>
+            select(Parameter = name, Value = value, Hold)
         },
-        digits = 4,
+        # digits = 4,
         width = "100%",
         striped = FALSE,
         hover = TRUE,
         sanitize.text.function = function(x) x,
-        align = "llc"
+        align = "rlc"
       )
     )
   )
@@ -157,9 +158,11 @@ singleResultsWell <- function(ns, res, held, paramNames) {
 mixtureResultsWell <- function(spec, res, k, aicTable = NULL) {
   w <- mixtureWeights(res, k)
   comp <- purrr::map_dfr(seq_len(k), function(j) {
-    vals <- lapply(spec$paramNames, function(nm) round(res[[paste0(nm, j)]], 4))
-    tibble(Subpopulation = j) %>%
-      bind_cols(as_tibble(setNames(vals, spec$paramNames))) %>%
+    vals <- lapply(spec$paramNames, function(nm) {
+      as.character(signif(res[[paste0(nm, j)]], 4))
+    })
+    tibble(Subpopulation = j) |>
+      bind_cols(as_tibble(setNames(vals, spec$paramNames))) |>
       mutate(Weight = round(w[j], 3))
   })
 
@@ -167,7 +170,7 @@ mixtureResultsWell <- function(spec, res, k, aicTable = NULL) {
     card(
       card_header(sprintf("Subpopulation coefficients (k = %d)", k)),
       card_body(
-        renderTable(comp, digits = 4, width = "100%", hover = TRUE),
+        renderTable(comp, width = "100%", hover = TRUE),
         div(
           class = "mt-2 text-muted",
           sprintf("Pseudo-R² = %.3f    AIC = %.1f", res$PseudoR2, res$AIC)
@@ -179,16 +182,22 @@ mixtureResultsWell <- function(spec, res, k, aicTable = NULL) {
         card_header("Subpopulation count comparison (lower AIC is better)"),
         card_body(
           renderTable(
-            aicTable |>
-              mutate(
-                `Subpops (k)` = k,
-                Parameters = npar,
-                `Pseudo-R²` = round(PseudoR2, 3),
-                AIC = round(AIC, 1),
-                `ΔAIC` = round(dAIC, 1),
-                .keep = "none"
-              ),
-            digits = 2,
+            {
+              aicTable |>
+                mutate(
+                  AIC = signif(AIC, 4),
+                  dAIC = signif(dAIC, 4),
+                  PseudoR2 = signif(PseudoR2, 3)
+                ) |>
+                select(
+                  `Subpops (k)` = k,
+                  Parameters = npar,
+                  `Pseudo-R²` = PseudoR2,
+                  AIC,
+                  `ΔAIC` = dAIC
+                ) |>
+                mutate(across(where(is.numeric), as.character))
+            },
             width = "100%",
             hover = TRUE
           )
@@ -209,14 +218,20 @@ setParamsUI <- function(ns, params) {
       )
     ),
     div(
-      class = "flex-row",
+      class = "form-grid",
       lapply(params, function(p) {
-        numericInput(
-          inputId = ns(paste0(p, "-set")),
-          label = p,
-          value = NA,
-          step = .1,
-          width = "30%"
+        tagList(
+          tags$label(
+            p,
+            `for` = ns(p)
+          ),
+          numericInput(
+            inputId = ns(paste0(p, "-set")),
+            label = NULL,
+            value = NA,
+            step = 0.1,
+            width = "100%"
+          )
         )
       })
     )
@@ -232,13 +247,9 @@ modelUI <- function(spec) {
   ns <- NS(spec$id)
   layout_columns(
     col_widths = 12,
-    # tabHeader(
-    #   title = paste(spec$label, "analysis"),
-    #   subtitle = spec$tabInfo,
-    #   doc = spec$doc,
-    #   doc_label = paste("About the", tolower(spec$label), "model")
-    # ),
-    renderMd(spec$doc),
+    div(
+      spec$doc
+    ),
     uiOutput(ns("content"))
   )
 }

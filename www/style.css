@@ -24,6 +24,10 @@ h1 {
   font-size: 1.5rem;
 }
 
+#about h1 {
+  border-bottom: 4px solid var(--bg-page);
+}
+
 h2 {
   font-size: 1.4rem;
 }
@@ -278,4 +282,29 @@ main {
 .shiny-output-error:before {
   content: "⚠";
   margin-right: 0.25em;
+}
+
+/* grid layout for forms with labels and inputs inline */
+
+.form-grid .form-group {
+  margin-bottom: 0;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem 1.5rem;
+  max-width: 400px;
+}
+
+.form-grid label {
+  align-self: center;
+  font-weight: 500;
+}
+
+.form-grid input[type="number"] {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
 }
