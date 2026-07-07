@@ -5,6 +5,7 @@
 
 # Dependencies ----
 
+rm(list = ls())
 suppressPackageStartupMessages({
   library(shiny)
   library(shinyjs)
@@ -13,12 +14,17 @@ suppressPackageStartupMessages({
   library(tidyverse)
   library(DT)
   library(plotly)
+  library(reactable)
 })
 
 
 # Development ----
 
+options(shiny.fullstacktrace = FALSE)
+
 if (FALSE) {
+  shiny::runApp() + shiny::devmode()
+
   renv::init() # initiate renv if not already
   renv::dependencies() # show project dependencies
   renv::update() # update project libraries
@@ -38,12 +44,59 @@ read <- function(file) {
 colValidation <- read("data/column-validation.csv")
 
 # sample data
-sampleTemplate <- read("data/sample-template.csv")
-sampleGermData <- read("data/sample-germ-data.csv")
-samplePrimingData <- read("data/sample-priming-data.csv")
-sampleAgingData <- read("data/sample-aging-data.csv")
-samplePromoterData <- read("data/sample-promoter-data.csv")
-sampleInhibitorData <- read("data/sample-inhibitor-data.csv")
+sample_template <- read("data/template.csv")
+sample_data <- list(
+  germination = list(
+    title = "Sample germination data",
+    info = "This tomato dataset can be used to explore the germination model and characterize the time to different germination fractions under each of the treatment conditions.",
+    data = read("data/PBTM Sample Germination Data.csv")
+  ),
+  thermal_time = list(
+    title = "Thermal time data",
+    info = "This tomato dataset can be used to explore the thermal time model and characterize the population behavior of the seeds under different temperature regimes.",
+    data = read("data/PBTM Sample Thermal Time Data.csv")
+  ),
+  thermal_time_subpop = list(
+    title = "Thermal time data (subpopulations)",
+    info = "This dataset for thermal time analysis has two mixed subpopulations to demonstrate the use of the subpopulation solver.",
+    data = read("data/PBTM Sample Thermal Time Subpopulation Data.csv")
+  ),
+  hydrotime = list(
+    title = "Hydrotime data",
+    info = "This tomato dataset can be used to explore the hydrotime model and characterize the population behavior of the seeds under different water potential regimes.",
+    data = read("data/PBTM Sample Hydrotime Data.csv")
+  ),
+  hydrothermal_time = list(
+    title = "Hydrothermal time data",
+    info = "This dataset tracks tomato seed germination under three temperature regimes (15, 20, 25°C) and three water potential conditions (0, -0.25, -0.5 MPa). It may also be used for germination, thermal time, and hydrotime models when filtered.",
+    data = read("data/PBTM Sample Hydrothermal Time Data.csv")
+  ),
+  hydropriming = list(
+    title = "Hydropriming data",
+    info = "This dataset shows the effect of priming seeds for different amounts of time at several different water potentials. Primed seeds may germinate faster than unprimed seeds.",
+    data = read("data/PBTM Sample Hydropriming Data.csv")
+  ),
+  hydrothermal_priming = list(
+    title = "Hydrothermal priming data",
+    info = "This dataset evaluates germination speed after seeds were primed at different water potentials, temperatures, and for different priming durations.",
+    data = read("data/PBTM Sample Hydrothermal Priming Data.csv")
+  ),
+  aging = list(
+    title = "Aging data",
+    info = "Seeds of different ages may exhibit different germination responses. This dataset of lettuce seeds allows exploration of the aging model.",
+    data = read("data/PBTM Sample Aging Data.csv")
+  ),
+  promoter = list(
+    title = "Promoter data",
+    info = "Germination speeds may be increased by the application of specific hormones. This tomato dataset shows dose response to the application of gibberellin (GA).",
+    data = read("data/PBTM Sample Promoter Data.csv")
+  ),
+  inhibitor = list(
+    title = "Inhibitor data",
+    info = "Germination may be inhibited by exposure to specific chemicals. This dataset shows dose response to the application of abscisic acid (ABA).",
+    data = read("data/PBTM Sample Inhibitor Data.csv")
+  )
+)
 
 # global vars
 nCols <- nrow(colValidation)
@@ -54,6 +107,12 @@ modelNames <- colValidation |>
 
 
 # Helpers ----------------------------------------------------------------------
+
+# message and print an object to the console for testing
+echo <- function(x) {
+  message(deparse(substitute(x)), " <", paste(class(x), collapse = ", "), ">")
+  print(x)
+}
 
 #' @description checks many types of objects and determines if they're truthy
 #' @details Tests for real content, not logical truth. 0 is truthy (valid value).
@@ -73,7 +132,7 @@ truthy <- function(x) {
 
   # container types
   if (is.data.frame(x)) {
-    return(nrow(x) > 0)
+    return(nrow(x) > 0 & ncol(x) > 0)
   }
   if (!is.atomic(x)) {
     return(TRUE)
@@ -91,6 +150,85 @@ truthy <- function(x) {
     logical = any(x, na.rm = TRUE),
     TRUE
   )
+}
+
+# Documentation ----------------------------------------------------------------
+
+.docCache <- new.env(parent = emptyenv())
+
+#' @description read and render a markdown file to cached HTML
+#' @param path path to a .md file
+#' @returns an HTML tag (or NULL if the file is missing)
+renderMd <- function(path) {
+  if (is.null(path) || !file.exists(path)) {
+    stop("renderMd: file not found: ", path)
+  }
+
+  if (is.null(.docCache[[path]])) {
+    txt <- paste(
+      readLines(path, warn = FALSE, encoding = "UTF-8"),
+      collapse = "\n"
+    )
+    .docCache[[path]] <- shiny::markdown(txt)
+  }
+  .docCache[[path]]
+}
+
+# model docs
+md_list <- c(
+  germination = "md/1-germination.md",
+  thermal_time = "md/2-thermal-time.md",
+  hydrotime = "md/3-hydrotime.md",
+  hydrothermal_time = "md/4-hydrothermal-time.md",
+  hydropriming = "md/5-hydropriming-time.md",
+  hydrothermal_priming = "md/6-hydrothermal-priming-time.md",
+  aging = "md/7-aging-time.md",
+  promoters = "md/8-promoters.md",
+  inhibitors = "md/9-inhibitors.md",
+  subpopulations = "md/10-subpopulations.md"
+)
+
+# this should also throw if the md doesn't exist
+model_docs <- lapply(md_list, function(md) {
+  renderMd(md)
+})
+
+#' Builds the 'More information' link that pops up the modal
+#' @param md path to the markdown file with more information
+#' @param title optional title attribute for the link
+#' @returns HTML
+build_modal_link <- function(md, title = "More information") {
+  if (is.null(md)) {
+    return()
+  }
+  onclick <- sprintf(
+    "Shiny.setInputValue('show_modal', {md: '%s'}, { priority: 'event' });",
+    md
+  )
+  shiny::HTML(
+    sprintf(
+      "<b><a style='cursor:pointer' title='%s' onclick=\"%s\">More information.</a></b>",
+      title,
+      onclick
+    )
+  )
+}
+
+#' Shows a markdown file in a modal popup
+#' @param md markdown file to display
+#' @param title optional modal title
+show_modal <- function(md) {
+  html <- renderMd(md)
+  if (is.null(html)) {
+    return(NULL)
+  }
+  m <- modalDialog(
+    html,
+    footer = modalButton("Close"),
+    easyClose = TRUE,
+    size = "xl"
+  )
+  showModal(m)
 }
 
 
@@ -177,7 +315,7 @@ interpolateGermSpeed <- function(df, groups, fracs) {
 namedWell <- function(..., title = NULL) {
   div(
     div(class = "well-title", title),
-    div(class = "p-3 bg-light border rounded", ...)
+    div(class = "p-3 border rounded", ...)
   )
 }
 

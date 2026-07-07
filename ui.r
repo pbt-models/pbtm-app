@@ -1,6 +1,6 @@
 # ---- UI ---- #
 
-# App Theme --------------------------------------------------------------------
+# App theme
 system_font_stack <- "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
 app_theme <- bslib::bs_theme(
   version = 5,
@@ -33,6 +33,7 @@ ui <- page(
     includeHTML(("www/google-analytics.html")),
     includeHTML(("www/favicons.html")),
     includeCSS("www/style.css"),
+    includeScript("www/script.js"),
     useShinyjs(),
   ),
 
@@ -43,7 +44,7 @@ ui <- page(
       class = "header-content",
       div(
         style = "display: inline-flex; align-items: center; gap: 1rem; justify-content: space-between; width: 100%;",
-        h1("PBTM Dashboard"),
+        h1("Population-Based Threshold Models"),
         a(
           icon("github"),
           title = "Source code",
@@ -61,20 +62,18 @@ ui <- page(
       c(
         list(
           id = "mainNav",
+
           nav_panel(
             "About",
             div(
+              id = "about",
               renderMd("md/_introduction.md"),
-              tags$hr(),
-              lapply(modelSpecs, function(m) {
-                tagList(
-                  renderMd(m$doc),
-                  tags$hr(),
-                )
-              }),
+              h1("Models Descriptions"),
+              lapply(md_list, function(md) renderMd(md)),
               renderMd("md/_references.md")
             )
           ),
+
           nav_panel(
             title = tagList(
               span(
