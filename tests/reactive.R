@@ -12,6 +12,10 @@ check <- function(label, cond) {
   if (!isTRUE(cond)) ok <<- FALSE
 }
 
+sampleGermData <- sample_data$germination$data
+samplePrimingData <- sample_data$hydropriming$data
+sampleAgingData <- sample_data$aging$data
+
 cat("== ThermalTime (cdf) reactive flow ==\n")
 testServer(
   modelServer,
@@ -34,15 +38,15 @@ testServer(
     check("dataSummary renders", grepl("data points", output$dataSummary))
 
     # pin Tb via the hold checkbox -> setParams updated, fit still succeeds
-    tbFit <- rv$lastGoodModel$Tb
-    session$setInputs(`Tb-set` = 5)
+    tbFit <- rv$lastGoodModel$t_b
+    session$setInputs(`t_b-set` = 5)
     check(
       "setParams captured",
-      isTRUE(rv$heldParams$Tb) && rv$setParams$Tb == 5
+      isTRUE(rv$heldParams$t_b) && rv$setParams$t_b == 5
     )
     check(
       "fit with pinned Tb returns 5",
-      isTRUE(all.equal(modelResults()$Tb, 5))
+      isTRUE(all.equal(modelResults()$t_b, 5))
     )
 
     # restricting the fraction window keeps fewer rows
@@ -53,7 +57,7 @@ testServer(
     )
 
     # subpopulation mixture mode
-    session$setInputs(cumFracRange = c(0, 100), `Tb-set` = NA, nSubpop = "2")
+    session$setInputs(cumFracRange = c(0, 100), `t_b-set` = NA, nSubpop = "2")
     r2 <- modelResults()
     check("k=2 mixture fits", is.list(r2) && identical(r2$k, 2L))
     check(

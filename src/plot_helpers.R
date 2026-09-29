@@ -28,7 +28,7 @@ addFracToPlot <- function(maxFrac) {
 #' @param `y` initial max y value to anchor the text
 #' @returns updated ggplot object
 addParamsToPlot <- function(gg, params, y) {
-  lineheight = y / 25
+  lineheight <- y / 25
   y <- y - lineheight
 
   gg <- gg +
@@ -180,7 +180,6 @@ buildCdfPlot <- function(
     coord_cartesian(ylim = c(0, 1)) +
     labs(
       title = "Cumulative germination",
-      caption = "Generated with the PBTM app",
       x = "Time",
       y = "Cumulative fraction germinated (%)",
       color = cfg$colorLab,
@@ -224,7 +223,12 @@ buildCdfPlot <- function(
     }
     if (k > 1) {
       plt <- plt +
-        labs(title = sprintf("%s (%d subpopulations)", cfg$fitTitle, k))
+        labs(
+          title = str_wrap(
+            sprintf("%s (%d subpopulations)", cfg$fitTitle, k),
+            width = 60
+          )
+        )
       # mixture has per-component params; show R^2 only (full details in the table)
       if (!interactive) {
         plt <- addParamsToPlot(
@@ -234,7 +238,7 @@ buildCdfPlot <- function(
         )
       }
     } else {
-      plt <- plt + labs(title = cfg$fitTitle)
+      plt <- plt + labs(title = str_wrap(cfg$fitTitle, width = 60))
       if (!interactive) {
         plt <- addParamsToPlot(plt, spec$annotate(model, transform), 1)
       }
@@ -287,7 +291,6 @@ buildRatePlot <- function(spec, df, model, interactive = FALSE) {
     ) +
     coord_cartesian(ylim = c(0, ymax)) +
     labs(
-      caption = "Generated with the PBTM app",
       x = cfg$xlab,
       y = "Germination rate",
       color = cfg$colorLab,

@@ -4,9 +4,9 @@ server <- function(input, output, session) {
   # Values ----
 
   rv <- reactiveValues(
+    raw_data = tibble(),
     data = tibble(),
-    colStatus = NULL,
-    modelReady = list()
+    model_ready = list()
   )
 
   # Outputs ----
@@ -24,7 +24,7 @@ server <- function(input, output, session) {
   ## Badges for model tabs ----
   lapply(modelNames, function(m) {
     output[[paste0("badge_", m)]] <- renderUI({
-      ready <- truthy(rv$modelReady[[m]])
+      ready <- truthy(rv$model_ready[[m]])
       if (ready) {
         span(class = "badge bg-success", icon("check"))
       } else {
@@ -33,47 +33,23 @@ server <- function(input, output, session) {
     })
   })
 
-  ## Sidebar navigation ----
-  lapply(
-    c("loadData", modelNames),
-    function(m) {
-      observeEvent(input[[paste0("nav_", m, "Tab")]], {
-        nav_select("mainNav", paste0("nav_", m, "Tab"))
-      })
-    }
-  )
-
   # Module Servers ----
 
-  # IntroServer()
-
-  # capture return values from the load data server
-  loadDataReturns <- loadDataServer()
-
-  # save return values
-  observe({
-    rv$data <- loadDataReturns()$data
-    rv$colStatus <- loadDataReturns()$colStatus
-    rv$modelReady <- loadDataReturns()$modelReady
-  })
+  loadDataServer(rv)
 
   # Call each of the model servers. Models with a spec run through the factory
   # (modelServer); Germination keeps its bespoke GerminationServer.
-  lapply(modelNames, function(m) {
-    dataReactive <- reactive(rv$data)
-    readyReactive <- reactive(truthy(rv$modelReady[[m]]))
-    if (m %in% names(modelSpecs)) {
-      modelServer(
-        spec = modelSpecs[[m]],
-        data = dataReactive,
-        ready = readyReactive
-      )
-    } else {
-      do.call(
-        paste0(m, "Server"),
-        list(data = dataReactive, ready = readyReactive)
-      )
-    }
+  GerminationServer(
+    data = reactive(rv$data),
+    ready = reactive(truthy(rv$model_ready$Germination))
+  )
+
+  lapply(names(modelSpecs), function(id) {
+    modelServer(
+      spec = modelSpecs[[id]],
+      data = reactive(rv$data),
+      ready = reactive(truthy(rv$model_ready[[id]]))
+    )
   })
 
   ## Modal handler ----

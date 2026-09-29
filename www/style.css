@@ -18,6 +18,33 @@
 }
 
 
+/* Rescale heading sizes */
+
+h1 {
+  font-size: 1.5rem;
+}
+
+#about h1 {
+  border-bottom: 4px solid var(--bg-page);
+}
+
+h2 {
+  font-size: 1.4rem;
+}
+
+h3 {
+  font-size: 1.3rem;
+}
+
+h4 {
+  font-size: 1.2rem;
+}
+
+h5 {
+  font-size: 1.1rem;
+}
+
+
 /* Primary layout */
 
 body {
@@ -234,4 +261,50 @@ main {
 .app-footer a:hover,
 .app-footer a:focus {
   color: #cfe6f5;
+}
+
+/* Reactable table width fix */
+.auto-width-table .rt-table {
+  table-layout: auto !important;
+  width: auto !important;
+}
+
+.auto-width-table .rt-td,
+.auto-width-table .rt-th {
+  white-space: nowrap;
+}
+
+.shiny-output-error {
+  font-weight: bold;
+  color: #c5050c;
+}
+
+.shiny-output-error:before {
+  content: "⚠";
+  margin-right: 0.25em;
+}
+
+/* grid layout for forms with labels and inputs inline */
+
+.form-grid .form-group {
+  margin-bottom: 0;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem 1.5rem;
+  max-width: 400px;
+}
+
+.form-grid label {
+  align-self: center;
+  font-weight: 500;
+}
+
+.form-grid input[type="number"] {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.375rem;
 }

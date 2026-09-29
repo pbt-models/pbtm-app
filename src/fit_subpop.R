@@ -93,7 +93,11 @@ attachFitStats <- function(res, spec, data, k, maxFrac, transform, npar) {
 mixtureStart <- function(spec, ranges, k, base, seed) {
   set.seed(1000 + seed)
   lower <- start <- upper <- list()
-  clamp <- function(x, nm) min(max(x, ranges[[nm]][1]), ranges[[nm]][3])
+  clamp <- function(x, nm) {
+    suppressWarnings(
+      min(max(x, ranges[[nm]][1]), ranges[[nm]][3])
+    )
+  }
 
   for (nm in names(ranges)) {
     rng <- ranges[[nm]]
@@ -205,7 +209,7 @@ fitMixture <- function(
     }
   }
   if (is.null(best)) {
-    "Mixture model failed to converge; try fewer subpopulations."
+    "Mixture model failed to converge; try fewer subpopulations"
   } else {
     best
   }
@@ -245,8 +249,8 @@ detectSubpops <- function(
     npar = vapply(ok, function(r) r$npar, numeric(1)),
     PseudoR2 = vapply(ok, function(r) r$PseudoR2, numeric(1)),
     AIC = vapply(ok, function(r) r$AIC, numeric(1))
-  ) %>%
-    arrange(k) %>%
+  ) |>
+    arrange(k) |>
     mutate(dAIC = AIC - min(AIC))
 
   bestK <- tbl$k[which.min(tbl$AIC)]

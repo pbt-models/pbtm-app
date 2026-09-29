@@ -6,7 +6,7 @@
 trtSelectUI <- function(ns, trtCols, data) {
   trtColChoices <- list()
   for (col in trtCols) {
-    trtColChoices[[col]] = sort(unique(data()[[col]]))
+    trtColChoices[[col]] <- sort(unique(data()[[col]]))
   }
 
   trtSelectServer(trtColChoices)
