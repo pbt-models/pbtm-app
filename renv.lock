@@ -2689,6 +2689,51 @@
       "Maintainer": "Aron Atkins <aron@posit.co>",
       "Repository": "CRAN"
     },
+    "pbtm": {
+      "Package": "pbtm",
+      "Version": "0.3.0",
+      "Source": "GitHub",
+      "Type": "Package",
+      "Title": "Population-Based Threshold Models of Seed Germination",
+      "Authors@R": "c( person(\"Pedro\", \"Bello\", email = \"pedrobello@gmail.com\", role = \"cre\"), person(\"Ben\", \"Bradford\", email = \"bradfordium@gmail.com\", role = \"aut\"))",
+      "Description": "Fits population-based threshold models (PBTMs) to seed germination time courses. Supports thermal time, hydrotime, hydrothermal time, hydropriming, hydrothermal priming, aging, promoter and inhibitor models, optional mixtures of seed subpopulations, germination speed calculations, and plots of the fitted models on linear or linearized (log time, probit fraction) scales.",
+      "License": "MIT + file LICENSE",
+      "URL": "https://github.com/pbt-models/pbtm",
+      "BugReports": "https://github.com/pbt-models/pbtm/issues",
+      "Encoding": "UTF-8",
+      "Roxygen": "list(markdown = TRUE)",
+      "Depends": [
+        "R (>= 4.1.0)"
+      ],
+      "Imports": [
+        "cli",
+        "dplyr (>= 1.1.0)",
+        "ggplot2 (>= 3.5.0)",
+        "rlang",
+        "scales (>= 1.3.0)",
+        "stats",
+        "tibble",
+        "tidyr"
+      ],
+      "Suggests": [
+        "callr",
+        "knitr",
+        "rmarkdown",
+        "testthat (>= 3.0.0)"
+      ],
+      "VignetteBuilder": "knitr",
+      "Config/testthat/edition": "3",
+      "LazyData": "true",
+      "Config/roxygen2/version": "8.1.0",
+      "Author": "Pedro Bello [cre], Ben Bradford [aut]",
+      "Maintainer": "Pedro Bello <pedrobello@gmail.com>",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "pbt-models",
+      "RemoteRepo": "pbtm",
+      "RemoteRef": "feature/v0.3.0",
+      "RemoteSha": "21c59e841bba91e9f1f93012aa1b6e17dded93c2"
+    },
     "pillar": {
       "Package": "pillar",
       "Version": "1.11.1",
