@@ -21,7 +21,7 @@ speedTable <- function(df, groups, basis = 50) {
   df |>
     addFracDiff(groups) |>
     interpolateGermSpeed(groups, basis) |>
-    dplyr::mutate(GR = round(1 / Time, 6))
+    dplyr::mutate(GR = 1 / Time)
 }
 ok <- TRUE
 chk <- function(lbl, p) {

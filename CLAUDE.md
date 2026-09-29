@@ -36,7 +36,7 @@ There is no linter configured. There is a headless test suite in `tests/` (see t
 
 **Model families** (`spec$family`):
 - `"cdf"` — thermal/hydro/hydrothermal time, aging, promoter, inhibitor. Fit `CumFraction ~ maxFrac * pnorm(z)` directly; plot cumulative germination vs. time with one fitted curve per factor level. Promoter/inhibitor add a log/none dosage transform; aging/inhibitor use `lower.tail = FALSE`.
-- `"rate"` — hydropriming, hydrothermal priming. First reduce to a germination-rate table (`addFracDiff` + `interpolateGermSpeed`), then fit `GR ~ linear(theta)`; plot GR vs. theta with an abline.
+- `"rate"` — hydropriming, hydrothermal priming. First reduce to a germination-rate table (`addFracDiff` + `interpolateGermSpeed`, which pools curves via `rescaleCumFrac` — the same helper the Germination tab's "rescale" option and speed table use; all in `global.R`), then fit `GR ~ linear(theta)`; plot GR vs. theta with an abline.
 
 **Single source of truth:** each spec's `predict(data, p, maxFrac, transform)` is reused by the nls fit, the fitted-curve overlay (`buildCdfCurveData`), the pseudo-R², and the subpopulation mixture. No formula is written more than once.
 
@@ -54,11 +54,15 @@ There is no linter configured. There is a headless test suite in `tests/` (see t
 
 **Data flow:** `loadDataServer()` (`src/modules/load_data.R`) returns a reactive list with `data`, `colStatus`, and `modelReady`. These are stored in a top-level `reactiveValues` in `server.R` and passed to each model server as `data` and `ready` reactives.
 
-**Tests** (`tests/`, run with `Rscript`): `equivalence.R` (generic fit reproduces the original literal nls formulas on every sample dataset), `runtime.R` (all 8 plots build via `ggplot_build`), `plotly.R` (all 8 plots also build via `ggplotly()`), `mixture.R` (subpopulation mixture fitting/AIC comparison), `reactive.R` (factory reactive flow via `testServer`). No browser needed.
+**Tests** (`tests/`, run with `Rscript`): `runtime.R` (all 8 models fit on their sample dataset and their plots build via `ggplot_build`; rate plots must draw the fitted line), `plotly.R` (CDF and rate plots also build via `ggplotly()`), `mixture.R` (subpopulation mixture fitting/AIC comparison), `reactive.R` (factory reactive flow via `testServer`). No browser needed. `.dev/equivalence.R` is a retired one-off from the factory refactor (it compares against pre-refactor parameter names and no longer runs); regression tests of the fitted estimates now live in the `pbtm` package (`tests/testthat/test-fit-reference.R`).
+
+**Relationship to the `pbtm` package:** the model-fitting core (`src/model_specs.R` math, `src/fit_model.R`, `src/fit_subpop.R`, the germination-speed helpers) has been ported to the `pbtm` R package (`../pbtm-package`, v0.3.0), which is intended to replace these files: the app will call `pbtm::fit_pbtm()` etc. and keep only UI config (labels, plot styling, docs) in its specs. Until then, keep the two in step — parameter names, default bounds, and formulas should match `pbtm::pbtm_models()`.
 
 ## Key Conventions
 
 - **Indentation:** 2 spaces (set in `.Rproj`)
+- **Model parameter names:** lowercase snake_case `symbol_subscript`, shared with the `pbtm` package: `t_b`, `theta_t50`, `sigma` (thermal time); `theta_h`, `psi_b50` (hydrotime); `theta_ht`, `t_b`, `psi_b50` (hydrothermal time); `psi_min`, `t_min`, `gr_i`, `slope` (priming); `theta_a`, `p_max50` (aging); `theta_p`, `p_b50` (promoter); `theta_i`, `i_b50` (inhibitor). Code that reads results (plots, annotations, tables) must use these exact names — a stale name returns `NULL` silently (this once hid the priming fit line).
+- **No rounding of estimates:** results are kept at full precision; round only for display (`signif()` in the results tables).
 - **UI wrappers:** `panelCard()` (in `global.R`) is a quiet `card()`/`card_header()`/`card_body()` wrapper used for top-level output groups; it replaced `primaryBox()` (retired — no call sites remain). `controlSection()` is a flat labeled block for grouping sidebar controls. `tabHeader()` renders a tab's title + subtitle + optional "About" modal link. `namedWell()` creates titled well panels using `div(class = "p-3 bg-light border rounded")` and remains in use for the model results wells.
 - **Badges:** Rendered via `renderUI` returning `span(class = "badge bg-{success|warning|danger}")`.
 - **Global helpers:** `truthy()` for content-aware truthiness checks, `parseSpeeds()` for germination speed input parsing, `getColChoices()` for labeled factor levels.

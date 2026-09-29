@@ -8,13 +8,14 @@
 #'   point estimates, and summary.nls() computes standard errors from the Hessian,
 #'   which fails with a "zero pivot" error for mixture models whose Hessian is
 #'   singular even when the fit itself converged. coef() returns the same
-#'   estimates for ordinary single fits.
+#'   estimates for ordinary single fits. Estimates are not rounded here (the
+#'   results table formats them for display): rounding to fixed decimal places
+#'   left small parameters such as the priming `slope` (~1e-5) with only one
+#'   or two significant digits.
 #' @param model the nls model
 #' @returns a named list
 getModelCoefs <- function(model) {
-  coef(model) |>
-    round(6) |>
-    as.list()
+  as.list(coef(model))
 }
 
 #' @description resolve user-set params + range defaults into nls bounds

@@ -342,7 +342,7 @@ modelServer <- function(id = spec$id, spec, data, ready) {
           spec$groups,
           input$germSpeedBasis
         ) %>%
-          mutate(GR = round(1 / Time, 6))
+          mutate(GR = 1 / Time)
       })
 
       ## data passed to the fit

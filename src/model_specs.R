@@ -83,7 +83,9 @@ modelSpecs <- list(
     params = list(
       t_b = c(0, 6, 20),
       theta_t50 = c(3, 1000, 5e19),
-      sigma = c(0.0005, 1, 35)
+      # sigma is on the log10 scale, where typical values are ~0.05-0.2; a
+      # start of 1 can stall nls at a false convergence far from the optimum
+      sigma = c(0.0005, 0.1, 35)
     ),
     predict = function(data, p, maxFrac = 1, transform = identity) {
       maxFrac *
@@ -161,7 +163,7 @@ modelSpecs <- list(
     doc = model_docs$hydrothermal_time,
     params = list(
       theta_ht = c(1, 800, 5000),
-      tb = c(0, 1, 15),
+      t_b = c(0, 1, 15),
       psi_b50 = c(-5, -1, 0),
       sigma = c(.0001, .4, 10)
     ),
@@ -169,7 +171,7 @@ modelSpecs <- list(
       maxFrac *
         pnorm(
           q = data$GermWP -
-            (p$theta_ht / ((data$GermTemp - p$tb) * data$CumTime)),
+            (p$theta_ht / ((data$GermTemp - p$t_b) * data$CumTime)),
           mean = p$psi_b50,
           sd = p$sigma
         )
@@ -177,7 +179,7 @@ modelSpecs <- list(
     annotate = function(res, transform = identity) {
       list(
         paste0("~~theta[HT]==", signif(res$theta_ht, 4)),
-        paste0("~~T[b]==", signif(res$tb, 4)),
+        paste0("~~T[b]==", signif(res$t_b, 4)),
         paste0("~~psi[b][50]==", signif(res$psi_b50, 4)),
         paste0("~~sigma==", signif(res$sigma, 4)),
         paste0("~~R^2==", signif(res$PseudoR2, 3))
@@ -208,17 +210,17 @@ modelSpecs <- list(
     doc = model_docs$hydropriming,
     params = list(
       psi_min = c(-10, -1, -0.5),
-      GR_i = c(1e-8, 0.001, 0.1),
+      gr_i = c(1e-8, 0.001, 0.1),
       slope = c(1e-8, 0.1, 1)
     ),
     predict = function(data, p, maxFrac = 1, transform = identity) {
       theta <- (data$PrimingWP - p$psi_min) * data$PrimingDuration
-      p$GR_i + theta * p$slope
+      p$gr_i + theta * p$slope
     },
     annotate = function(res, transform = identity) {
       list(
         paste0("~~psi[min](50)==", signif(res$psi_min, 4)),
-        paste0("~~GR[i]==", signif(res$GR_i, 4)),
+        paste0("~~GR[i]==", signif(res$gr_i, 4)),
         paste0("~~R^2==", signif(res$PseudoR2, 3))
       )
     },
@@ -253,20 +255,20 @@ modelSpecs <- list(
     params = list(
       t_min = c(0.5, 12, 20),
       psi_min = c(-10, -1, -0.5),
-      GR_i = c(1e-8, 0.001, 0.1),
+      gr_i = c(1e-8, 0.001, 0.1),
       slope = c(1e-8, 0.1, 1)
     ),
     predict = function(data, p, maxFrac = 1, transform = identity) {
       theta <- (data$PrimingWP - p$psi_min) *
         (data$PrimingTemp - p$t_min) *
         data$PrimingDuration
-      p$GR_i + theta * p$slope
+      p$gr_i + theta * p$slope
     },
     annotate = function(res, transform = identity) {
       list(
         paste0("~~t[min]==", signif(res$t_min, 4)),
         paste0("~~psi[min](50)==", signif(res$psi_min, 4)),
-        paste0("~~GR[i]==", signif(res$GR_i, 4)),
+        paste0("~~GR[i]==", signif(res$gr_i, 4)),
         paste0("~~R^2==", signif(res$PseudoR2, 3))
       )
     },
@@ -377,27 +379,27 @@ modelSpecs <- list(
     factorLabels = c(GermInhibitorDosage = "Included inhibitor dosages:"),
     transformCol = "GermInhibitorDosage",
     subpop = TRUE,
-    subpopParam = "I_b50",
+    subpopParam = "i_b50",
     doc = model_docs$inhibitors,
     params = list(
-      theta_I = c(1, 100, 1000),
-      I_b50 = c(0.05, 10, 1000),
+      theta_i = c(1, 100, 1000),
+      i_b50 = c(0.05, 10, 1000),
       sigma = c(.001, 3, 10)
     ),
     predict = function(data, p, maxFrac = 1, transform = identity) {
       maxFrac *
         pnorm(
-          q = transform(data$GermInhibitorDosage) + p$theta_I / data$CumTime,
-          mean = p$I_b50,
+          q = transform(data$GermInhibitorDosage) + p$theta_i / data$CumTime,
+          mean = p$i_b50,
           sd = p$sigma,
           lower.tail = FALSE
         )
     },
     annotate = function(res, transform = identity) {
-      I_b50 <- if (identical(transform, log10)) 10^res$I_b50 else res$I_b50
+      i_b50 <- if (identical(transform, log10)) 10^res$i_b50 else res$i_b50
       list(
-        paste0("~~theta[I]==", signif(res$theta_I, 4)),
-        paste0("~~I[b][50]==", signif(I_b50, 4)),
+        paste0("~~theta[I]==", signif(res$theta_i, 4)),
+        paste0("~~I[b][50]==", signif(i_b50, 4)),
         paste0("~~sigma==", signif(res$sigma, 4)),
         paste0("~~R^2==", signif(res$PseudoR2, 3))
       )

@@ -33,16 +33,20 @@ speedTable <- function(df, groups, basis = 50) {
   df |>
     addFracDiff(groups) |>
     interpolateGermSpeed(groups, basis) |>
-    dplyr::mutate(GR = round(1 / Time, 6))
+    dplyr::mutate(GR = 1 / Time)
 }
 
 dataFor <- list(
-  ThermalTime = sampleGermData,
-  Hydrotime = sampleGermData,
-  HydrothermalTime = sampleGermData,
-  Aging = sampleAgingData,
-  Promoter = samplePromoterData,
-  Inhibitor = sampleInhibitorData
+  ThermalTime = sample_data$thermal_time$data,
+  Hydrotime = sample_data$hydrotime$data,
+  HydrothermalTime = sample_data$hydrothermal_time$data,
+  Aging = sample_data$aging$data,
+  Promoter = sample_data$promoter$data,
+  Inhibitor = sample_data$inhibitor$data
+)
+primingDataFor <- list(
+  Hydropriming = sample_data$hydropriming$data,
+  HydrothermalPriming = sample_data$hydrothermal_priming$data
 )
 
 cat("== CDF model plots ==\n")
@@ -70,13 +74,23 @@ for (nm in c("Promoter", "Inhibitor")) {
 }
 
 cat("== Rate model plots ==\n")
-for (nm in c("Hydropriming", "HydrothermalPriming")) {
+for (nm in names(primingDataFor)) {
   spec <- modelSpecs[[nm]]
-  df <- speedTable(samplePrimingData, spec$groups)
+  df <- speedTable(primingDataFor[[nm]], spec$groups)
   res <- fitSpec(spec, df)
   check(paste(nm, "fits"), is.list(res))
   p <- buildRatePlot(spec, df, res)
   check(paste(nm, "plot builds"), buildsClean(p))
+  # the fitted line must be drawn (it silently vanished when the plot looked up
+  # parameters under stale names)
+  abline <- which(vapply(p$layers, function(l) inherits(l$geom, "GeomAbline"), TRUE))
+  lineData <- if (length(abline) == 1) ggplot2::layer_data(p, abline)
+  check(
+    paste(nm, "plot draws the fitted line"),
+    !is.null(lineData) && nrow(lineData) == 1 &&
+      isTRUE(all.equal(lineData$slope, res$slope)) &&
+      isTRUE(all.equal(lineData$intercept, res$gr_i))
+  )
 }
 
 cat(sprintf("\n%s\n", strrep("-", 40)))

@@ -8,8 +8,8 @@ where `theta_ABA` is the ABA sensitivity time constant, `ABA_b(g)` is the base A
 
 The parameters calculated are:
 
-- `theta_I` = the inhibitor time constant, `theta_ABA` in this case
-- `I_b(50)` = the base inhibitor concentration (or `ABA_b(50)` for ABA)
+- `theta_i` = the inhibitor time constant, `theta_ABA` in this case
+- `i_b50` = the base inhibitor concentration (or `ABA_b(50)` for ABA)
 - `sigma` = the standard deviation of the `ABA_b(g)` distribution
 
 The graph shows the germination data along with the time courses for each concentration predicted by the model based upon the calculated parameters.

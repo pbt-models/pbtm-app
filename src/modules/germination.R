@@ -99,37 +99,7 @@ GerminationServer <- function(id = "germination", data, ready) {
       germSpeedData <- reactive({
         req(ready())
 
-        workingData() %>%
-          mutate(
-            MaxCumFrac = max(CumFraction),
-            .by = all_of(input$germSpeedTrts)
-          ) %>%
-          arrange(CumTime) %>%
-          summarise(
-            MaxCumFrac = max(MaxCumFrac),
-            FracDiff = sum(FracDiff),
-            .by = c(all_of(input$germSpeedTrts), CumTime)
-          ) %>%
-          mutate(
-            CumFraction = cumsum(FracDiff) / sum(FracDiff) * MaxCumFrac,
-            .by = all_of(input$germSpeedTrts)
-          ) %>%
-          group_by(across(all_of(input$germSpeedTrts))) %>%
-          arrange(CumTime) %>%
-          reframe(
-            {
-              approx(
-                CumFraction,
-                CumTime,
-                xout = rv$germSpeeds / 100,
-                ties = "ordered",
-                rule = 2
-              ) %>%
-                setNames(c("Frac", "Time")) %>%
-                as_tibble() %>%
-                drop_na()
-            }
-          )
+        interpolateGermSpeed(workingData(), input$germSpeedTrts, rv$germSpeeds)
       })
 
       # Event Reactives ----
@@ -265,21 +235,7 @@ GerminationServer <- function(id = "germination", data, ready) {
 
           # rescales cumulative fraction across retained treatments
           if (input$mergeTrts) {
-            df <- df %>%
-              mutate(
-                MaxCumFrac = max(CumFraction),
-                .by = any_of(trts)
-              ) %>%
-              arrange(CumTime) %>%
-              summarise(
-                MaxCumFrac = max(MaxCumFrac),
-                FracDiff = sum(FracDiff),
-                .by = c(all_of(trts), CumTime)
-              ) %>%
-              mutate(
-                CumFraction = cumsum(FracDiff) / sum(FracDiff) * MaxCumFrac,
-                .by = any_of(trts)
-              )
+            df <- rescaleCumFrac(df, trts)
           }
 
           # no color, no shape

@@ -306,7 +306,7 @@ buildRatePlot <- function(spec, df, model, interactive = FALSE) {
 
   plt <- plt +
     labs(title = cfg$fitTitle) +
-    geom_abline(intercept = model$GRi, slope = model$Slope, color = "blue")
+    geom_abline(intercept = model$gr_i, slope = model$slope, color = "blue")
   if (!interactive) {
     plt <- addParamsToPlot(plt, spec$annotate(model), ymax)
   }
