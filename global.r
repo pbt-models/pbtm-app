@@ -234,8 +234,8 @@ show_modal <- function(md) {
 
 # Germination speed ------------------------------------------------------------
 
-# Shared by the germination tab and the rate-based models (hydro / hydrothermal
-# priming), which previously each inlined this near-identical pipeline.
+# Germination speeds, rates, and curve pooling come from the pbtm package
+# (pbtm::germ_speed, pbtm::rescale_cum_frac); this parses the speed input.
 
 #' @description parses the comma-separated germ speed input, returns an ordered vector of numbers
 #' @param x a string to parse
@@ -258,66 +258,6 @@ parseSpeeds <- function(x) {
   return(parsed)
 }
 
-
-#' @description adds a per-group incremental fraction (FracDiff) column
-#' @param df data frame with CumTime, CumFraction
-#' @param groups character vector of grouping columns
-#' @returns df with FracDiff added, ungrouped
-addFracDiff <- function(df, groups) {
-  df %>%
-    group_by(across(all_of(groups))) %>%
-    arrange(across(all_of(groups)), CumTime, CumFraction) %>%
-    mutate(FracDiff = CumFraction - lag(CumFraction, default = 0)) %>%
-    ungroup()
-}
-
-
-#' @description pools germination curves within each group: sums the per-curve
-#'   increments (FracDiff) at each time and re-accumulates them, scaled to the
-#'   group's highest cumulative fraction (pbtm::rescale_cum_frac)
-#' @param df data frame that already has FracDiff (see addFracDiff)
-#' @param groups character vector of grouping columns (may be empty)
-#' @returns df with one row per group x CumTime and the pooled CumFraction
-rescaleCumFrac <- function(df, groups) {
-  df %>%
-    mutate(MaxCumFrac = max(CumFraction), .by = all_of(groups)) %>%
-    arrange(CumTime) %>%
-    summarise(
-      MaxCumFrac = max(MaxCumFrac),
-      FracDiff = sum(FracDiff),
-      .by = c(all_of(groups), CumTime)
-    ) %>%
-    mutate(
-      CumFraction = cumsum(FracDiff) / sum(FracDiff) * MaxCumFrac,
-      .by = all_of(groups)
-    )
-}
-
-
-#' @description rescales cumulative germination per group and interpolates the
-#'   time to reach each target fraction (the germination-speed table)
-#' @param df data frame that already has FracDiff (see addFracDiff)
-#' @param groups character vector of grouping columns
-#' @param fracs numeric vector of target germination percentages (0-100)
-#' @returns long tibble with one row per group x target fraction: Frac, Time
-interpolateGermSpeed <- function(df, groups, fracs) {
-  df %>%
-    rescaleCumFrac(groups) %>%
-    group_by(across(all_of(groups))) %>%
-    arrange(CumTime) %>%
-    reframe({
-      approx(
-        CumFraction,
-        CumTime,
-        xout = fracs / 100,
-        ties = "ordered",
-        rule = 2
-      ) %>%
-        setNames(c("Frac", "Time")) %>%
-        as_tibble() %>%
-        drop_na()
-    })
-}
 
 # Basic UI blocks --------------------------------------------------------------
 

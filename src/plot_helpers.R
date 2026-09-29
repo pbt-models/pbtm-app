@@ -64,73 +64,20 @@ addParamsToPlot <- function(gg, params, y) {
 # so they render identically in static ggplot and in ggplotly (which does not
 # evaluate stat_function on a fine grid).
 
-#' @description build predicted CDF curve data over a CumTime grid for each
-#'   unique combination of a model's factor levels
+#' @description predicted CDF curve data over a CumTime grid for each unique
+#'   combination of a model's factor levels (single fits and mixtures alike)
 #' @param spec a CDF model spec
 #' @param df the working data (provides factor levels and the time range)
-#' @param params named list of fitted/held parameter values
-#' @param maxFrac scalar max cumulative fraction
-#' @param transform dosage transform (identity or log10)
+#' @param fit a pbtm_fit
 #' @param n number of grid points
 #' @returns tibble with the factor columns, CumTime, and `pred`
-buildCdfCurveData <- function(
-  spec,
-  df,
-  params,
-  maxFrac,
-  transform = identity,
-  n = 200
-) {
+buildCdfCurveData <- function(spec, df, fit, n = 200) {
   combos <- distinct(df, across(all_of(spec$factors)))
   tmax <- max(df$CumTime, na.rm = TRUE)
   tseq <- seq(tmax / (n * 10), tmax * 1.05, length.out = n)
-  purrr::pmap_dfr(combos, function(...) {
-    row <- list(...)
-    nd <- tibble(CumTime = tseq)
-    for (f in spec$factors) {
-      nd[[f]] <- row[[f]]
-    }
-    nd$pred <- spec$predict(
-      nd,
-      params,
-      maxFrac = maxFrac,
-      transform = transform
-    )
-    nd
-  })
-}
-
-#' @description predicted combined-mixture curve data over a CumTime grid for
-#'   each factor-level combination (uses mixturePredict from fit-mixture.R)
-#' @param res mixture results list; @param k number of subpopulations
-buildMixtureCurveData <- function(
-  spec,
-  df,
-  res,
-  k,
-  maxFrac,
-  transform = identity,
-  n = 200
-) {
-  combos <- distinct(df, across(all_of(spec$factors)))
-  tmax <- max(df$CumTime, na.rm = TRUE)
-  tseq <- seq(tmax / (n * 10), tmax * 1.05, length.out = n)
-  purrr::pmap_dfr(combos, function(...) {
-    row <- list(...)
-    nd <- tibble(CumTime = tseq)
-    for (f in spec$factors) {
-      nd[[f]] <- row[[f]]
-    }
-    nd$pred <- mixturePredict(
-      spec,
-      nd,
-      res,
-      k,
-      maxFrac = maxFrac,
-      transform = transform
-    )
-    nd
-  })
+  grid <- tidyr::expand_grid(combos, CumTime = tseq)
+  grid$pred <- predict(fit, newdata = grid)
+  grid
 }
 
 
@@ -139,9 +86,8 @@ buildMixtureCurveData <- function(
 #' @description assemble the cumulative-germination plot for a CDF model
 #' @param spec a CDF model spec
 #' @param df working data
-#' @param model results list (rv$lastGoodModel) or NULL if no successful fit
+#' @param model pbtm_fit (rv$lastGoodModel) or NULL if no successful fit
 #' @param maxFrac scalar max cumulative fraction
-#' @param transform dosage transform
 #' @param interactive if TRUE, omit static-only plotmath annotations (added by
 #'   the caller as a caption instead) for ggplotly compatibility
 buildCdfPlot <- function(
@@ -149,7 +95,6 @@ buildCdfPlot <- function(
   df,
   model,
   maxFrac,
-  transform = identity,
   interactive = FALSE
 ) {
   cfg <- spec$plot
@@ -190,12 +135,8 @@ buildCdfPlot <- function(
     theme(plot.title = element_text(face = "bold", size = 14))
 
   if (is.list(model)) {
-    k <- model$k %||% 1
-    curve <- if (k > 1) {
-      buildMixtureCurveData(spec, df, model, k, maxFrac, transform)
-    } else {
-      buildCdfCurveData(spec, df, model, maxFrac, transform)
-    }
+    k <- model$k
+    curve <- buildCdfCurveData(spec, df, model)
     if (!is.null(cfg$lineTypeVar)) {
       plt <- plt +
         geom_line(
@@ -233,14 +174,18 @@ buildCdfPlot <- function(
       if (!interactive) {
         plt <- addParamsToPlot(
           plt,
-          list(sprintf("~~R^2==%.3f", model$PseudoR2)),
+          list(sprintf("~~R^2==%.3f", model$stats$pseudo_r2)),
           1
         )
       }
     } else {
       plt <- plt + labs(title = str_wrap(cfg$fitTitle, width = 60))
       if (!interactive) {
-        plt <- addParamsToPlot(plt, spec$annotate(model, transform), 1)
+        plt <- addParamsToPlot(
+          plt,
+          spec$annotate(fitValues(model), fitTransform(model)),
+          1
+        )
       }
     }
   }
@@ -250,8 +195,9 @@ buildCdfPlot <- function(
 
 #' @description assemble the germination-rate plot for a rate model
 #' @param spec a rate model spec
-#' @param df the germination-speed table (Frac, Time, factor columns)
-#' @param model results list (rv$lastGoodModel) or NULL
+#' @param df the germination-speed table (pbtm::germ_speed: factor columns,
+#'   Fraction, Time, GR)
+#' @param model pbtm_fit (rv$lastGoodModel) or NULL
 #' @param interactive if TRUE, omit static-only annotations
 buildRatePlot <- function(spec, df, model, interactive = FALSE) {
   cfg <- spec$plot
@@ -259,10 +205,11 @@ buildRatePlot <- function(spec, df, model, interactive = FALSE) {
     is.list(model),
     "Model results not yet available; adjust settings."
   ))
+  vals <- fitValues(model)
 
   df <- as_tibble(df)
-  df$.theta <- cfg$theta(df, model)
-  df$.gr <- 1 / df$Time
+  df$.theta <- spec$theta(df, vals)
+  df$.gr <- df$GR
   ymax <- max(df$.gr, na.rm = TRUE)
 
   plt <- ggplot(
@@ -306,9 +253,9 @@ buildRatePlot <- function(spec, df, model, interactive = FALSE) {
 
   plt <- plt +
     labs(title = cfg$fitTitle) +
-    geom_abline(intercept = model$gr_i, slope = model$slope, color = "blue")
+    geom_abline(intercept = vals$gr_i, slope = vals$slope, color = "blue")
   if (!interactive) {
-    plt <- addParamsToPlot(plt, spec$annotate(model), ymax)
+    plt <- addParamsToPlot(plt, spec$annotate(vals), ymax)
   }
 
   plt

@@ -83,23 +83,24 @@ GerminationServer <- function(id = "germination", data, ready) {
       })
 
       ## workingData ----
-      # slightly modified dataset used by plot and table
+      # time courses in order, used by plot and table
       workingData <- reactive({
         req(ready())
 
-        data() %>%
-          group_by(TrtID) %>%
-          arrange(TrtID, CumTime, CumFraction) %>%
-          mutate(FracDiff = CumFraction - lag(CumFraction, default = 0)) %>%
-          ungroup()
+        arrange(data(), TrtID, CumTime, CumFraction)
       })
 
       ## germSpeedData ----
-      # used by germination speed table
+      # time to each selected germination fraction (Fraction, Time, GR), pooled
+      # within the selected treatment groups; used by speed table and plot
       germSpeedData <- reactive({
         req(ready())
 
-        interpolateGermSpeed(workingData(), input$germSpeedTrts, rv$germSpeeds)
+        pbtm::germ_speed(
+          workingData(),
+          fractions = rv$germSpeeds / 100,
+          groups = input$germSpeedTrts %||% character()
+        )
       })
 
       # Event Reactives ----
@@ -235,7 +236,7 @@ GerminationServer <- function(id = "germination", data, ready) {
 
           # rescales cumulative fraction across retained treatments
           if (input$mergeTrts) {
-            df <- rescaleCumFrac(df, trts)
+            df <- pbtm::rescale_cum_frac(df, trts)
           }
 
           # no color, no shape
@@ -323,7 +324,7 @@ GerminationServer <- function(id = "germination", data, ready) {
             plt <- plt +
               geom_linerange(
                 data = germSpeedData(),
-                aes(x = Time, ymax = Frac),
+                aes(x = Time, ymax = Fraction),
                 inherit.aes = F,
                 ymin = 0,
                 color = "red",
@@ -331,7 +332,7 @@ GerminationServer <- function(id = "germination", data, ready) {
               ) +
               geom_point(
                 data = germSpeedData(),
-                aes(x = Time, y = Frac),
+                aes(x = Time, y = Fraction),
                 inherit.aes = F,
                 color = "red",
                 size = 2
@@ -363,22 +364,24 @@ GerminationServer <- function(id = "germination", data, ready) {
           # show as rate or cumulative fraction
           if (input$germSpeedType == "Rate") {
             germSpeedData() %>%
-              mutate(
-                Time = round(1 / Time, 6),
-                Frac = paste0("GR", Frac * 100)
+              transmute(
+                across(!c(Fraction, Time, GR)),
+                Fraction = paste0("GR", Fraction * 100),
+                GR = signif(GR, 4)
               ) %>%
               pivot_wider(
-                names_from = "Frac",
-                values_from = "Time"
+                names_from = "Fraction",
+                values_from = "GR"
               )
           } else {
             germSpeedData() %>%
-              mutate(
-                Frac = paste0("T", Frac * 100),
+              transmute(
+                across(!c(Fraction, Time, GR)),
+                Fraction = paste0("T", Fraction * 100),
                 Time = round(Time, 1)
               ) %>%
               pivot_wider(
-                names_from = "Frac",
+                names_from = "Fraction",
                 values_from = "Time"
               )
           }

@@ -1,9 +1,9 @@
-# Runtime check: fit every model (via the validated fitModel) and assemble its
-# plot (buildCdfPlot / buildRatePlot), forcing ggplot_build to surface any aes
-# or layer errors. This exercises the new data-first plotting for all 8 models,
-# including the two-factor (hydrothermal time), dosage-transform (promoter,
-# inhibitor) and rate (priming) variants. Run from project root:
-#   "C:/Program Files/R/R-4.5.3/bin/Rscript.exe" tests/runtime.R
+# Runtime check: fit every model on its sample dataset (via pbtm, through the
+# app's fitPbtm adapter) and assemble its plot (buildCdfPlot / buildRatePlot),
+# forcing ggplot_build to surface any aes or layer errors. Covers the
+# two-factor (hydrothermal time), dosage-transform (promoter, inhibitor) and
+# rate (priming) variants. Run from project root:
+#   "C:/Program Files/R/R-4.6.1/bin/Rscript.exe" tests/runtime.R
 
 suppressPackageStartupMessages(source("global.R"))
 
@@ -15,25 +15,6 @@ check <- function(label, cond) {
 buildsClean <- function(p) {
   inherits(p, "ggplot") &&
     !inherits(try(ggplot2::ggplot_build(p), silent = TRUE), "try-error")
-}
-
-# fit a spec on a data frame under default settings; returns results list
-fitSpec <- function(spec, df, maxFrac = 1, transform = identity) {
-  resolved <- resolveParams(
-    setNames(as.list(rep(NA, length(spec$params))), spec$paramNames),
-    spec$params
-  )
-  pred <- function(d, p) {
-    spec$predict(d, p, maxFrac = maxFrac, transform = transform)
-  }
-  fitModel(pred, df, resolved, spec$response)
-}
-
-speedTable <- function(df, groups, basis = 50) {
-  df |>
-    addFracDiff(groups) |>
-    interpolateGermSpeed(groups, basis) |>
-    dplyr::mutate(GR = 1 / Time)
 }
 
 dataFor <- list(
@@ -49,18 +30,27 @@ primingDataFor <- list(
   HydrothermalPriming = sample_data$hydrothermal_priming$data
 )
 
+cat("== Specs match pbtm ==\n")
+for (nm in names(modelSpecs)) {
+  spec <- modelSpecs[[nm]]
+  check(
+    paste(nm, "params match pbtm"),
+    identical(spec$paramNames, pbtm::pbtm_models(spec$pbtm)$param_names)
+  )
+}
+
 cat("== CDF model plots ==\n")
 for (nm in names(dataFor)) {
   spec <- modelSpecs[[nm]]
   df <- dataFor[[nm]]
-  res <- fitSpec(spec, df)
-  check(paste(nm, "fits"), is.list(res))
-  p <- buildCdfPlot(spec, df, res, 1, identity)
+  res <- fitPbtm(spec, df)
+  check(paste(nm, "fits"), inherits(res, "pbtm_fit"))
+  p <- buildCdfPlot(spec, df, res, 1)
   check(paste(nm, "plot builds (fitted)"), buildsClean(p))
   # also build with no model yet (points only)
   check(
     paste(nm, "plot builds (no fit)"),
-    buildsClean(buildCdfPlot(spec, df, NULL, 1, identity))
+    buildsClean(buildCdfPlot(spec, df, NULL, 1))
   )
 }
 
@@ -68,17 +58,25 @@ for (nm in names(dataFor)) {
 for (nm in c("Promoter", "Inhibitor")) {
   spec <- modelSpecs[[nm]]
   df <- dataFor[[nm]]
-  res <- fitSpec(spec, df, transform = log10)
-  p <- buildCdfPlot(spec, df, res, 1, log10)
+  res <- fitPbtm(spec, df, logDose = TRUE)
+  check(paste(nm, "fits (log transform)"), identical(res$dose_transform, "log10"))
+  p <- buildCdfPlot(spec, df, res, 1)
   check(paste(nm, "plot builds (log transform)"), buildsClean(p))
 }
+
+cat("== Fit problems are reported, not fatal ==\n")
+# promoter on the linear dose scale: theta_p runs into its upper bound
+res <- fitPbtm(modelSpecs$Promoter, dataFor$Promoter)
+check("bound warning captured", any(grepl("theta_p", res$warnings)))
+res <- fitPbtm(modelSpecs$Hydrotime, dataFor$ThermalTime)
+check("missing column gives an error string", is.character(res))
 
 cat("== Rate model plots ==\n")
 for (nm in names(primingDataFor)) {
   spec <- modelSpecs[[nm]]
-  df <- speedTable(primingDataFor[[nm]], spec$groups)
-  res <- fitSpec(spec, df)
-  check(paste(nm, "fits"), is.list(res))
+  df <- pbtm::germ_speed(primingDataFor[[nm]], 0.5, groups = spec$groups)
+  res <- fitPbtm(spec, df)
+  check(paste(nm, "fits"), inherits(res, "pbtm_fit"))
   p <- buildRatePlot(spec, df, res)
   check(paste(nm, "plot builds"), buildsClean(p))
   # the fitted line must be drawn (it silently vanished when the plot looked up
@@ -88,8 +86,8 @@ for (nm in names(primingDataFor)) {
   check(
     paste(nm, "plot draws the fitted line"),
     !is.null(lineData) && nrow(lineData) == 1 &&
-      isTRUE(all.equal(lineData$slope, res$slope)) &&
-      isTRUE(all.equal(lineData$intercept, res$gr_i))
+      isTRUE(all.equal(lineData$slope, coef(res)[["slope"]])) &&
+      isTRUE(all.equal(lineData$intercept, coef(res)[["gr_i"]]))
   )
 }
 

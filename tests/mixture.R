@@ -1,37 +1,11 @@
-# Synthetic-data check for the subpopulation mixture: build a hydrotime curve
-# from a known 2-component mixture, confirm detectSubpops prefers k = 2 and
-# recovers the two PsiB50 thresholds. Run from project root:
-#   "C:/Program Files/R/R-4.5.3/bin/Rscript.exe" tests/mixture.R
+# Subpopulation mixtures through the app: the fitting itself is tested in the
+# pbtm package; this checks the app's adapter, results table, and plot handle
+# mixture fits. Uses the two-subpopulation thermal time sample dataset. Run from
+# project root:
+#   "C:/Program Files/R/R-4.6.1/bin/Rscript.exe" tests/mixture.R
 
 suppressPackageStartupMessages(source("global.R"))
-set.seed(42)
-
-spec <- modelSpecs$Hydrotime
-
-# true mixture: two subpopulations differing in PsiB50
-trueW <- 0.6
-comp <- list(
-  list(theta_h = 60, psi_b50 = -0.5, sigma = 0.2),
-  list(theta_h = 60, psi_b50 = -1.5, sigma = 0.2)
-)
-grid <- expand.grid(
-  GermWP = c(0, -0.3, -0.6, -0.9, -1.2),
-  CumTime = seq(2, 60, by = 2)
-)
-mixFrac <- function(d) {
-  trueW *
-    spec$predict(d, comp[[1]], 1) +
-    (1 - trueW) * spec$predict(d, comp[[2]], 1)
-}
-df <- grid %>%
-  as_tibble() %>%
-  mutate(
-    TrtID = as.integer(factor(GermWP)),
-    CumFraction = pmin(
-      pmax(mixFrac(pick(everything())) + rnorm(n(), 0, 0.01), 0),
-      1
-    )
-  )
+library(shiny)
 
 ok <- TRUE
 chk <- function(lbl, cond) {
@@ -39,36 +13,36 @@ chk <- function(lbl, cond) {
   if (!isTRUE(cond)) ok <<- FALSE
 }
 
-det <- detectSubpops(spec, df, maxK = 3)
+spec <- modelSpecs$ThermalTime
+df <- sample_data$thermal_time_subpop$data
+
+single <- fitPbtm(spec, df)
+mix <- fitPbtm(spec, df, subpops = 2)
+auto <- fitPbtm(spec, df, subpops = "auto")
+
 cat("AIC comparison:\n")
-print(det$table)
+print(auto$subpop_table)
 
 # NOTE: PBT subpopulation mixtures are frequently *equifinal* — quite different
-# parameter sets fit the same time course nearly identically (the literature
-# debates which model to use; see md/subpopulations.md). So we validate that the
-# mixture machinery works and improves the fit, NOT exact parameter recovery.
-res1 <- det$fits[["1"]]
-res2 <- det$fits[["2"]]
+# parameter sets fit the same time course nearly identically (see
+# md/10-subpopulations.md). So we check that mixtures work and improve the fit,
+# not exact parameter recovery.
+chk("k=2 fits", inherits(mix, "pbtm_fit") && mix$k == 2)
+chk("mixture improves on single fit", mix$stats$aic < single$stats$aic)
+chk("auto-detect picks 2 subpopulations", auto$k == 2)
+chk("auto comparison table present", is.data.frame(auto$subpop_table))
+chk("weights sum to 1", abs(sum(mix$components$weight) - 1) < 1e-8)
 
-chk("k=2 fits", is.list(res2))
-chk("k=2 has high pseudo-R2", res2$PseudoR2 > 0.99)
-chk("mixture improves on single fit", res2$PseudoR2 > res1$PseudoR2 + 0.01)
-chk("auto-detect finds >1 subpopulation", det$bestK >= 2)
-chk("AIC table covers k = 1:3", setequal(det$table$k, 1:3))
-
-# weights form a valid simplex
-w <- mixtureWeights(res2, 2)
-chk("weights sum to 1", abs(sum(w) - 1) < 1e-8)
-chk("weights in [0,1]", all(w >= 0 & w <= 1))
-
-# the mixture prediction reconstructs the observed curve
-predMix <- mixturePredict(spec, df, res2, 2, 1, identity)
-chk("mixture reconstructs data", cor(df$CumFraction, predMix)^2 > 0.99)
-
-# single-population fit should match the ordinary non-mixture path
-single <- fitMixture(spec, df, 1)
-chk("k=1 is a list", is.list(single))
-chk("k=1 matches base PseudoR2", abs(single$PseudoR2 - res1$PseudoR2) < 1e-6)
+# results table and plot render for a mixture
+ui <- mixtureResultsWell(spec, auto)
+chk("mixture results well renders", inherits(ui, "shiny.tag.list"))
+p <- buildCdfPlot(spec, df, mix, 1)
+chk(
+  "mixture plot builds",
+  !inherits(try(ggplot2::ggplot_build(p), silent = TRUE), "try-error")
+)
+curve <- buildCdfCurveData(spec, df, mix)
+chk("mixture curve predictions in [0, 1]", all(curve$pred >= 0 & curve$pred <= 1))
 
 cat(sprintf("\n%s\n", strrep("-", 40)))
 if (ok) {

@@ -84,13 +84,22 @@ germSpeedSliderUI <- function(ns) {
   )
 }
 
-#' @description ui element showing model error if present
-#' @param results object from modelResults either list or string error
+#' @description ui element showing the model error, or the fit's warnings
+#'   (e.g. an estimate stuck on its bound), if any
+#' @param results object from modelResults: a pbtm_fit or a string error
 #' @returns a rendered UI element or nothing
 modelErrorUI <- function(results) {
   renderUI({
-    if (is.list(results())) {
-      return()
+    res <- results()
+    if (is.list(res)) {
+      if (length(res$warnings) == 0) {
+        return()
+      }
+      return(div(
+        class = "model-warning",
+        strong("Check this fit:"),
+        tags$ul(lapply(res$warnings, tags$li))
+      ))
     }
     div(
       class = "model-error",
@@ -106,7 +115,7 @@ modelErrorUI <- function(results) {
 #'   hold checkboxes. Returns UI (call inside a renderUI); only parameter rows
 #'   and the pseudo-R^2 are shown (mixture/stats fields like AIC are filtered).
 #' @param ns namespace function
-#' @param res a results list (params + PseudoR2, possibly extra stats)
+#' @param res a single-population pbtm_fit
 #' @param held named list of held-param flags
 #' @param paramNames fittable parameter names (these rows get a hold checkbox)
 singleResultsWell <- function(ns, res, held, paramNames) {
@@ -116,7 +125,7 @@ singleResultsWell <- function(ns, res, held, paramNames) {
     card_body(
       renderTable(
         {
-          res |>
+          fitValues(res) |>
             enframe() |>
             filter(name %in% c(paramNames, "PseudoR2")) |>
             unnest(value) |>
@@ -152,28 +161,29 @@ singleResultsWell <- function(ns, res, held, paramNames) {
 #'   per-subpopulation coefficients + mixing weight, the fit stats, and (when
 #'   provided) the AIC model-comparison table from auto-detect.
 #' @param spec the model spec
-#' @param res a mixture results list (componentParam names like Tb1, Tb2, ... + w*)
-#' @param k number of subpopulations
-#' @param aicTable optional comparison tibble (k, npar, PseudoR2, AIC, dAIC)
-mixtureResultsWell <- function(spec, res, k, aicTable = NULL) {
-  w <- mixtureWeights(res, k)
-  comp <- purrr::map_dfr(seq_len(k), function(j) {
-    vals <- lapply(spec$paramNames, function(nm) {
-      as.character(signif(res[[paste0(nm, j)]], 4))
-    })
-    tibble(Subpopulation = j) |>
-      bind_cols(as_tibble(setNames(vals, spec$paramNames))) |>
-      mutate(Weight = round(w[j], 3))
-  })
+#' @param res a mixture pbtm_fit: `res$components` has one row per
+#'   subpopulation; `res$subpop_table` (auto-detect only) compares k by AIC
+mixtureResultsWell <- function(spec, res) {
+  comp <- res$components |>
+    mutate(across(all_of(spec$paramNames), function(x) {
+      as.character(signif(x, 4))
+    })) |>
+    select(Subpopulation = component, all_of(spec$paramNames), weight) |>
+    mutate(Weight = round(weight, 3), .keep = "unused")
+  aicTable <- res$subpop_table
 
   tagList(
     card(
-      card_header(sprintf("Subpopulation coefficients (k = %d)", k)),
+      card_header(sprintf("Subpopulation coefficients (k = %d)", res$k)),
       card_body(
         renderTable(comp, width = "100%", hover = TRUE),
         div(
           class = "mt-2 text-muted",
-          sprintf("Pseudo-R² = %.3f    AIC = %.1f", res$PseudoR2, res$AIC)
+          sprintf(
+            "Pseudo-R² = %.3f    AIC = %.1f",
+            res$stats$pseudo_r2,
+            res$stats$aic
+          )
         )
       )
     ),
@@ -185,16 +195,16 @@ mixtureResultsWell <- function(spec, res, k, aicTable = NULL) {
             {
               aicTable |>
                 mutate(
-                  AIC = signif(AIC, 4),
-                  dAIC = signif(dAIC, 4),
-                  PseudoR2 = signif(PseudoR2, 3)
+                  aic = signif(aic, 4),
+                  delta_aic = signif(delta_aic, 4),
+                  pseudo_r2 = signif(pseudo_r2, 3)
                 ) |>
                 select(
                   `Subpops (k)` = k,
                   Parameters = npar,
-                  `Pseudo-R²` = PseudoR2,
-                  AIC,
-                  `ΔAIC` = dAIC
+                  `Pseudo-R²` = pseudo_r2,
+                  AIC = aic,
+                  `ΔAIC` = delta_aic
                 ) |>
                 mutate(across(where(is.numeric), as.character))
             },
@@ -274,25 +284,12 @@ modelServer <- function(id = spec$id, spec, data, ready) {
       rv <- reactiveValues(
         setParams = setNames(as.list(rep(NA, length(params))), params),
         heldParams = setNames(as.list(rep(FALSE, length(params))), params),
-        lastGoodModel = NULL,
-        subpopTable = NULL
+        lastGoodModel = NULL
       )
-
-      # dosage transform (promoter/inhibitor only); identity otherwise
-      transformFn <- reactive({
-        if (
-          !is.null(spec$transformCol) &&
-            identical(input$dataTransfSelect, "log")
-        ) {
-          log10
-        } else {
-          identity
-        }
-      })
 
       # Reactives ----
 
-      ## workingData: filtered (cdf) or fraction-differenced (rate) data
+      ## workingData: filtered time courses (cleaned and windowed for cdf)
       workingData <- reactive({
         req(ready())
         df <- data()
@@ -317,7 +314,7 @@ modelServer <- function(id = spec$id, spec, data, ready) {
         if (spec$family == "cdf") {
           req(input$dataCleanSelect, input$cumFracRange, input$maxCumFrac)
           if (input$dataCleanSelect == "clean") {
-            df <- distinct(df, TrtID, CumFraction, .keep_all = TRUE)
+            df <- pbtm::clean_germ_data(df)
           }
           df <- filter(
             df,
@@ -327,25 +324,23 @@ modelServer <- function(id = spec$id, spec, data, ready) {
               input$cumFracRange[2]
             )
           )
-        } else {
-          df <- addFracDiff(df, spec$groups)
         }
         df
       })
 
-      ## speedData: germination-rate table (rate models only)
+      ## speedData: germination-rate table (rate models only): time to the
+      ## chosen germination fraction and GR = 1 / time, per priming treatment
       speedData <- reactive({
         req(ready(), spec$family == "rate", input$germSpeedBasis)
         req(nrow(workingData()) > 0)
-        interpolateGermSpeed(
+        pbtm::germ_speed(
           workingData(),
-          spec$groups,
-          input$germSpeedBasis
-        ) %>%
-          mutate(GR = 1 / Time)
+          fractions = input$germSpeedBasis / 100,
+          groups = spec$groups
+        )
       })
 
-      ## data passed to the fit
+      ## data passed to the fit (rate models are fit to the speed table)
       fitData <- reactive({
         if (spec$family == "rate") speedData() else workingData()
       })
@@ -358,64 +353,32 @@ modelServer <- function(id = spec$id, spec, data, ready) {
         input$nSubpop %||% "1"
       })
 
-      ## fit: list(res = results-or-error, table = AIC comparison or NULL)
-      ## k = 1 keeps the single-population fit (honours user-pinned params);
-      ## k > 1 / auto run the subpopulation mixture.
-      fitObj <- reactive({
+      ## fit with pbtm: a pbtm_fit on success, an error string on failure.
+      ## k = 1 honours user-pinned params; k > 1 / auto fit a subpopulation
+      ## mixture (pinned params don't apply). Auto compares k = 1..3 by AIC.
+      modelResults <- reactive({
         req(ready())
         if (!is.null(spec$transformCol)) {
           req(input$dataTransfSelect)
         }
         req(nrow(fitData()) > 0)
 
-        maxFrac <- if (spec$family == "cdf") input$maxCumFrac / 100 else 1
-        tf <- transformFn()
         mode <- nSub()
-
-        if (identical(mode, "1")) {
-          resolved <- resolveParams(rv$setParams, spec$params)
-          pred <- function(d, p) {
-            spec$predict(d, p, maxFrac = maxFrac, transform = tf)
-          }
-          res <- fitModel(pred, fitData(), resolved, spec$response)
-          if (is.list(res)) {
-            res$k <- 1L
-          }
-          list(res = res, table = NULL)
-        } else if (identical(mode, "auto")) {
-          det <- detectSubpops(
-            spec,
-            fitData(),
-            maxK = 3,
-            maxFrac = maxFrac,
-            transform = tf
-          )
-          list(res = det$best, table = det$table)
-        } else {
-          kk <- as.integer(mode)
-          base <- fitMixture(spec, fitData(), 1, NULL, maxFrac, tf)
-          res <- fitMixture(
-            spec,
-            fitData(),
-            kk,
-            if (is.list(base)) base else NULL,
-            maxFrac,
-            tf
-          )
-          list(res = res, table = NULL)
-        }
+        fitPbtm(
+          spec,
+          fitData(),
+          maxFrac = if (spec$family == "cdf") input$maxCumFrac / 100 else 1,
+          logDose = identical(input$dataTransfSelect, "log"),
+          subpops = if (identical(mode, "auto")) "auto" else as.integer(mode),
+          fixed = if (identical(mode, "1")) rv$setParams
+        )
       })
-
-      modelResults <- reactive(fitObj()$res)
 
       # cache last successful fit; when a later fit fails, the results table and
       # plot keep showing this one and modelErrorUI notes that the displayed
       # coefficients are the last valid ones.
       observe({
-        if (is.list(fitObj()$res)) rv$lastGoodModel <- fitObj()$res
-      })
-      observe({
-        rv$subpopTable <- fitObj()$table
+        if (is.list(modelResults())) rv$lastGoodModel <- modelResults()
       })
 
       # Observers ----
@@ -436,7 +399,7 @@ modelServer <- function(id = spec$id, spec, data, ready) {
           rv$heldParams[[p]] <- held
           updateNumericInput(
             inputId = paste0(p, "-set"),
-            value = if (isTRUE(held)) rv$lastGoodModel[[p]] else ""
+            value = if (isTRUE(held)) coef(rv$lastGoodModel)[[p]] else ""
           )
         })
       })
@@ -568,9 +531,8 @@ modelServer <- function(id = spec$id, spec, data, ready) {
       output$modelResults <- renderUI({
         res <- rv$lastGoodModel
         validate(need(is.list(res), "No model results yet."))
-        k <- res$k %||% 1
-        if (k > 1) {
-          mixtureResultsWell(spec, res, k, rv$subpopTable)
+        if (res$k > 1) {
+          mixtureResultsWell(spec, res)
         } else {
           singleResultsWell(ns, res, rv$heldParams, params)
         }
@@ -585,7 +547,6 @@ modelServer <- function(id = spec$id, spec, data, ready) {
             workingData(),
             rv$lastGoodModel,
             input$maxCumFrac / 100,
-            transformFn(),
             interactive = interactive
           )
         } else {

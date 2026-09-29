@@ -38,7 +38,7 @@ testServer(
     check("dataSummary renders", grepl("data points", output$dataSummary))
 
     # pin Tb via the hold checkbox -> setParams updated, fit still succeeds
-    tbFit <- rv$lastGoodModel$t_b
+    tbFit <- coef(rv$lastGoodModel)[["t_b"]]
     session$setInputs(`t_b-set` = 5)
     check(
       "setParams captured",
@@ -46,7 +46,7 @@ testServer(
     )
     check(
       "fit with pinned Tb returns 5",
-      isTRUE(all.equal(modelResults()$t_b, 5))
+      isTRUE(all.equal(coef(modelResults())[["t_b"]], 5))
     )
 
     # restricting the fraction window keeps fewer rows
@@ -68,8 +68,7 @@ testServer(
             modelSpecs$ThermalTime,
             workingData(),
             rv$lastGoodModel,
-            1,
-            identity
+            1
           )),
           silent = TRUE
         ),
@@ -80,8 +79,7 @@ testServer(
             modelSpecs$ThermalTime,
             workingData(),
             rv$lastGoodModel,
-            1,
-            identity
+            1
           ),
           "ggplot"
         )
@@ -90,7 +88,7 @@ testServer(
     session$setInputs(nSubpop = "auto")
     ra <- modelResults()
     check("auto mixture fits", is.list(ra))
-    check("auto produces comparison table", is.data.frame(rv$subpopTable))
+    check("auto produces comparison table", is.data.frame(rv$lastGoodModel$subpop_table))
   }
 )
 
@@ -111,6 +109,7 @@ testServer(
     )
     check("speedData has rows", nrow(speedData()) > 0)
     check("GR column present", "GR" %in% names(speedData()))
+    check("fitted line params", all(c("gr_i", "slope") %in% names(coef(rv$lastGoodModel))))
     check("modelResults is list", is.list(modelResults()))
     check("lastGoodModel cached", is.list(rv$lastGoodModel))
   }
@@ -161,6 +160,9 @@ testServer(
       "germ static builds",
       !inherits(try(ggplot2::ggplot_build(p), silent = TRUE), "try-error")
     )
+    session$setInputs(germSpeedTrts = "GermTemp", mergeTrts = TRUE, showSpeeds = TRUE)
+    check("speed table has one row per temperature x speed", nrow(germSpeedData()) == 3 * length(rv$germSpeeds))
+    check("pooled + speeds plot builds", !inherits(try(ggplot2::ggplot_build(germPlot()), silent = TRUE), "try-error"))
     check(
       "germ ggplotly builds",
       !inherits(
