@@ -186,6 +186,22 @@ main {
   color: #8a0308;
 }
 
+/* non-fatal fit problems reported by pbtm (e.g. an estimate on its bound) */
+.model-warning {
+  border: 1px solid #b26a00;
+  border-radius: 4px;
+  background: rgba(178, 106, 0, 0.08);
+  padding: 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 15px;
+  color: #6b3f00;
+}
+
+.model-warning ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+}
+
 .well-title {
   margin-bottom: 0.25rem;
   font-weight: bold;

@@ -9,7 +9,7 @@ where `theta_GA` is the GA sensitivity time constant, `GA` is the GA concentrati
 The parameters calculated are:
 
 - `theta_p` = promoter time constant, or `theta_GA`
-- `P_b(50)` = base promoter concentration (or `GA_b(50)` for GA)
+- `p_b50` = base promoter concentration (or `GA_b(50)` for GA)
 - `sigma` = the standard deviation of the `GA_b(g)` distribution
 
 The graph shows the germination data along with the time courses for each concentration predicted by the model based upon the calculated parameters.

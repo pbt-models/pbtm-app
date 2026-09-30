@@ -1,66 +1,46 @@
 # ---- Model specifications ---- #
-# One spec per nls model. Everything that differs between the 8 model tabs lives
-# here; the shared behaviour lives in the model factory (model-module.R), the
-# fitting core (fit.R), and the plot helpers (plot-helpers.R). The `predict`
-# function is the single source of truth for each model: it is reused by the nls
-# fit, the fitted-curve overlay, the pseudo-R^2, and (for CDF models) the
-# subpopulation mixture.
+# One spec per model tab. The model itself (parameters, bounds, formula, fitting,
+# subpopulation mixtures) comes from the pbtm package, looked up by the spec's
+# `pbtm` id; a spec only holds what the app adds on top: UI labels, the docs
+# modal, plot styling, and the plotmath parameter annotations. The model
+# factory (src/modules/models.R) builds each tab from its spec.
 #
-# Two families:
-#   "cdf"  - fit CumFraction ~ maxFrac * pnorm(z); one curve per factor level.
-#   "rate" - first reduce to a germination-rate table, then fit GR ~ linear(theta).
-#
-# predict(data, p, maxFrac = 1, transform = identity) -> numeric vector
-#   data:      data frame with the predictor columns
-#   p:         named list of parameter values
-#   maxFrac:   scalar max cumulative fraction (ignored by rate models)
-#   transform: dosage transform for promoter/inhibitor ("none" = identity,
-#              "log" = log10); ignored by other models
+# Two families (from pbtm):
+#   "cdf"  - cumulative germination CumFraction ~ maxFrac * pnorm(...); one
+#            fitted curve per factor level.
+#   "rate" - germination rate GR (from a germination-speed table) linear in a
+#            priming time theta; fitted as a line.
 
-#' @description spec constructor with light validation / defaults
+#' @description spec constructor: UI config plus model metadata from pbtm
+#' @param pbtm the pbtm model id (see pbtm::pbtm_models())
 #' @param factorLabels named chr vector: checkbox-group label per factor column
-#' @param plot model-specific plotting config (see usage in model-module.R)
-#' @param annotate function(res) -> list of plotmath strings for the fit overlay
-modelSpec <- function(
-  label,
-  family,
-  factors,
-  factorLabels,
-  params,
-  predict,
-  annotate,
-  plot,
-  response = if (family == "rate") "GR" else "CumFraction",
-  groups = NULL,
-  transformCol = NULL,
-  subpop = FALSE,
-  subpopParam = NULL,
-  doc = NULL,
-  tabInfo = NULL
-) {
+#' @param annotate function(res, transform) -> list of plotmath strings for the
+#'   fit overlay; `res` is fitValues(fit)
+#' @param plot model-specific plotting config (see usage in plot_helpers.R)
+modelSpec <- function(label, pbtm, factorLabels, annotate, plot, doc = NULL) {
+  model <- pbtm::pbtm_models(pbtm)
   stopifnot(
-    family %in% c("cdf", "rate"),
-    is.function(predict),
-    is.function(annotate)
+    is.function(annotate),
+    setequal(names(factorLabels), model$factors)
   )
   list(
     label = label,
-    family = family,
-    factors = factors,
-    factorLabels = factorLabels,
-    params = params,
-    paramNames = names(params),
-    predict = predict,
+    pbtm = pbtm,
+    family = model$family,
+    factors = model$factors,
+    factorLabels = factorLabels[model$factors],
+    paramNames = model$param_names,
+    # rate models group the speed table by TrtID + the treatment factors
+    groups = model$groups,
+    transformCol = model$transform_col,
+    # every cumulative model can be fit as a mixture of subpopulations
+    subpop = model$family == "cdf",
+    # log-normal in time (thermal time): exactly linear on log time x probit
+    logNormal = isTRUE(model$normalized$log),
+    # rate models: the priming time on the plot's x axis, theta(data, params)
+    theta = model$theta,
     annotate = annotate,
     plot = plot,
-    response = response,
-    # rate models group the speed table by TrtID + the treatment factors
-    groups = groups %||% c("TrtID", factors),
-    transformCol = transformCol,
-    subpop = subpop,
-    # parameter that distinguishes subpopulations (the threshold / b50 param);
-    # the mixture fitter spreads starting values across components along it
-    subpopParam = subpopParam,
     doc = doc
   )
 }
@@ -74,25 +54,9 @@ modelSpecs <- list(
   ## 2. Thermal time ----
   ThermalTime = modelSpec(
     label = "Thermal time",
-    family = "cdf",
-    factors = "GermTemp",
+    pbtm = "thermal_time",
     factorLabels = c(GermTemp = "Included temperature levels:"),
-    subpop = TRUE,
-    subpopParam = "theta_t50",
     doc = model_docs$thermal_time,
-    params = list(
-      t_b = c(0, 6, 20),
-      theta_t50 = c(3, 1000, 5e19),
-      sigma = c(0.0005, 1, 35)
-    ),
-    predict = function(data, p, maxFrac = 1, transform = identity) {
-      maxFrac *
-        pnorm(
-          q = log10((data$GermTemp - p$t_b) * data$CumTime),
-          mean = log10(p$theta_t50),
-          sd = p$sigma
-        )
-    },
     annotate = function(res, transform = identity) {
       list(
         paste0("~~T[b]==", signif(res$t_b, 4)),
@@ -105,32 +69,17 @@ modelSpecs <- list(
       colorVar = "GermTemp",
       colorLab = "Temperature",
       legendReverse = TRUE,
-      fitTitle = "Cumulative germination and thermal time sub-optimal model fit"
+      fitTitle = "Cumulative germination and thermal time sub-optimal model fit",
+      normLab = "Thermal time, (T - Tb) × t"
     )
   ),
 
   ## 3. Hydrotime ----
   Hydrotime = modelSpec(
     label = "Hydrotime",
-    family = "cdf",
-    factors = "GermWP",
+    pbtm = "hydrotime",
     factorLabels = c(GermWP = "Included water potential levels:"),
-    subpop = TRUE,
-    subpopParam = "psi_b50",
     doc = model_docs$hydrotime,
-    params = list(
-      theta_h = c(1, 60, 1000),
-      psi_b50 = c(-5, -0.8, -1e-9),
-      sigma = c(1e-4, 0.2, 2)
-    ),
-    predict = function(data, p, maxFrac = 1, transform = identity) {
-      maxFrac *
-        pnorm(
-          q = data$GermWP - (p$theta_h / data$CumTime),
-          mean = p$psi_b50,
-          sd = p$sigma
-        )
-    },
     annotate = function(res, transform = identity) {
       list(
         paste0("~~theta~H==", signif(res$theta_h, 4)),
@@ -143,41 +92,24 @@ modelSpecs <- list(
       colorVar = "GermWP",
       colorLab = "Water potential",
       legendReverse = TRUE,
-      fitTitle = "Cumulative germination and hydrotime model fit"
+      fitTitle = "Cumulative germination and hydrotime model fit",
+      normLab = "Base water potential, ψ - θH / t"
     )
   ),
 
   ## 4. Hydrothermal time ----
   HydrothermalTime = modelSpec(
     label = "Hydrothermal time",
-    family = "cdf",
-    factors = c("GermWP", "GermTemp"),
+    pbtm = "hydrothermal_time",
     factorLabels = c(
       GermWP = "Included water potential levels:",
       GermTemp = "Included temperature levels:"
     ),
-    subpop = TRUE,
-    subpopParam = "psi_b50",
     doc = model_docs$hydrothermal_time,
-    params = list(
-      theta_ht = c(1, 800, 5000),
-      tb = c(0, 1, 15),
-      psi_b50 = c(-5, -1, 0),
-      sigma = c(.0001, .4, 10)
-    ),
-    predict = function(data, p, maxFrac = 1, transform = identity) {
-      maxFrac *
-        pnorm(
-          q = data$GermWP -
-            (p$theta_ht / ((data$GermTemp - p$tb) * data$CumTime)),
-          mean = p$psi_b50,
-          sd = p$sigma
-        )
-    },
     annotate = function(res, transform = identity) {
       list(
         paste0("~~theta[HT]==", signif(res$theta_ht, 4)),
-        paste0("~~T[b]==", signif(res$tb, 4)),
+        paste0("~~T[b]==", signif(res$t_b, 4)),
         paste0("~~psi[b][50]==", signif(res$psi_b50, 4)),
         paste0("~~sigma==", signif(res$sigma, 4)),
         paste0("~~R^2==", signif(res$PseudoR2, 3))
@@ -190,42 +122,28 @@ modelSpecs <- list(
       shapeLab = "Temperature",
       lineTypeVar = "GermTemp",
       legendReverse = TRUE,
-      fitTitle = "Cumulative germination and hydrothermal time model fit"
+      fitTitle = "Cumulative germination and hydrothermal time model fit",
+      normLab = "Base water potential, ψ - θHT / ((T - Tb) × t)"
     )
   ),
 
   ## 5. Hydropriming ----
   Hydropriming = modelSpec(
     label = "Hydropriming",
-    family = "rate",
-    factors = c("PrimingWP", "PrimingDuration"),
+    pbtm = "hydropriming",
     factorLabels = c(
       PrimingWP = "Included priming water potential levels:",
       PrimingDuration = "Included priming duration levels:"
     ),
-    groups = c("TrtID", "PrimingWP", "PrimingDuration"),
-    subpop = FALSE,
     doc = model_docs$hydropriming,
-    params = list(
-      psi_min = c(-10, -1, -0.5),
-      GR_i = c(1e-8, 0.001, 0.1),
-      slope = c(1e-8, 0.1, 1)
-    ),
-    predict = function(data, p, maxFrac = 1, transform = identity) {
-      theta <- (data$PrimingWP - p$psi_min) * data$PrimingDuration
-      p$GR_i + theta * p$slope
-    },
     annotate = function(res, transform = identity) {
       list(
         paste0("~~psi[min](50)==", signif(res$psi_min, 4)),
-        paste0("~~GR[i]==", signif(res$GR_i, 4)),
+        paste0("~~GR[i]==", signif(res$gr_i, 4)),
         paste0("~~R^2==", signif(res$PseudoR2, 3))
       )
     },
     plot = list(
-      theta = function(data, res) {
-        (data$PrimingWP - res$psi_min) * data$PrimingDuration
-      },
       xlab = "Hydropriming time",
       colorVar = "PrimingWP",
       colorLab = "Water potential",
@@ -240,42 +158,22 @@ modelSpecs <- list(
   ## 6. Hydrothermal priming ----
   HydrothermalPriming = modelSpec(
     label = "Hydrothermal priming",
-    family = "rate",
-    factors = c("PrimingTemp", "PrimingWP", "PrimingDuration"),
+    pbtm = "hydrothermal_priming",
     factorLabels = c(
       PrimingTemp = "Included priming temperature levels:",
       PrimingWP = "Included priming water potential levels:",
       PrimingDuration = "Included priming duration levels:"
     ),
-    groups = c("TrtID", "PrimingTemp", "PrimingWP", "PrimingDuration"),
-    subpop = FALSE,
     doc = model_docs$hydrothermal_priming,
-    params = list(
-      t_min = c(0.5, 12, 20),
-      psi_min = c(-10, -1, -0.5),
-      GR_i = c(1e-8, 0.001, 0.1),
-      slope = c(1e-8, 0.1, 1)
-    ),
-    predict = function(data, p, maxFrac = 1, transform = identity) {
-      theta <- (data$PrimingWP - p$psi_min) *
-        (data$PrimingTemp - p$t_min) *
-        data$PrimingDuration
-      p$GR_i + theta * p$slope
-    },
     annotate = function(res, transform = identity) {
       list(
         paste0("~~t[min]==", signif(res$t_min, 4)),
         paste0("~~psi[min](50)==", signif(res$psi_min, 4)),
-        paste0("~~GR[i]==", signif(res$GR_i, 4)),
+        paste0("~~GR[i]==", signif(res$gr_i, 4)),
         paste0("~~R^2==", signif(res$PseudoR2, 3))
       )
     },
     plot = list(
-      theta = function(data, res) {
-        (data$PrimingWP - res$psi_min) *
-          (data$PrimingTemp - res$t_min) *
-          data$PrimingDuration
-      },
       xlab = "Hydrothermal priming time",
       colorVar = "PrimingWP",
       colorLab = "Water potential",
@@ -291,26 +189,9 @@ modelSpecs <- list(
   ## 7. Aging ----
   Aging = modelSpec(
     label = "Aging",
-    family = "cdf",
-    factors = "AgingTime",
+    pbtm = "aging",
     factorLabels = c(AgingTime = "Included aging times:"),
-    subpop = TRUE,
-    subpopParam = "p_max50",
     doc = model_docs$aging,
-    params = list(
-      theta_a = c(1, 100, 1000),
-      p_max50 = c(1, 10, 1000),
-      sigma = c(0.1, 3, 10)
-    ),
-    predict = function(data, p, maxFrac = 1, transform = identity) {
-      maxFrac *
-        pnorm(
-          q = data$AgingTime + p$theta_a / data$CumTime,
-          mean = p$p_max50,
-          sd = p$sigma,
-          lower.tail = FALSE
-        )
-    },
     annotate = function(res, transform = identity) {
       list(
         paste0("~~theta~Age==", signif(res$theta_a, 4)),
@@ -323,33 +204,17 @@ modelSpecs <- list(
       colorVar = "AgingTime",
       colorLab = "Aging time",
       legendReverse = FALSE,
-      fitTitle = "Cumulative germination and aging model fit"
+      fitTitle = "Cumulative germination and aging model fit",
+      normLab = "Aging threshold, aging time + θAge / t"
     )
   ),
 
   ## 8. Promoter ----
   Promoter = modelSpec(
     label = "Promoter",
-    family = "cdf",
-    factors = "GermPromoterDosage",
+    pbtm = "promoter",
     factorLabels = c(GermPromoterDosage = "Included promoter dosages:"),
-    transformCol = "GermPromoterDosage",
-    subpop = TRUE,
-    subpopParam = "p_b50",
     doc = model_docs$promoters,
-    params = list(
-      theta_p = c(1, 200, 1000),
-      p_b50 = c(0.05, 5, 1000),
-      sigma = c(.001, 3, 10)
-    ),
-    predict = function(data, p, maxFrac = 1, transform = identity) {
-      maxFrac *
-        pnorm(
-          q = transform(data$GermPromoterDosage) - p$theta_p / data$CumTime,
-          mean = p$p_b50,
-          sd = p$sigma
-        )
-    },
     annotate = function(res, transform = identity) {
       # p_b50 is in log10 units only when the log dosage transform is applied;
       # back-transform for display in that case, otherwise show it as-is
@@ -365,39 +230,22 @@ modelSpecs <- list(
       colorVar = "GermPromoterDosage",
       colorLab = "Promoter dosage",
       legendReverse = FALSE,
-      fitTitle = "Cumulative germination and promoter model fit"
+      fitTitle = "Cumulative germination and promoter model fit",
+      normLab = "Promoter threshold, dose - θP / t"
     )
   ),
 
   ## 9. Inhibitor ----
   Inhibitor = modelSpec(
     label = "Inhibitor",
-    family = "cdf",
-    factors = "GermInhibitorDosage",
+    pbtm = "inhibitor",
     factorLabels = c(GermInhibitorDosage = "Included inhibitor dosages:"),
-    transformCol = "GermInhibitorDosage",
-    subpop = TRUE,
-    subpopParam = "I_b50",
     doc = model_docs$inhibitors,
-    params = list(
-      theta_I = c(1, 100, 1000),
-      I_b50 = c(0.05, 10, 1000),
-      sigma = c(.001, 3, 10)
-    ),
-    predict = function(data, p, maxFrac = 1, transform = identity) {
-      maxFrac *
-        pnorm(
-          q = transform(data$GermInhibitorDosage) + p$theta_I / data$CumTime,
-          mean = p$I_b50,
-          sd = p$sigma,
-          lower.tail = FALSE
-        )
-    },
     annotate = function(res, transform = identity) {
-      I_b50 <- if (identical(transform, log10)) 10^res$I_b50 else res$I_b50
+      i_b50 <- if (identical(transform, log10)) 10^res$i_b50 else res$i_b50
       list(
-        paste0("~~theta[I]==", signif(res$theta_I, 4)),
-        paste0("~~I[b][50]==", signif(I_b50, 4)),
+        paste0("~~theta[I]==", signif(res$theta_i, 4)),
+        paste0("~~I[b][50]==", signif(i_b50, 4)),
         paste0("~~sigma==", signif(res$sigma, 4)),
         paste0("~~R^2==", signif(res$PseudoR2, 3))
       )
@@ -406,7 +254,8 @@ modelSpecs <- list(
       colorVar = "GermInhibitorDosage",
       colorLab = "Inhibitor dosage",
       legendReverse = FALSE,
-      fitTitle = "Cumulative germination and inhibitor model fit"
+      fitTitle = "Cumulative germination and inhibitor model fit",
+      normLab = "Inhibitor threshold, dose + θI / t"
     )
   )
 )
