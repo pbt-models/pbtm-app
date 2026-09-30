@@ -35,6 +35,8 @@ modelSpec <- function(label, pbtm, factorLabels, annotate, plot, doc = NULL) {
     transformCol = model$transform_col,
     # every cumulative model can be fit as a mixture of subpopulations
     subpop = model$family == "cdf",
+    # log-normal in time (thermal time): exactly linear on log time x probit
+    logNormal = isTRUE(model$normalized$log),
     # rate models: the priming time on the plot's x axis, theta(data, params)
     theta = model$theta,
     annotate = annotate,
@@ -67,7 +69,8 @@ modelSpecs <- list(
       colorVar = "GermTemp",
       colorLab = "Temperature",
       legendReverse = TRUE,
-      fitTitle = "Cumulative germination and thermal time sub-optimal model fit"
+      fitTitle = "Cumulative germination and thermal time sub-optimal model fit",
+      normLab = "Thermal time, (T - Tb) × t"
     )
   ),
 
@@ -89,7 +92,8 @@ modelSpecs <- list(
       colorVar = "GermWP",
       colorLab = "Water potential",
       legendReverse = TRUE,
-      fitTitle = "Cumulative germination and hydrotime model fit"
+      fitTitle = "Cumulative germination and hydrotime model fit",
+      normLab = "Base water potential, ψ - θH / t"
     )
   ),
 
@@ -118,7 +122,8 @@ modelSpecs <- list(
       shapeLab = "Temperature",
       lineTypeVar = "GermTemp",
       legendReverse = TRUE,
-      fitTitle = "Cumulative germination and hydrothermal time model fit"
+      fitTitle = "Cumulative germination and hydrothermal time model fit",
+      normLab = "Base water potential, ψ - θHT / ((T - Tb) × t)"
     )
   ),
 
@@ -199,7 +204,8 @@ modelSpecs <- list(
       colorVar = "AgingTime",
       colorLab = "Aging time",
       legendReverse = FALSE,
-      fitTitle = "Cumulative germination and aging model fit"
+      fitTitle = "Cumulative germination and aging model fit",
+      normLab = "Aging threshold, aging time + θAge / t"
     )
   ),
 
@@ -224,7 +230,8 @@ modelSpecs <- list(
       colorVar = "GermPromoterDosage",
       colorLab = "Promoter dosage",
       legendReverse = FALSE,
-      fitTitle = "Cumulative germination and promoter model fit"
+      fitTitle = "Cumulative germination and promoter model fit",
+      normLab = "Promoter threshold, dose - θP / t"
     )
   ),
 
@@ -247,7 +254,8 @@ modelSpecs <- list(
       colorVar = "GermInhibitorDosage",
       colorLab = "Inhibitor dosage",
       legendReverse = FALSE,
-      fitTitle = "Cumulative germination and inhibitor model fit"
+      fitTitle = "Cumulative germination and inhibitor model fit",
+      normLab = "Inhibitor threshold, dose + θI / t"
     )
   )
 )

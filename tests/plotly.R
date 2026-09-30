@@ -39,6 +39,30 @@ chk(
     interactive = TRUE
   )
 )
+chk(
+  "ThermalTime log/probit ggplotly",
+  buildCdfPlot(
+    spec,
+    sampleThermData,
+    fitPbtm(spec, sampleThermData),
+    0.9,
+    interactive = TRUE,
+    xScale = "log",
+    yScale = "probit"
+  )
+)
+chk(
+  "ThermalTime normalized ggplotly",
+  buildNormalizedPlot(
+    spec,
+    sampleThermData,
+    fitPbtm(spec, sampleThermData),
+    0.9,
+    interactive = TRUE,
+    xScale = "log",
+    yScale = "probit"
+  )
+)
 spec <- modelSpecs$HydrothermalTime
 chk(
   "HydrothermalTime ggplotly",

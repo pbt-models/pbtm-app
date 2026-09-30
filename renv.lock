@@ -2695,12 +2695,13 @@
       "Source": "GitHub",
       "Type": "Package",
       "Title": "Population-Based Threshold Models of Seed Germination",
-      "Authors@R": "c( person(\"Pedro\", \"Bello\", email = \"pedrobello@gmail.com\", role = \"cre\"), person(\"Ben\", \"Bradford\", email = \"bradfordium@gmail.com\", role = \"aut\"))",
-      "Description": "Fits population-based threshold models (PBTMs) to seed germination time courses. Supports thermal time, hydrotime, hydrothermal time, hydropriming, hydrothermal priming, aging, promoter and inhibitor models, optional mixtures of seed subpopulations, germination speed calculations, and plots of the fitted models on linear or linearized (log time, probit fraction) scales.",
+      "Authors@R": "c( person(\"Pedro\", \"Bello\", email = \"pedrobello@gmail.com\", role = c(\"aut\", \"cre\")), person(\"Ben\", \"Bradford\", email = \"bradfordium@gmail.com\", role = \"aut\"))",
+      "Description": "Fits population-based threshold models (PBTMs) to seed germination time courses, as described by Bradford and Bello (2022) <doi:10.19103/AS.2022.0105.05>. Supports thermal time, hydrotime, hydrothermal time, hydropriming, hydrothermal priming, aging, promoter and inhibitor models, optional mixtures of seed subpopulations, germination speed calculations, and plots of the fitted models on linear or linearized (log time, probit fraction) scales.",
       "License": "MIT + file LICENSE",
-      "URL": "https://github.com/pbt-models/pbtm",
+      "URL": "https://pbt-models.github.io/pbtm/, https://github.com/pbt-models/pbtm",
       "BugReports": "https://github.com/pbt-models/pbtm/issues",
       "Encoding": "UTF-8",
+      "Language": "en-US",
       "Roxygen": "list(markdown = TRUE)",
       "Depends": [
         "R (>= 4.1.0)"
@@ -2725,14 +2726,14 @@
       "Config/testthat/edition": "3",
       "LazyData": "true",
       "Config/roxygen2/version": "8.1.0",
-      "Author": "Pedro Bello [cre], Ben Bradford [aut]",
+      "Author": "Pedro Bello [aut, cre], Ben Bradford [aut]",
       "Maintainer": "Pedro Bello <pedrobello@gmail.com>",
       "RemoteType": "github",
       "RemoteHost": "api.github.com",
       "RemoteUsername": "pbt-models",
       "RemoteRepo": "pbtm",
-      "RemoteRef": "feature/v0.3.0",
-      "RemoteSha": "21c59e841bba91e9f1f93012aa1b6e17dded93c2"
+      "RemoteRef": "main",
+      "RemoteSha": "8e632dba856b43c7508b796f16b911ed5b114150"
     },
     "pillar": {
       "Package": "pillar",

@@ -217,6 +217,64 @@ mixtureResultsWell <- function(spec, res) {
   )
 }
 
+#' @description plot type and axis scale options for CDF model tabs. A log
+#'   time axis with a probit fraction axis linearizes the fitted probit curves;
+#'   the normalized plot collapses all treatments onto one population line.
+#' @param ns namespace function from calling server
+#' @param logNormal TRUE if the model is log-normal in time (thermal time):
+#'   its time-course curves become exactly straight on log/probit axes, and its
+#'   normalized (thermal time) axis can also be log scale
+plotScalesUI <- function(ns, logNormal = FALSE) {
+  isTime <- sprintf("input['%s'] == 'time'", ns("plotType"))
+  isNorm <- sprintf("input['%s'] == 'normalized'", ns("plotType"))
+  xScaleInput <- radioButtons(
+    ns("xScale"),
+    label = if (logNormal) "Time / thermal time axis:" else "Time axis:",
+    choices = c("Linear" = "linear", "Log" = "log"),
+    selected = "linear",
+    inline = TRUE
+  )
+  controlSection(
+    title = "Plot options",
+    radioButtons(
+      ns("plotType"),
+      label = "Plot:",
+      choices = c("Time course" = "time", "Normalized" = "normalized"),
+      selected = "time",
+      inline = TRUE
+    ),
+    # the normalized axis is a threshold that can be negative, except for
+    # log-normal models (thermal time), so only they keep the log option there
+    if (logNormal) xScaleInput else conditionalPanel(isTime, xScaleInput),
+    radioButtons(
+      ns("yScale"),
+      label = "Germination axis:",
+      choices = c("Linear" = "linear", "Probit" = "probit"),
+      selected = "linear",
+      inline = TRUE
+    ),
+    conditionalPanel(
+      isTime,
+      em(
+        if (logNormal) {
+          "Log time with a probit axis turns each fitted curve into a straight line, since thermal time is log-normally distributed."
+        } else {
+          "A probit axis with log time straightens the fitted curves approximately. This model is normal in its threshold variable (not in log time), so some curvature remains; the normalized plot straightens it exactly."
+        }
+      )
+    ),
+    conditionalPanel(
+      isNorm,
+      em(
+        "Each observation is placed on the model's threshold axis using the fitted parameters, so all treatments collapse onto one population curve: a straight line on a probit axis. The dashed line marks the population median. Single-population fits only."
+      )
+    ),
+    em(
+      " On a probit axis germination is shown relative to the maximum germination set above, and points at 0% or 100% are omitted."
+    )
+  )
+}
+
 #' @description a shared ui component
 #' @param ns namespace function from calling server
 #' @param params vector of param names
@@ -478,22 +536,33 @@ modelServer <- function(id = spec$id, spec, data, ready) {
             width = 360,
             open = "open",
             accordion(
-              open = c("Data", "Parameters", "Subpopulations"),
+              open = c("plot", "data"),
+              if (spec$family == "cdf") {
+                accordion_panel(
+                  "Plot Options",
+                  value = "plot",
+                  icon = icon("chart-line"),
+                  plotScalesUI(ns, spec$logNormal)
+                )
+              },
               accordion_panel(
-                "Data",
+                "Data Selection",
+                value = "data",
                 icon = icon("table"),
                 controlSection(title = "Data input options", dataOpts),
                 rightCol,
                 trtSelectUI(ns, otherTrtCols, reactive(data()))
               ),
               accordion_panel(
-                "Parameters",
+                "Model Parameters",
+                value = "params",
                 icon = icon("sliders"),
                 setParamsUI(ns, params)
               ),
               if (isTRUE(spec$subpop)) {
                 accordion_panel(
-                  "Subpopulations",
+                  "Subpopulation Fitting",
+                  value = "subpops",
                   icon = icon("buffer"),
                   subpopSection
                 )
@@ -542,12 +611,19 @@ modelServer <- function(id = spec$id, spec, data, ready) {
       ## plot (shared builder; interactive flag drops static-only plotmath)
       buildPlot <- function(interactive) {
         if (spec$family == "cdf") {
-          buildCdfPlot(
+          builder <- if (identical(input$plotType, "normalized")) {
+            buildNormalizedPlot
+          } else {
+            buildCdfPlot
+          }
+          builder(
             spec,
             workingData(),
             rv$lastGoodModel,
             input$maxCumFrac / 100,
-            interactive = interactive
+            interactive = interactive,
+            xScale = input$xScale %||% "linear",
+            yScale = input$yScale %||% "linear"
           )
         } else {
           buildRatePlot(

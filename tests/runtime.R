@@ -52,7 +52,71 @@ for (nm in names(dataFor)) {
     paste(nm, "plot builds (no fit)"),
     buildsClean(buildCdfPlot(spec, df, NULL, 1))
   )
+  # linearizing axes, including a max germination below 100%
+  for (sc in list(c("log", "linear"), c("linear", "probit"), c("log", "probit"))) {
+    p <- buildCdfPlot(spec, df, res, 0.9, xScale = sc[1], yScale = sc[2])
+    check(
+      sprintf("%s plot builds (%s time, %s fraction)", nm, sc[1], sc[2]),
+      buildsClean(p)
+    )
+  }
 }
+
+cat("== Probit axis linearizes thermal time ==\n")
+# on log time x probit, each temperature's fitted curve is a straight line
+spec <- modelSpecs$ThermalTime
+df <- dataFor$ThermalTime
+res <- fitPbtm(spec, df)
+curve <- ggplot2::layer_data(
+  buildCdfPlot(spec, df, res, 1, xScale = "log", yScale = "probit"),
+  2 # points, then the fitted curves (no max-germination band on probit)
+)
+straight <- vapply(split(curve, curve$group), function(g) {
+  summary(lm(y ~ x, data = g))$r.squared > 0.9999
+}, logical(1))
+check("thermal time curves are straight on log/probit axes", all(straight))
+
+cat("== Normalized plots ==\n")
+# every treatment collapses onto one population line, straight on probit
+# (log thermal time for thermal time; the threshold axis itself otherwise)
+for (nm in names(dataFor)) {
+  spec <- modelSpecs[[nm]]
+  df <- dataFor[[nm]]
+  res <- fitPbtm(spec, df, logDose = nm %in% c("Promoter", "Inhibitor"))
+  for (sc in list(c("linear", "linear"), c("linear", "probit"), c("log", "probit"))) {
+    p <- buildNormalizedPlot(spec, df, res, 0.9, xScale = sc[1], yScale = sc[2])
+    check(
+      sprintf("%s normalized plot builds (%s x, %s fraction)", nm, sc[1], sc[2]),
+      buildsClean(p)
+    )
+  }
+  line <- ggplot2::layer_data(
+    buildNormalizedPlot(spec, df, res, 1, xScale = "log", yScale = "probit"),
+    2 # median line, then the population curve
+  )
+  check(
+    paste(nm, "normalized curve is straight on probit"),
+    summary(lm(y ~ x, data = line))$r.squared > 0.9999
+  )
+}
+mix <- fitPbtm(
+  modelSpecs$ThermalTime,
+  sample_data$thermal_time_subpop$data,
+  subpops = 2
+)
+msg <- tryCatch(
+  buildNormalizedPlot(
+    modelSpecs$ThermalTime,
+    sample_data$thermal_time_subpop$data,
+    mix,
+    1
+  ),
+  error = conditionMessage
+)
+check(
+  "normalized plot explains it needs a single population",
+  is.character(msg) && grepl("single-population", msg)
+)
 
 # promoter/inhibitor with log transform
 for (nm in c("Promoter", "Inhibitor")) {

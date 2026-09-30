@@ -23,6 +23,8 @@ suppressPackageStartupMessages({
 options(shiny.fullstacktrace = FALSE)
 
 if (FALSE) {
+  renv::install("pbt-models/pbtm")
+
   shiny::runApp() + shiny::devmode()
 
   renv::init() # initiate renv if not already
